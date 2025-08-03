@@ -51,6 +51,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const [result, setResult] = React.useState<AppreciationResultType | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isGenerateClicked, setIsGenerateClicked] = React.useState(false);
+  const [tag, setTag] = React.useState('');
+  const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(appreciationSchema),
@@ -67,6 +70,39 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
   const { register, control, handleSubmit, watch, setValue, reset } = form;
   const selectedSubject = watch('subject');
+
+  const saveAppreciation = React.useCallback(
+    async (tagValue: string, generated?: AppreciationResultType) => {
+      if (!user) return;
+      const dataToSave = generated || result;
+      if (!dataToSave) return;
+      setSaveError(null);
+      setSaveSuccess(null);
+      try {
+        const { error: insertError } = await supabase.from('appreciations').insert({
+          user_id: user.id,
+          detailed: dataToSave.detailed,
+          summary: dataToSave.summary,
+          tag: tagValue,
+          created_at: new Date().toISOString(),
+        });
+        if (insertError) throw insertError;
+        setSaveSuccess('Appréciation sauvegardée avec succès.');
+      } catch (err) {
+        console.error("Erreur lors de l'enregistrement de l'appréciation:", err);
+        setSaveError("Erreur lors de l'enregistrement de l'appréciation.");
+      }
+    },
+    [user, result]
+  );
+
+  const handleTagChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    setTag(value);
+    if (result) {
+      await saveAppreciation(value);
+    }
+  };
 
   const fetchSubjects = React.useCallback(async () => {
     if (!user) return;
@@ -177,9 +213,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
       // Notifier la mise à jour des tokens
       tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
-      
+
       onTokensUpdated?.();
       setResult(generatedResult);
+      if (tag) {
+        await saveAppreciation(tag, generatedResult);
+      }
     } catch (error: any) {
       console.error('Erreur lors de la génération:', error);
       setError(error.message || 'Une erreur est survenue lors de la génération. Veuillez réessayer.');
@@ -193,6 +232,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
     setResult(null);
     setError(null);
     setIsGenerateClicked(false);
+    setTag('');
+    setSaveError(null);
+    setSaveSuccess(null);
   };
 
   return (
@@ -368,7 +410,38 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
         </div>
       </form>
 
-      {result && <AppreciationResult detailed={result.detailed} summary={result.summary} />}
+      {result && (
+        <>
+          <AppreciationResult detailed={result.detailed} summary={result.summary} />
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                Tag
+              </label>
+              <select
+                value={tag}
+                onChange={handleTagChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="">Sélectionnez un tag</option>
+                <option value="positif">Positif</option>
+                <option value="neutre">Neutre</option>
+                <option value="negatif">Négatif</option>
+              </select>
+            </div>
+            {saveError && (
+              <div className="rounded-md bg-red-50 p-4">
+                <div className="text-sm text-red-700">{saveError}</div>
+              </div>
+            )}
+            {saveSuccess && (
+              <div className="rounded-md bg-green-50 p-4">
+                <div className="text-sm text-green-700">{saveSuccess}</div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
