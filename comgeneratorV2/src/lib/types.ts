@@ -23,6 +23,8 @@ export interface AppreciationResult {
 
 export type AppreciationTone = 'bienveillant' | 'normal' | 'severe';
 
+export type AppreciationTag = 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
+
 export interface AppreciationFormFields {
   subject: string;
   studentName: string;
@@ -36,6 +38,14 @@ export interface AppreciationFormFields {
   minLength: number;
   maxLength: number;
   tone: AppreciationTone;
+}
+
+export interface SavedAppreciation {
+  id: string;
+  detailed: string;
+  summary: string;
+  tag: AppreciationTag;
+  createdAt: string;
 }
 
 export interface Article {
