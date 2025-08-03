@@ -103,27 +103,32 @@ export interface Database {
       };
       appreciations: {
         Row: {
+          id: string;
           user_id: string;
           detailed: string;
           summary: string;
-          tag: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at: string;
         };
         Insert: {
+          id?: string;
           user_id: string;
           detailed: string;
           summary: string;
-          tag: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at?: string;
         };
         Update: {
+          id?: string;
           user_id?: string;
           detailed?: string;
           summary?: string;
-          tag?: string;
+          tag?: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at?: string;
         };
       };
     };
   };
 }
+
+

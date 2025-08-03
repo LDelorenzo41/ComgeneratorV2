@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { BuyTokensPage } from './pages/BuyTokensPage';
+import { AppreciationBankPage } from './pages/AppreciationBankPage';
 import { LandingPage } from './pages/LandingPage';
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -110,6 +111,7 @@ function App() {
               <Route path="/communication" element={<CommunicationPage />} />
               <Route path="/resources" element={<ResourcesPage />} />
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
+              <Route path="/my-appreciations" element={<AppreciationBankPage />} />
             </Route>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           </Routes>

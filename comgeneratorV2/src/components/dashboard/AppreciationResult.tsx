@@ -1,5 +1,7 @@
 import React from 'react';
 import { Copy, Check } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../lib/store';
 
 interface AppreciationResultProps {
   detailed: string;
@@ -9,6 +11,10 @@ interface AppreciationResultProps {
 export function AppreciationResult({ detailed, summary }: AppreciationResultProps) {
   const [copiedDetailed, setCopiedDetailed] = React.useState(false);
   const [copiedSummary, setCopiedSummary] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [selectedTag, setSelectedTag] = React.useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const { user } = useAuthStore();
 
   const copyToClipboard = async (text: string, type: 'detailed' | 'summary') => {
     try {
@@ -22,6 +28,37 @@ export function AppreciationResult({ detailed, summary }: AppreciationResultProp
       }
     } catch (err) {
       console.error('Erreur lors de la copie:', err);
+    }
+  };
+
+  const handleTagClick = () => {
+    if (!user) return;
+    setMenuOpen((prev) => !prev);
+  };
+
+  const handleSelectTag = (tag: string) => {
+    setSelectedTag(tag);
+    setMenuOpen(false);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!user || !selectedTag) return;
+    try {
+      const { error } = await supabase.from('appreciations').insert({
+        user_id: user.id,
+        detailed,
+        summary,
+        tag: selectedTag,
+      });
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement de l\'appréciation:', error);
+    } finally {
+      setConfirmOpen(false);
+      setSelectedTag(null);
     }
   };
 
@@ -61,6 +98,51 @@ export function AppreciationResult({ detailed, summary }: AppreciationResultProp
           </button>
         </div>
       </div>
+      <div className="relative">
+        <button
+          onClick={handleTagClick}
+          disabled={!user}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+        >
+          Taguer
+        </button>
+        {menuOpen && (
+          <div className="absolute z-10 mt-2 w-40 rounded-md shadow-lg bg-white dark:bg-gray-800">
+            {['Très bien', 'Bien', 'Moyen', 'Insuffisant'].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => handleSelectTag(tag)}
+                className="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {confirmOpen && selectedTag && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-sm w-full">
+            <p className="mb-4 text-gray-800 dark:text-gray-200">
+              Confirmer l'enregistrement de cette appréciation avec le tag "{selectedTag}" ?
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 dark:text-gray-300"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="px-4 py-2 rounded-md bg-blue-600 text-white"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
