@@ -101,6 +101,29 @@ export interface Database {
           created_at?: string;
         };
       };
+      appreciations: {
+        Row: {
+          user_id: string;
+          detailed: string;
+          summary: string;
+          tag: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          detailed: string;
+          summary: string;
+          tag: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          detailed?: string;
+          summary?: string;
+          tag?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 }
