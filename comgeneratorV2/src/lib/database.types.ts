@@ -104,6 +104,7 @@ export interface Database {
       appreciations: {
         Row: {
           id: string;
+          user_id: string;
           detailed: string;
           summary: string;
           tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
@@ -111,6 +112,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          user_id: string;
           detailed: string;
           summary: string;
           tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
@@ -118,6 +120,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          user_id?: string;
           detailed?: string;
           summary?: string;
           tag?: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
