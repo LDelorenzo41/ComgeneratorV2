@@ -107,7 +107,7 @@ export interface Database {
           user_id: string;
           detailed: string;
           summary: string;
-          tag: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at: string;
         };
         Insert: {
@@ -115,7 +115,7 @@ export interface Database {
           user_id: string;
           detailed: string;
           summary: string;
-          tag: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at?: string;
         };
         Update: {
@@ -123,10 +123,11 @@ export interface Database {
           user_id?: string;
           detailed?: string;
           summary?: string;
-          tag?: string;
+          tag?: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
           created_at?: string;
         };
       };
     };
   };
 }
+

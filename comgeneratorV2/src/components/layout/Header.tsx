@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore, useThemeStore } from '../../lib/store';
-import { LogOut, Moon, Sun, Menu, MessageSquare, PenTool, BookOpen } from 'lucide-react';
+import { LogOut, Moon, Sun, Menu, MessageSquare, PenTool, BookOpen, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 // Event pour notifier les changements de tokens
@@ -76,6 +76,11 @@ export function Header() {
       name: 'Ressources',
       path: '/resources',
       icon: <BookOpen className="w-5 h-5" />
+    },
+    {
+      name: 'Ma banque',
+      path: '/my-appreciations',
+      icon: <Tag className="w-5 h-5" />
     }
   ];
 
