@@ -101,6 +101,29 @@ export interface Database {
           created_at?: string;
         };
       };
+      appreciations: {
+        Row: {
+          id: string;
+          detailed: string;
+          summary: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          detailed: string;
+          summary: string;
+          tag: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          detailed?: string;
+          summary?: string;
+          tag?: 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
+          created_at?: string;
+        };
+      };
     };
   };
 }
