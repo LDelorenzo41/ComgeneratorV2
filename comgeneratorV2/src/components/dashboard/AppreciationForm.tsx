@@ -96,13 +96,6 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
     [user, result]
   );
 
-  const handleTagChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setTag(value);
-    if (result) {
-      await saveAppreciation(value);
-    }
-  };
 
   const fetchSubjects = React.useCallback(async () => {
     if (!user) return;
@@ -322,7 +315,7 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Critères d'évaluation</h3>
               {field.value.map((criterion, index) => (
-                <div key={criterion.id || index} className="space-y-2">
+                <div key={index} className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                     {criterion.name}
                   </label>
@@ -414,21 +407,7 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
         <>
           <AppreciationResult detailed={result.detailed} summary={result.summary} />
           <div className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                Tag
-              </label>
-              <select
-                value={tag}
-                onChange={handleTagChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              >
-                <option value="">Sélectionnez un tag</option>
-                <option value="positif">Positif</option>
-                <option value="neutre">Neutre</option>
-                <option value="negatif">Négatif</option>
-              </select>
-            </div>
+            
             {saveError && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="text-sm text-red-700">{saveError}</div>
