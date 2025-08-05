@@ -12,7 +12,7 @@ export function Footer() {
               À propos
             </h3>
             <p className="mt-4 text-base text-gray-500 dark:text-gray-400">
-              Comgénérator est un outil innovant pour la génération d'appréciations scolaires personnalisées.
+              ProfAssist est un outil innovant pour la génération d'appréciations scolaires personnalisées.
             </p>
           </div>
           
@@ -23,8 +23,8 @@ export function Footer() {
             <ul className="mt-4 space-y-2">
               <li className="flex items-center text-gray-500 dark:text-gray-400">
                 <Mail className="h-5 w-5 mr-2" />
-                <a href="mailto:ld.teachtech@gmail.com" className="hover:text-blue-600">
-                  ld.teachtech@gmail.com
+                <a href="mailto:lionel.delorenzo@teachtech.fr" className="hover:text-blue-600">
+                  lionel.delorenzo@teachtech.fr
                 </a>
               </li>
               <li className="flex items-center text-gray-500 dark:text-gray-400">
@@ -55,7 +55,7 @@ export function Footer() {
 
         <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
           <p className="text-center text-base text-gray-500 dark:text-gray-400">
-            © {new Date().getFullYear()} Comgénérator. Tous droits réservés.
+            © {new Date().getFullYear()} ProfAssist. Tous droits réservés.
           </p>
         </div>
       </div>

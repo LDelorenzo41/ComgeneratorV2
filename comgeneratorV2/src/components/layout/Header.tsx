@@ -62,27 +62,33 @@ export function Header() {
   };
 
   const navigationItems = [
-    {
-      name: 'Appréciations',
-      path: '/dashboard',
-      icon: <PenTool className="w-5 h-5" />
-    },
-    {
-      name: 'Communication',
-      path: '/communication',
-      icon: <MessageSquare className="w-5 h-5" />
-    },
-    {
-      name: 'Ressources',
-      path: '/resources',
-      icon: <BookOpen className="w-5 h-5" />
-    },
-    {
-      name: 'Ma banque',
-      path: '/my-appreciations',
-      icon: <Tag className="w-5 h-5" />
-    }
-  ];
+  {
+    name: 'Appréciations',
+    path: '/dashboard',
+    icon: <PenTool className="w-5 h-5" />
+  },
+  {
+    name: 'Synthèse',
+    path: '/synthese',
+    icon: <BookOpen className="w-5 h-5" />
+  },
+  {
+    name: 'Communication',
+    path: '/communication',
+    icon: <MessageSquare className="w-5 h-5" />
+  },
+  {
+    name: 'Ressources',
+    path: '/resources',
+    icon: <BookOpen className="w-5 h-5" />
+  },
+  {
+    name: 'Ma banque',
+    path: '/my-appreciations',
+    icon: <Tag className="w-5 h-5" />
+  }
+];
+
 
   const isActivePath = (path: string) => {
     return location.pathname === path;
@@ -94,16 +100,16 @@ export function Header() {
         <div className="flex justify-between h-20">
           <div className="flex items-center space-x-4">
             <Link to="/" className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">Comgénérator</span>
+              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">ProfAssist</span>
             </Link>
-            <span className="text-gray-600 dark:text-gray-300 flex items-center">
-              un service web proposé par
-              <img 
-                src="https://res.cloudinary.com/dhva6v5n8/image/upload/v1728059847/LOGO_T_T_zcdp8s.jpg"
-                alt="Logo entreprise"
-                className="h-16 ml-3"
-              />
-            </span>
+          
+            <img 
+  src="https://res.cloudinary.com/dhva6v5n8/image/upload/v1728059847/LOGO_T_T_zcdp8s.jpg"
+  alt="Logo entreprise"
+  className="h-16"
+/>
+
+          
           </div>
 
           {user && (
@@ -124,11 +130,13 @@ export function Header() {
               ))}
               {user && (
                 <div className="flex items-center space-x-3">
+                  {/* 
                   {tokenCount !== null && (
                     <span className="text-sm text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">
                       {tokenCount.toLocaleString()} tokens
                     </span>
                   )}
+                  */}
                   <Link
                     to="/buy-tokens"
                     className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
@@ -187,13 +195,14 @@ export function Header() {
                 <span className="ml-2">{item.name}</span>
               </Link>
             ))}
+            {/* 
             {user && tokenCount !== null && (
               <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
                 Tokens: {tokenCount.toLocaleString()}
               </div>
             )}
+            */}
             {user && (
-
               <button
                 onClick={handleLogout}
                 className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"

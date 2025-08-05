@@ -97,13 +97,13 @@ export function LandingPage() {
 
         <div className="mt-24">
           <p className="text-center text-xl font-semibold text-gray-700 dark:text-gray-300 mb-8">
-            Comgénérator propulsé par ChatGPT
+            Profassist propulsé par ChatGPT
           </p>
           <div className="rounded-lg overflow-hidden shadow-xl">
             <div className="relative w-full" style={{ height: 'calc(100% - 80px)' }}>
               <img 
                 src="https://res.cloudinary.com/dhva6v5n8/image/upload/DALL_E_2024-11-20_08.22.33_-_A_split-screen_photographic-style_widescreen_image_in_shades_of_blue_showing_two_contrasting_scenes._On_the_left_a_frustrated_teacher_is_seated_at_th_dghgas.png"
-                alt="Comparaison avant/après utilisation de Comgénérator"
+                alt="Comparaison avant/après utilisation de ProfAssist"
                 className="w-full object-cover object-center"
                 style={{ clipPath: 'inset(40px 0)' }}
               />

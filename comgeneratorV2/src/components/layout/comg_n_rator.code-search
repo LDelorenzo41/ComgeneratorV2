@@ -1,0 +1,9 @@
+# Query: comgénérator
+# ContextLines: 1
+
+1 résultat - 1 fichier
+
+comgeneratorV2/src/components/layout/Header.tsx:
+  96              <Link to="/" className="flex-shrink-0 flex items-center">
+  97:               <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">ProfAssist</span>
+  98              </Link>

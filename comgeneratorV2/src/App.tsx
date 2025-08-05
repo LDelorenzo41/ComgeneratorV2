@@ -11,6 +11,8 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { BuyTokensPage } from './pages/BuyTokensPage';
 import { AppreciationBankPage } from './pages/AppreciationBankPage';
 import { LandingPage } from './pages/LandingPage';
+import { SynthesePage } from './pages/SynthesePage'; // ✅ NOUVEL IMPORT
+
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
 
@@ -20,38 +22,32 @@ function App() {
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // Vérifier la session actuelle
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Écouter les changements d'authentification
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED') {
         console.log('Token rafraîchi avec succès');
       } else if (event === 'SIGNED_OUT') {
-        // Nettoyer l'état lors de la déconnexion
         setUser(null);
       } else if (event === 'USER_DELETED') {
-        // Gérer la suppression du compte
         await signOut();
       }
-      
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, [setUser, setLoading, signOut]);
 
-  // Gérer les erreurs d'authentification
   React.useEffect(() => {
     const handleAuthError = async (error: any) => {
       if (error?.__isAuthError) {
         console.log('Erreur d\'authentification détectée:', error);
-        
+
         if (error.message.includes('refresh_token_not_found')) {
           console.log('Token de rafraîchissement non trouvé, déconnexion...');
           await signOut();
@@ -60,10 +56,8 @@ function App() {
       }
     };
 
-    // Intercepter les erreurs d'authentification
     const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED' && session) {
-        // Effacer le message d'erreur si le token est rafraîchi avec succès
         setConnectionError(null);
       }
     });
@@ -112,6 +106,7 @@ function App() {
               <Route path="/resources" element={<ResourcesPage />} />
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
               <Route path="/my-appreciations" element={<AppreciationBankPage />} />
+              <Route path="/synthese" element={<SynthesePage />} /> {/* ✅ NOUVELLE ROUTE */}
             </Route>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           </Routes>
