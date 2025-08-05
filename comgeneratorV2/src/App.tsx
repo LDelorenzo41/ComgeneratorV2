@@ -12,6 +12,8 @@ import { BuyTokensPage } from './pages/BuyTokensPage';
 import { AppreciationBankPage } from './pages/AppreciationBankPage';
 import { LandingPage } from './pages/LandingPage';
 import { SynthesePage } from './pages/SynthesePage'; // ✅ NOUVEL IMPORT
+import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
+
 
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -107,6 +109,8 @@ function App() {
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
               <Route path="/my-appreciations" element={<AppreciationBankPage />} />
               <Route path="/synthese" element={<SynthesePage />} /> {/* ✅ NOUVELLE ROUTE */}
+              <Route path="/generate-lesson" element={<LessonGeneratorPage />} /> {/* ✅ Nouvelle page */}
+
             </Route>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           </Routes>
