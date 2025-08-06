@@ -171,15 +171,32 @@ ${extracted}
           'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4.1-mini',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.5,
           max_tokens: Math.floor(maxChars * 1.5),
         })
       });
 
-      const data = await response.json();
+            const data = await response.json();
       setSummary(data.choices?.[0]?.message?.content || '');
+
+      // ✅ Mise à jour du compteur si usage des tokens détecté
+      const usedTokens = data.usage?.total_tokens ?? 0;
+
+      if (usedTokens > 0 && user) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ tokens: Math.max(0, tokenCount! - usedTokens) })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Erreur lors de la mise à jour du compteur de tokens:', updateError);
+        } else {
+          fetchTokenCount(); // 🔄 Recharge le solde depuis Supabase
+        }
+      }
+
     } catch (error) {
       console.error('Erreur lors de l’appel à OpenAI:', error);
       alert("Une erreur est survenue.");
