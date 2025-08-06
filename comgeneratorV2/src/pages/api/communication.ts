@@ -21,7 +21,7 @@ ${contenu}
 Rédige une communication claire, structurée, sans excès de formalisme, avec une salutation d’ouverture et une formule de clôture.`;
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4-1106-preview', // ou 'gpt-4.1-mini' si tu y as accès
+    model: 'gpt-4.1-mini', 
     messages: [
       {
         role: 'user',

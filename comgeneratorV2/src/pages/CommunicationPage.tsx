@@ -36,6 +36,8 @@ export function CommunicationPage() {
     try {
       const text = await generateCommunication({ destinataire, ton, contenu });
       setGeneratedContent(text);
+      window.dispatchEvent(new Event('TOKEN_UPDATED'));
+
     } catch (err: any) {
       setError('Erreur lors de la génération');
       console.error(err);
@@ -56,6 +58,7 @@ export function CommunicationPage() {
         objectifs: objectifsReponse
       });
       setGeneratedReply(reply);
+      window.dispatchEvent(new Event('TOKEN_UPDATED'));
     } catch (err: any) {
       setReplyError('Erreur lors de la génération de la réponse.');
       console.error(err);
@@ -93,6 +96,7 @@ export function CommunicationPage() {
             label="Type de destinataire"
             value={destinataire}
             onChange={(e) => setDestinataire(e.target.value)}
+            className="border border-gray-400 dark:border-gray-600"
             options={[
               { value: "Parents d'élèves", label: "Parents d'élèves" },
               { value: 'Élève', label: 'Élève' },
@@ -110,6 +114,7 @@ export function CommunicationPage() {
             label="Ton de la communication"
             value={ton}
             onChange={(e) => setTon(e.target.value)}
+            className="border border-gray-400 dark:border-gray-600"
             options={[
               { value: 'Détendu', label: 'Détendu' },
               { value: 'Neutre', label: 'Neutre' },
@@ -168,6 +173,7 @@ export function CommunicationPage() {
             label="Ton de la réponse"
             value={tonReponse}
             onChange={(e) => setTonReponse(e.target.value)}
+            className="border border-gray-400 dark:border-gray-600"
             options={[
               { value: 'Détendu', label: 'Détendu' },
               { value: 'Neutre', label: 'Neutre' },
@@ -201,9 +207,22 @@ export function CommunicationPage() {
               onChange={(e) => setGeneratedReply(e.target.value)}
             />
 
-            <Button onClick={() => copyToClipboard(generatedReply)} className="w-full">
-              Copier la réponse
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button onClick={() => copyToClipboard(generatedReply)} className="flex-1">
+                Copier la réponse
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1 bg-blue-100 text-blue-700 hover:bg-blue-200"
+                onClick={() => {
+                  setMessageRecu('');
+                  setObjectifsReponse('');
+                  setGeneratedReply('');
+                }}
+              >
+                Faire une autre demande
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -212,3 +231,4 @@ export function CommunicationPage() {
 }
 
 export default CommunicationPage;
+
