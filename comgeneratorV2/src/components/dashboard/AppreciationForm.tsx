@@ -54,6 +54,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const [tag, setTag] = React.useState('');
   const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const [editableDetailed, setEditableDetailed] = React.useState('');
+  const [editableSummary, setEditableSummary] = React.useState('');
+
 
   const form = useForm<FormData>({
     resolver: zodResolver(appreciationSchema),
@@ -72,29 +75,35 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const selectedSubject = watch('subject');
 
   const saveAppreciation = React.useCallback(
-    async (tagValue: string, generated?: AppreciationResultType) => {
-      if (!user) return;
-      const dataToSave = generated || result;
-      if (!dataToSave) return;
-      setSaveError(null);
-      setSaveSuccess(null);
-      try {
-        const { error: insertError } = await supabase.from('appreciations').insert({
-          user_id: user.id,
-          detailed: dataToSave.detailed,
-          summary: dataToSave.summary,
-          tag: tagValue,
-          created_at: new Date().toISOString(),
-        });
-        if (insertError) throw insertError;
-        setSaveSuccess('Appréciation sauvegardée avec succès.');
-      } catch (err) {
-        console.error("Erreur lors de l'enregistrement de l'appréciation:", err);
-        setSaveError("Erreur lors de l'enregistrement de l'appréciation.");
-      }
-    },
-    [user, result]
-  );
+  async (tagValue: string, _generated?: AppreciationResultType) => {
+    if (!user) return;
+
+    const dataToSave = {
+      detailed: editableDetailed,
+      summary: editableSummary
+    };
+
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    try {
+      const { error: insertError } = await supabase.from('appreciations').insert({
+        user_id: user.id,
+        detailed: dataToSave.detailed,
+        summary: dataToSave.summary,
+        tag: tagValue,
+        created_at: new Date().toISOString(),
+      });
+      if (insertError) throw insertError;
+      setSaveSuccess('Appréciation sauvegardée avec succès.');
+    } catch (err) {
+      console.error("Erreur lors de l'enregistrement de l'appréciation:", err);
+      setSaveError("Erreur lors de l'enregistrement de l'appréciation.");
+    }
+  },
+  [editableDetailed, editableSummary, user]
+);
+
 
 
   const fetchSubjects = React.useCallback(async () => {
@@ -209,6 +218,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
       onTokensUpdated?.();
       setResult(generatedResult);
+      setEditableDetailed(generatedResult.detailed);
+      setEditableSummary(generatedResult.summary);
+
       if (tag) {
         await saveAppreciation(tag, generatedResult);
       }
@@ -248,6 +260,11 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
               </option>
             ))}
           </select>
+          {form.formState.errors.subject && (
+            <p className="text-sm text-red-600 mt-1">
+              {form.formState.errors.subject.message}
+            </p>
+          )}
         </div>
 
         <div>
@@ -259,6 +276,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             {...register('studentName')}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           />
+          {form.formState.errors.studentName && (
+            <p className="text-sm text-red-600 mt-1">
+              {form.formState.errors.studentName.message}
+            </p>
+          )}
+
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -405,7 +428,13 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
       {result && (
         <>
-          <AppreciationResult detailed={result.detailed} summary={result.summary} />
+          <AppreciationResult
+            detailed={editableDetailed}
+            summary={editableSummary}
+            setDetailed={setEditableDetailed}
+            setSummary={setEditableSummary}
+/>
+
           <div className="mt-6 space-y-4">
             
             {saveError && (

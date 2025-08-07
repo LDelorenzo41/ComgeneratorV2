@@ -11,17 +11,23 @@ const openai = new OpenAI({
 });
 
 interface Params {
-  situation: string;
-  destinataire: string;
+  message: string;
+  ton: string;
+  objectifs: string;
 }
 
-export async function generateReply({ situation, destinataire }: Params): Promise<string> {
-  const prompt = `Tu es un professeur répondant à un message de ${destinataire}.
-Voici la situation :
+export async function generateReply({ message, ton, objectifs }: Params): Promise<string> {
+  const prompt = `Tu es un professeur répondant à un message.
+Le ton doit être ${ton.toLowerCase()} (mais toujours professionnel et bienveillant).
+Voici le message reçu :
 
-${situation}
+${message}
 
-Rédige une réponse adaptée, claire et bienveillante.`;
+Voici les éléments à intégrer dans la réponse :
+
+${objectifs}
+
+Rédige une réponse claire, structurée et bienveillante.`;
 
   const user = useAuthStore.getState().user;
 
@@ -75,5 +81,6 @@ Rédige une réponse adaptée, claire et bienveillante.`;
 
   return result;
 }
+
 
 

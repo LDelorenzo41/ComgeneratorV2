@@ -53,10 +53,11 @@ export function CommunicationPage() {
 
     try {
       const reply = await generateReply({
-        messageRecu,
+        message: messageRecu,
         ton: tonReponse,
         objectifs: objectifsReponse
-      });
+});
+
       setGeneratedReply(reply);
       window.dispatchEvent(new Event('TOKEN_UPDATED'));
     } catch (err: any) {

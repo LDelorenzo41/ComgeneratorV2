@@ -6,9 +6,16 @@ import { useAuthStore } from '../../lib/store';
 interface AppreciationResultProps {
   detailed: string;
   summary: string;
+  setDetailed: React.Dispatch<React.SetStateAction<string>>;
+  setSummary: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export function AppreciationResult({ detailed, summary }: AppreciationResultProps) {
+export function AppreciationResult({
+  detailed,
+  summary,
+  setDetailed,
+  setSummary
+}: AppreciationResultProps) {
   const [copiedDetailed, setCopiedDetailed] = React.useState(false);
   const [copiedSummary, setCopiedSummary] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -74,7 +81,12 @@ export function AppreciationResult({ detailed, summary }: AppreciationResultProp
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Version détaillée</h3>
         <div className="mt-2 p-4 bg-white dark:bg-gray-800 rounded-md shadow relative">
-          <p className="text-gray-700 dark:text-gray-300 pr-10">{detailed}</p>
+          <textarea
+            value={detailed}
+            onChange={(e) => setDetailed(e.target.value)}
+            rows={6}
+            className="w-full resize-y rounded-md border border-gray-300 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <button
             onClick={() => copyToClipboard(detailed, 'detailed')}
             className="absolute bottom-4 right-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
@@ -88,7 +100,12 @@ export function AppreciationResult({ detailed, summary }: AppreciationResultProp
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Version synthétique</h3>
         <div className="mt-2 p-4 bg-white dark:bg-gray-800 rounded-md shadow relative">
-          <p className="text-gray-700 dark:text-gray-300 pr-10">{summary}</p>
+          <textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            rows={4}
+            className="w-full resize-y rounded-md border border-gray-300 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           <button
             onClick={() => copyToClipboard(summary, 'summary')}
             className="absolute bottom-4 right-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
@@ -148,3 +165,4 @@ export function AppreciationResult({ detailed, summary }: AppreciationResultProp
     </div>
   );
 }
+
