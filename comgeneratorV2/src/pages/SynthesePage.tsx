@@ -11,14 +11,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export function SynthesePage() {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const screenshotInputRef = React.useRef<HTMLInputElement | null>(null);
   const { user } = useAuthStore();
 
   const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
-  const [selection, setSelection] = React.useState<{ x: number; y: number; w: number; h: number; dragging: boolean } | null>(null);
+  const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
   const [maxChars, setMaxChars] = React.useState(300);
   const [summary, setSummary] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  const [copySuccess, setCopySuccess] = React.useState(false);
 
   const fetchTokenCount = React.useCallback(async () => {
     if (!user) return;
@@ -53,7 +56,7 @@ export function SynthesePage() {
   }, [fetchTokenCount]);
 
   const getResponsiveScale = (containerWidth: number, page: pdfjsLib.PDFPageProxy): number => {
-    const desiredWidth = Math.min(containerWidth, 800); // limite à 800px max
+    const desiredWidth = Math.min(containerWidth, 800);
     const viewport = page.getViewport({ scale: 1 });
     return desiredWidth / viewport.width;
   };
@@ -65,6 +68,7 @@ export function SynthesePage() {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     setPdfDoc(pdf);
+    setCapturedImage(null); // Reset de la capture précédente
 
     const page = await pdf.getPage(1);
     const canvas = canvasRef.current!;
@@ -82,78 +86,69 @@ export function SynthesePage() {
     }).promise;
   };
 
-  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setSelection({ x: e.clientX - rect.left, y: e.clientY - rect.top, w: 0, h: 0, dragging: true });
-  };
-
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!selection?.dragging) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    setSelection(s => s && ({
-      ...s,
-      w: (e.clientX - rect.left) - s.x,
-      h: (e.clientY - rect.top) - s.y
-    }));
-  };
-
-  const onMouseUp = () => {
-    setSelection(s => s && ({ ...s, dragging: false }));
-  };
-
-  const extractText = async (): Promise<string> => {
-    if (!pdfDoc || !selection || selection.w <= 0 || selection.h <= 0) return '';
-    const page = await pdfDoc.getPage(1);
-    const viewport = page.getViewport({ scale: 1 });
-    const textContent = await page.getTextContent();
-    const selected: string[] = [];
-
-    for (const item of textContent.items as any[]) {
-      const transform = item.transform;
-      const tx = transform[4];
-      const ty = transform[5];
-      const px = tx;
-      const py = viewport.height - ty;
-
-      if (
-        px >= selection.x && px <= selection.x + selection.w &&
-        py >= selection.y && py <= selection.y + selection.h
-      ) {
-        selected.push(item.str);
-      }
+  // 🔥 Gestion de l'upload de capture d'écran
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      alert('Veuillez sélectionner une image valide.');
+      return;
     }
 
-    const extractedText = selected.join(' ').trim();
-    if (extractedText) return extractedText;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageDataUrl = event.target?.result as string;
+      setCapturedImage(imageDataUrl);
+      console.log('📸 Capture d\'écran chargée avec succès');
+    };
+    reader.readAsDataURL(file);
+  };
 
-    // fallback OCR
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
-    const imgData = ctx.getImageData(selection.x, selection.y, selection.w, selection.h);
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = selection.w;
-    tempCanvas.height = selection.h;
-    tempCanvas.getContext('2d')!.putImageData(imgData, 0, 0);
+  // 🔥 Extraction de texte depuis la capture d'écran
+  const extractTextFromCapture = async (): Promise<string> => {
+    if (!capturedImage) return '';
 
-    const worker = await createWorker('fra');
-    const { data: { text: ocrText } } = await worker.recognize(tempCanvas.toDataURL());
-    await worker.terminate();
-
-    return ocrText.trim();
+    console.log('=== EXTRACTION OCR DEPUIS CAPTURE ===');
+    
+    try {
+      // OCR sur la capture avec paramètres optimisés
+      const worker = await createWorker('fra');
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?()[]- àâäéèêëïîôöùûüÿçÀÂÄÉÈÊËÏÎÔÖÙÛÜŸÇ',
+      });
+      
+      console.log('🔍 Lancement OCR...');
+      const { data: { text: ocrText } } = await worker.recognize(capturedImage);
+      await worker.terminate();
+      
+      const extractedText = ocrText.trim();
+      console.log('=== RÉSULTAT OCR ===');
+      console.log('Texte extrait:', extractedText);
+      console.log('===================');
+      
+      return extractedText;
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction OCR:', error);
+      return '';
+    }
   };
 
   const generateSynthese = async () => {
-    if (!selection) return;
+    if (!capturedImage) {
+      alert('Veuillez d\'abord faire une capture d\'écran de la partie souhaitée.');
+      return;
+    }
+    
     setLoading(true);
-    const extracted = await extractText();
+    const extracted = await extractTextFromCapture();
+    
     if (!extracted) {
       setLoading(false);
-      alert('Aucun texte détecté dans la zone sélectionnée.');
+      alert('Aucun texte détecté dans votre capture d\'écran.');
       return;
     }
 
     const prompt = `
-Voici plusieurs commentaires de professeurs extraits d’un bulletin scolaire.
+Voici plusieurs commentaires de professeurs extraits d'un bulletin scolaire.
 
 Tu dois générer une appréciation globale en identifiant les grandes tendances : points forts, difficultés éventuelles, éléments positifs. Ne cite pas les professeurs mais tu peux mentionner les matières. Utilise un ton fluide, synthétique et pertinent.
 
@@ -178,7 +173,7 @@ ${extracted}
         })
       });
 
-            const data = await response.json();
+      const data = await response.json();
       setSummary(data.choices?.[0]?.message?.content || '');
 
       // ✅ Mise à jour du compteur si usage des tokens détecté
@@ -193,15 +188,43 @@ ${extracted}
         if (updateError) {
           console.error('Erreur lors de la mise à jour du compteur de tokens:', updateError);
         } else {
-          fetchTokenCount(); // 🔄 Recharge le solde depuis Supabase
+          fetchTokenCount();
         }
       }
 
     } catch (error) {
-      console.error('Erreur lors de l’appel à OpenAI:', error);
+      console.error('Erreur lors de l\'appel à OpenAI:', error);
       alert("Une erreur est survenue.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Erreur lors de la copie:', err);
+    }
+  };
+
+  const resetForNewSynthesis = () => {
+    setSummary('');
+    setCapturedImage(null);
+    setPdfDoc(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (screenshotInputRef.current) {
+      screenshotInputRef.current.value = '';
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
     }
   };
 
@@ -219,7 +242,75 @@ ${extracted}
       </div>
 
       <div className="space-y-6">
-        <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+        {/* Étape 1 : Upload PDF */}
+        <div className="border rounded-lg p-4">
+          <h3 className="text-lg font-medium mb-3">📄 Étape 1 : Uploadez votre bulletin PDF</h3>
+          <Input 
+            ref={fileInputRef}
+            type="file" 
+            accept="application/pdf" 
+            onChange={handleFileChange} 
+          />
+        </div>
+
+        {/* Affichage du PDF */}
+        {pdfDoc && (
+          <div className="border rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-3">📋 Votre bulletin</h3>
+            <div className="relative border rounded overflow-hidden max-w-full">
+              <canvas ref={canvasRef} className="w-full" />
+            </div>
+          </div>
+        )}
+
+        {/* Étape 2 : Upload de capture */}
+        {pdfDoc && (
+          <div className="border rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-3">📸 Étape 2 : Uploadez votre capture d'écran</h3>
+            <div className="space-y-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  📋 Instructions simples :
+                </p>
+                <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <li><strong>Windows :</strong> Appuyez sur <kbd className="bg-blue-100 px-1 rounded">Windows + Shift + S</kbd></li>
+                  <li><strong>Mac :</strong> Appuyez sur <kbd className="bg-blue-100 px-1 rounded">Cmd + Shift + 4</kbd></li>
+                  <li><strong>Linux :</strong> Appuyez sur <kbd className="bg-blue-100 px-1 rounded">Print Screen</kbd></li>
+                  <li>Sélectionnez la partie du bulletin que vous voulez analyser</li>
+                  <li>Uploadez l'image avec le bouton ci-dessous</li>
+                </ol>
+              </div>
+              
+              <label className="cursor-pointer inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <Input 
+                  ref={screenshotInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleScreenshotUpload}
+                  className="hidden"
+                />
+                <span>📤 Sélectionner votre capture d'écran</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Affichage de la capture */}
+        {capturedImage && (
+          <div className="border rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-3">✅ Capture sélectionnée</h3>
+            <div className="border rounded overflow-hidden max-w-full">
+              <img 
+                src={capturedImage} 
+                alt="Capture d'écran sélectionnée" 
+                className="w-full max-h-96 object-contain"
+              />
+            </div>
+            <p className="text-sm text-green-600 mt-2">
+              ✅ Parfait ! Cette image sera analysée par l'IA.
+            </p>
+          </div>
+        )}
 
         <Input
           type="number"
@@ -229,29 +320,13 @@ ${extracted}
           min={50}
         />
 
-        <div className="relative border rounded overflow-hidden max-w-full">
-          <canvas
-            ref={canvasRef}
-            className="w-full"
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-          />
-          {selection && (
-            <div
-              className="absolute border-2 border-blue-500 bg-blue-200 bg-opacity-20 pointer-events-none"
-              style={{
-                left: Math.min(selection.x, selection.x + selection.w),
-                top: Math.min(selection.y, selection.y + selection.h),
-                width: Math.abs(selection.w),
-                height: Math.abs(selection.h)
-              }}
-            />
-          )}
-        </div>
-
-        <Button onClick={generateSynthese} loading={loading}>
-          Générer la synthèse
+        <Button 
+          onClick={generateSynthese} 
+          loading={loading}
+          disabled={!capturedImage}
+          className="w-full"
+        >
+          {capturedImage ? '🚀 Générer la synthèse' : '⏳ Uploadez d\'abord un PDF puis faites une capture'}
         </Button>
 
         {summary && (
@@ -259,10 +334,33 @@ ${extracted}
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               Synthèse générée
             </h3>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-md shadow">
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {summary}
-              </p>
+            <div className="relative p-4 bg-white dark:bg-gray-800 rounded-md shadow">
+              <textarea
+                className="w-full min-h-32 p-2 text-gray-700 dark:text-gray-300 bg-transparent border-none resize-none focus:outline-none"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Votre synthèse apparaîtra ici..."
+              />
+              <button
+                onClick={copyToClipboard}
+                className="absolute bottom-2 right-2 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                title="Copier le texte"
+              >
+                {copySuccess ? (
+                  <span className="text-green-500">✅</span>
+                ) : (
+                  <span>📋</span>
+                )}
+              </button>
+            </div>
+            
+            <div className="mt-4">
+              <Button 
+                onClick={resetForNewSynthesis}
+                className="bg-gray-500 hover:bg-gray-600 text-white"
+              >
+                🔄 Faire une autre synthèse
+              </Button>
             </div>
           </div>
         )}
