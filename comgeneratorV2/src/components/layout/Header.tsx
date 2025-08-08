@@ -22,7 +22,7 @@ export function Header() {
   const { isDark, toggleTheme } = useThemeStore();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [tokenCount, setTokenCount] = React.useState<number | null>(null);
-  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [openDropdown, setOpenDropdown] = React.useState<string | false>(false);
   const location = useLocation();
 
   const fetchTokens = React.useCallback(async () => {
@@ -69,12 +69,15 @@ export function Header() {
     }
   };
 
-  // Ferme le menu déroulant "Autres" si on clique ailleurs
+  // Ferme le menu déroulant si on clique ailleurs (ma banque ou autres)
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.dropdown-autres')) {
-        setIsDropdownOpen(false);
+      if (
+        !target.closest('.dropdown-banque') &&
+        !target.closest('.dropdown-autres')
+      ) {
+        setOpenDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -133,17 +136,50 @@ export function Header() {
                 </Link>
               ))}
 
+              {/* Sous-menu Ma banque */}
+              <div className="relative dropdown-banque">
+                <button
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'banque' ? false : 'banque')
+                  }
+                  className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Tag className="w-5 h-5" />
+                  <span className="ml-2">Ma banque</span>
+                </button>
+                {openDropdown === 'banque' && (
+                  <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-56">
+                    <div className="flex flex-col py-2">
+                      <Link
+                        to="/appreciation-bank"
+                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Banque d’appréciations
+                      </Link>
+                      <Link
+                        to="/lessons-bank"
+                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Banque de séances
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Menu déroulant "Autres" au clic */}
               <div className="relative dropdown-autres">
                 <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'autres' ? false : 'autres')
+                  }
                   className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
                   <BookOpen className="w-5 h-5" />
                   <span className="ml-2">Autres</span>
                 </button>
 
-                {isDropdownOpen && (
+                {openDropdown === 'autres' && (
                   <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
                     <div className="flex flex-col py-2">
                       <Link to="/communication" className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -151,9 +187,6 @@ export function Header() {
                       </Link>
                       <Link to="/resources" className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
                         Ressources
-                      </Link>
-                      <Link to="/my-appreciations" className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                        Ma banque
                       </Link>
                     </div>
                   </div>
@@ -219,14 +252,24 @@ export function Header() {
               </Link>
             ))}
 
+            {/* Sous-menu Ma banque mobile */}
+            <div className="block px-3 py-2">
+              <span className="text-gray-700 dark:text-gray-200 font-semibold">Ma banque</span>
+              <div className="ml-2">
+                <Link to="/appreciation-bank" className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  Banque d’appréciations
+                </Link>
+                <Link to="/lessons-bank" className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  Banque de séances
+                </Link>
+              </div>
+            </div>
+
             <Link to="/communication" className="block px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
               Communication
             </Link>
             <Link to="/resources" className="block px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
               Ressources
-            </Link>
-            <Link to="/my-appreciations" className="block px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-              Ma banque
             </Link>
 
             {user && (
@@ -244,4 +287,5 @@ export function Header() {
     </header>
   );
 }
+
 

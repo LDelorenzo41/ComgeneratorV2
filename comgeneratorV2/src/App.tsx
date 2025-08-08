@@ -14,6 +14,8 @@ import { LandingPage } from './pages/LandingPage';
 import { SynthesePage } from './pages/SynthesePage'; // ✅ NOUVEL IMPORT
 import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
 
+// 👉 Import de la nouvelle page banque de séances
+import LessonsBankPage from './pages/LessonsBankPage';
 
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -108,9 +110,10 @@ function App() {
               <Route path="/resources" element={<ResourcesPage />} />
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
               <Route path="/my-appreciations" element={<AppreciationBankPage />} />
-              <Route path="/synthese" element={<SynthesePage />} /> {/* ✅ NOUVELLE ROUTE */}
-              <Route path="/generate-lesson" element={<LessonGeneratorPage />} /> {/* ✅ Nouvelle page */}
-
+              <Route path="/appreciation-bank" element={<AppreciationBankPage />} /> {/* ✅ pour la cohérence avec le header */}
+              <Route path="/lessons-bank" element={<LessonsBankPage />} /> {/* ✅ nouvelle page */}
+              <Route path="/synthese" element={<SynthesePage />} />
+              <Route path="/generate-lesson" element={<LessonGeneratorPage />} />
             </Route>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           </Routes>
@@ -122,3 +125,4 @@ function App() {
 }
 
 export default App;
+
