@@ -9,8 +9,6 @@ import { generateAppreciation } from '../../lib/api';
 import { AppreciationResult } from './AppreciationResult';
 import type { AppreciationResult as AppreciationResultType } from '../../lib/types';
 import { RatingBar } from './RatingBar';
-import { subjectUpdateEvent, SUBJECT_UPDATED } from './SubjectList';
-import { tokenUpdateEvent, TOKEN_UPDATED } from '../layout/Header';
 
 const appreciationSchema = z.object({
   subject: z.string().min(1, 'Veuillez sélectionner une matière'),
@@ -56,7 +54,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [editableDetailed, setEditableDetailed] = React.useState('');
   const [editableSummary, setEditableSummary] = React.useState('');
-
+  
+  // État pour le compteur de tokens
+  const [tokenCount, setTokenCount] = React.useState<number | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(appreciationSchema),
@@ -74,37 +74,69 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const { register, control, handleSubmit, watch, setValue, reset } = form;
   const selectedSubject = watch('subject');
 
-  const saveAppreciation = React.useCallback(
-  async (tagValue: string, _generated?: AppreciationResultType) => {
+  // Fonction pour récupérer le compteur de tokens
+  const fetchTokenCount = React.useCallback(async () => {
     if (!user) return;
-
-    const dataToSave = {
-      detailed: editableDetailed,
-      summary: editableSummary
-    };
-
-    setSaveError(null);
-    setSaveSuccess(null);
-
     try {
-      const { error: insertError } = await supabase.from('appreciations').insert({
-        user_id: user.id,
-        detailed: dataToSave.detailed,
-        summary: dataToSave.summary,
-        tag: tagValue,
-        created_at: new Date().toISOString(),
-      });
-      if (insertError) throw insertError;
-      setSaveSuccess('Appréciation sauvegardée avec succès.');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('tokens')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .insert({ user_id: user.id, tokens: 100000 })
+            .select('tokens')
+            .single();
+          setTokenCount(newProfile?.tokens ?? 100000);
+          return;
+        }
+        throw error;
+      }
+
+      setTokenCount(data?.tokens ?? 0);
     } catch (err) {
-      console.error("Erreur lors de l'enregistrement de l'appréciation:", err);
-      setSaveError("Erreur lors de l'enregistrement de l'appréciation.");
+      console.error('Erreur lors de la récupération des tokens:', err);
     }
-  },
-  [editableDetailed, editableSummary, user]
-);
+  }, [user]);
 
+  // Effet pour charger le compteur de tokens
+  React.useEffect(() => {
+    fetchTokenCount();
+  }, [fetchTokenCount]);
 
+  const saveAppreciation = React.useCallback(
+    async (tagValue: string, _generated?: AppreciationResultType) => {
+      if (!user) return;
+
+      const dataToSave = {
+        detailed: editableDetailed,
+        summary: editableSummary
+      };
+
+      setSaveError(null);
+      setSaveSuccess(null);
+
+      try {
+        const { error: insertError } = await supabase.from('appreciations').insert({
+          user_id: user.id,
+          detailed: dataToSave.detailed,
+          summary: dataToSave.summary,
+          tag: tagValue,
+          created_at: new Date().toISOString(),
+        });
+        if (insertError) throw insertError;
+        setSaveSuccess('Appréciation sauvegardée avec succès.');
+      } catch (err) {
+        console.error("Erreur lors de l'enregistrement de l'appréciation:", err);
+        setSaveError("Erreur lors de l'enregistrement de l'appréciation.");
+      }
+    },
+    [editableDetailed, editableSummary, user]
+  );
 
   const fetchSubjects = React.useCallback(async () => {
     if (!user) return;
@@ -129,17 +161,6 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
       setError('Erreur lors de la récupération des matières. Veuillez réessayer.');
     }
   }, [user]);
-
-  React.useEffect(() => {
-    const handleSubjectUpdate = () => {
-      fetchSubjects();
-    };
-
-    subjectUpdateEvent.addEventListener(SUBJECT_UPDATED, handleSubjectUpdate);
-    return () => {
-      subjectUpdateEvent.removeEventListener(SUBJECT_UPDATED, handleSubjectUpdate);
-    };
-  }, [fetchSubjects]);
 
   React.useEffect(() => {
     fetchSubjects();
@@ -188,33 +209,24 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
         maxLength: data.maxLength,
         tone: data.tone
       });
+
       const usedTokens = generatedResult.usedTokens;
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user!.id)
-        .single();
-
-      if (profileError) {
-        throw new Error("Impossible de vérifier votre solde de tokens");
-      }
-
-      if ((profile?.tokens ?? 0) < usedTokens) {
+      // Vérification et mise à jour des tokens
+      if (tokenCount && tokenCount < usedTokens) {
         throw new Error('Solde de tokens insuffisant');
       }
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ tokens: (profile.tokens || 0) - usedTokens })
+        .update({ tokens: Math.max(0, (tokenCount || 0) - usedTokens) })
         .eq('user_id', user!.id);
 
       if (updateError) {
-        throw new Error('Échec de la mise à jour du solde de tokens');
+        console.error('Erreur lors de la mise à jour du compteur de tokens:', updateError);
+      } else {
+        fetchTokenCount(); // Refresh automatique
       }
-
-      // Notifier la mise à jour des tokens
-      tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
 
       onTokensUpdated?.();
       setResult(generatedResult);
@@ -244,6 +256,15 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Affichage du compteur de tokens */}
+      {tokenCount !== null && (
+        <div className="mb-6 text-right">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Crédits restants : {tokenCount.toLocaleString()} tokens
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(handleGenerateClick)} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -281,7 +302,6 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
               {form.formState.errors.studentName.message}
             </p>
           )}
-
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -433,10 +453,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             summary={editableSummary}
             setDetailed={setEditableDetailed}
             setSummary={setEditableSummary}
-/>
+          />
 
           <div className="mt-6 space-y-4">
-            
             {saveError && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="text-sm text-red-700">{saveError}</div>

@@ -12,6 +12,19 @@ import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
+import { 
+  BookOpen, 
+  Copy, 
+  FileDown, 
+  Save, 
+  Edit, 
+  Check, 
+  X, 
+  Sparkles,
+  Clock,
+  Users,
+  Target
+} from 'lucide-react';
 
 const pedagogies = [
   {
@@ -80,7 +93,7 @@ const lessonSchema = z.object({
 
 type LessonFormData = z.infer<typeof lessonSchema>;
 
-// Composant éditeur markdown avec prévisualisation
+// Composant éditeur markdown avec prévisualisation modernisé
 const MarkdownEditor: React.FC<{
   content: string;
   onChange: (content: string) => void;
@@ -258,146 +271,163 @@ const MarkdownEditor: React.FC<{
 
   if (isEditing) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Mode édition
-          </h3>
-          <div className="space-x-2">
-            <Button
-              type="button"
-              variant="outline"
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+              <Edit className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              Mode édition
+            </h3>
+          </div>
+          <div className="flex space-x-3">
+            <button
               onClick={handleCancel}
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200"
             >
+              <X className="w-4 h-4 mr-2" />
               Annuler
-            </Button>
-            <Button
-              type="button"
+            </button>
+            <button
               onClick={handleSave}
+              className="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
             >
+              <Check className="w-4 h-4 mr-2" />
               Sauvegarder
-            </Button>
+            </button>
           </div>
         </div>
-        <textarea
-          className="w-full h-96 p-4 border border-gray-300 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 font-mono"
-          value={editContent}
-          onChange={(e) => setEditContent(e.target.value)}
-          placeholder="Éditez votre contenu markdown ici..."
-        />
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          💡 Utilisez la syntaxe Markdown : **gras**, *italique*, # Titre, - Liste, etc.
-        </p>
+        <div className="relative">
+          <textarea
+            className="w-full h-96 p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none transition-all duration-200"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            placeholder="Éditez votre contenu markdown ici..."
+          />
+          <div className="absolute bottom-4 right-4 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
+            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+              💡 Syntaxe Markdown supportée
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Aperçu de la séance
-        </h3>
-        <div className="space-x-2">
-          <Button
-            type="button"
-            variant="outline"
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Aperçu de la séance
+          </h3>
+        </div>
+        <div className="flex space-x-3">
+          <button
             onClick={() => navigator.clipboard.writeText(content)}
+            className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
           >
-            📋 Copier
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
+            <Copy className="w-4 h-4 mr-2" />
+            Copier
+          </button>
+          <button
             onClick={handleExportPDF}
             disabled={isExporting}
+            className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-xl hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50"
           >
-            {isExporting ? '⏳ Export...' : '📄 PDF'}
-          </Button>
-          <Button
-            type="button"
+            <FileDown className="w-4 h-4 mr-2" />
+            {isExporting ? 'Export...' : 'PDF'}
+          </button>
+          <button
             onClick={() => onSaveToBank(content)}
             disabled={isSaving}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50"
           >
-            {isSaving ? '⏳ Sauvegarde...' : '💾 Ajouter à ma banque'}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
+            <Save className="w-4 h-4 mr-2" />
+            {isSaving ? 'Sauvegarde...' : 'Ajouter à ma banque'}
+          </button>
+          <button
             onClick={() => setIsEditing(true)}
+            className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200"
           >
-            ✏️ Modifier
-          </Button>
+            <Edit className="w-4 h-4 mr-2" />
+            Modifier
+          </button>
         </div>
       </div>
-      <div className="prose prose-sm max-w-none dark:prose-invert bg-gray-50 dark:bg-gray-900 p-6 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto max-h-96">
-        <ReactMarkdown
-          components={{
-            h1: ({ children }) => (
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
-                {children}
-              </h1>
-            ),
-            h2: ({ children }) => (
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">
-                {children}
-              </h2>
-            ),
-            h3: ({ children }) => (
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
-                {children}
-              </h3>
-            ),
-            p: ({ children }) => (
-              <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
-                {children}
-              </p>
-            ),
-            ul: ({ children }) => (
-              <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                {children}
-              </ul>
-            ),
-            ol: ({ children }) => (
-              <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                {children}
-              </ol>
-            ),
-            li: ({ children }) => (
-              <li className="mb-1">
-                {children}
-              </li>
-            ),
-            strong: ({ children }) => (
-              <strong className="font-semibold text-gray-900 dark:text-gray-100">
-                {children}
-              </strong>
-            ),
-            em: ({ children }) => (
-              <em className="italic text-gray-800 dark:text-gray-200">
-                {children}
-              </em>
-            ),
-            blockquote: ({ children }) => (
-              <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4">
-                {children}
-              </blockquote>
-            ),
-            code: ({ children }) => (
-              <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm font-mono text-gray-900 dark:text-gray-100">
-                {children}
-              </code>
-            ),
-            pre: ({ children }) => (
-              <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto my-4">
-                {children}
-              </pre>
-            )
-          }}
-        >
-          {content}
-        </ReactMarkdown>
+      <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
+        <div className="prose prose-sm max-w-none dark:prose-invert p-8 overflow-auto max-h-96">
+          <ReactMarkdown
+            components={{
+              h1: ({ children }) => (
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">
+                  {children}
+                </h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
+                  {children}
+                </h3>
+              ),
+              p: ({ children }) => (
+                <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
+                  {children}
+                </p>
+              ),
+              ul: ({ children }) => (
+                <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">
+                  {children}
+                </ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">
+                  {children}
+                </ol>
+              ),
+              li: ({ children }) => (
+                <li className="mb-1">
+                  {children}
+                </li>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-gray-900 dark:text-gray-100">
+                  {children}
+                </strong>
+              ),
+              em: ({ children }) => (
+                <em className="italic text-gray-800 dark:text-gray-200">
+                  {children}
+                </em>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">
+                  {children}
+                </blockquote>
+              ),
+              code: ({ children }) => (
+                <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">
+                  {children}
+                </code>
+              ),
+              pre: ({ children }) => (
+                <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">
+                  {children}
+                </pre>
+              )
+            }}
+          >
+            {content}
+          </ReactMarkdown>
+        </div>
       </div>
     </div>
   );
@@ -556,11 +586,12 @@ export function LessonGeneratorPage() {
 
       // Success feedback plus discret et professionnel
       const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
       successDiv.innerHTML = '✅ Séance ajoutée à votre banque !';
       document.body.appendChild(successDiv);
       
       setTimeout(() => {
+        successDiv.style.transform = 'translateX(100%)';
         successDiv.style.opacity = '0';
         setTimeout(() => document.body.removeChild(successDiv), 300);
       }, 3000);
@@ -578,88 +609,177 @@ export function LessonGeneratorPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Générateur de séance
-        </h1>
-        {tokenCount !== null && (
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Crédits restants : {tokenCount.toLocaleString()} tokens
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header moderne */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <BookOpen className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Générateur de séance
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+            Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
+          
+          {/* Stats */}
+          {tokenCount !== null && (
+            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Formulaire modernisé */}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Paramètres de la séance
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Configurez les détails de votre séance pédagogique
+            </p>
+          </div>
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-8"
+          >
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <Target className="w-4 h-4 inline mr-2" />
+                  Matière
+                </label>
+                <Input
+                  id="subject"
+                  {...register('subject')}
+                  error={errors.subject?.message}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  placeholder="Ex: Mathématiques, Français, Histoire..."
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <BookOpen className="w-4 h-4 inline mr-2" />
+                  Thème
+                </label>
+                <Input
+                  id="topic"
+                  {...register('topic')}
+                  error={errors.topic?.message}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  placeholder="Ex: Les fractions, La Renaissance, L'écosystème..."
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <Users className="w-4 h-4 inline mr-2" />
+                  Niveau
+                </label>
+                <Input
+                  id="level"
+                  {...register('level')}
+                  error={errors.level?.message}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  placeholder="Ex: CE2, 6ème, Terminale S..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <Clock className="w-4 h-4 inline mr-2" />
+                  Durée
+                </label>
+                <Select
+                  id="duration"
+                  onChange={(e) => {
+                    setSelectedDuration(e.target.value);
+                    setValue('duration', e.target.value);
+                  }}
+                  value={selectedDuration}
+                  options={durationOptions}
+                  error={errors.duration?.message}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                Type de pédagogie
+              </label>
+              <Select
+                id="pedagogy_type"
+                onChange={(e) => {
+                  setSelectedPedagogy(e.target.value);
+                  setValue('pedagogy_type', e.target.value);
+                }}
+                options={pedagogies.map(p => ({ value: p.value, label: p.label }))}
+                error={errors.pedagogy_type?.message}
+                className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              />
+              {selectedPedagogy && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                    💡 <strong>Description :</strong> {pedagogies.find(p => p.value === selectedPedagogy)?.description}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <p className="text-red-700 dark:text-red-300 font-medium">❌ {error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+              <span className="relative flex items-center justify-center">
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                    Génération en cours...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-3" />
+                    Générer la séance pédagogique
+                  </>
+                )}
+              </span>
+            </button>
+          </form>
+        </div>
+
+        {/* Résultat généré */}
+        {generatedContent && (
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <MarkdownEditor
+              content={generatedContent}
+              onChange={handleContentChange}
+              onSaveToBank={handleSaveToBank}
+              isSaving={savingToBank}
+            />
+          </div>
         )}
       </div>
-
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        className="space-y-4 bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-8"
-      >
-        <Input
-          id="subject"
-          label="Matière"
-          {...register('subject')}
-          error={errors.subject?.message}
-          className="border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:focus:border-blue-500"
-        />
-        <Input
-          id="topic"
-          label="Thème"
-          {...register('topic')}
-          error={errors.topic?.message}
-          className="border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:focus:border-blue-500"
-        />
-        <Input
-          id="level"
-          label="Niveau"
-          {...register('level')}
-          error={errors.level?.message}
-          className="border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:focus:border-blue-500"
-        />
-        <Select
-          id="pedagogy_type"
-          label="Type de pédagogie"
-          onChange={(e) => {
-            setSelectedPedagogy(e.target.value);
-            setValue('pedagogy_type', e.target.value);
-          }}
-          options={pedagogies.map(p => ({ value: p.value, label: p.label }))}
-          error={errors.pedagogy_type?.message}
-          className="border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:focus:border-blue-500"
-        />
-        {selectedPedagogy && (
-          <p className="text-sm text-gray-600 dark:text-gray-300 italic">
-            {pedagogies.find(p => p.value === selectedPedagogy)?.description}
-          </p>
-        )}
-        <Select
-          id="duration"
-          label="Durée"
-          onChange={(e) => {
-            setSelectedDuration(e.target.value);
-            setValue('duration', e.target.value);
-          }}
-          value={selectedDuration}
-          options={durationOptions}
-          error={errors.duration?.message}
-          className="border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:border-gray-600 dark:focus:border-blue-500"
-        />
-
-        <Button type="submit" loading={loading} className="w-full">
-          Générer la séance
-        </Button>
-        {error && <p className="text-red-600 mt-2">{error}</p>}
-      </form>
-
-      {generatedContent && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <MarkdownEditor
-            content={generatedContent}
-            onChange={handleContentChange}
-            onSaveToBank={handleSaveToBank}
-            isSaving={savingToBank}
-          />
-        </div>
-      )}
     </div>
   );
 }

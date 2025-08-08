@@ -9,7 +9,10 @@ import {
   MessageSquare,
   PenTool,
   BookOpen,
-  Tag
+  Database,
+  Coins,
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -22,7 +25,8 @@ export function Header() {
   const { isDark, toggleTheme } = useThemeStore();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [tokenCount, setTokenCount] = React.useState<number | null>(null);
-  const [openDropdown, setOpenDropdown] = React.useState<string | false>(false);
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isBankDropdownOpen, setIsBankDropdownOpen] = React.useState(false);
   const location = useLocation();
 
   const fetchTokens = React.useCallback(async () => {
@@ -35,6 +39,15 @@ export function Header() {
         .single();
 
       if (error) {
+        if (error.code === 'PGRST116') {
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .insert({ user_id: user.id, tokens: 100000 })
+            .select('tokens')
+            .single();
+          setTokenCount(newProfile?.tokens ?? 100000);
+          return;
+        }
         console.error('Erreur lors de la récupération des tokens:', error);
         return;
       }
@@ -69,15 +82,15 @@ export function Header() {
     }
   };
 
-  // Ferme le menu déroulant si on clique ailleurs (ma banque ou autres)
+  // Ferme les menus déroulants si on clique ailleurs
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (
-        !target.closest('.dropdown-banque') &&
-        !target.closest('.dropdown-autres')
-      ) {
-        setOpenDropdown(false);
+      if (!target.closest('.dropdown-autres')) {
+        setIsDropdownOpen(false);
+      }
+      if (!target.closest('.dropdown-bank')) {
+        setIsBankDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -93,7 +106,7 @@ export function Header() {
     {
       name: 'Synthèse',
       path: '/synthese',
-      icon: <BookOpen className="w-5 h-5" />
+      icon: <FileText className="w-5 h-5" />
     },
     {
       name: 'Leçons',
@@ -136,31 +149,32 @@ export function Header() {
                 </Link>
               ))}
 
-              {/* Sous-menu Ma banque */}
-              <div className="relative dropdown-banque">
+              {/* Menu déroulant "Ma banque" */}
+              <div className="relative dropdown-bank">
                 <button
-                  onClick={() =>
-                    setOpenDropdown(openDropdown === 'banque' ? false : 'banque')
-                  }
+                  onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
                   className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <Tag className="w-5 h-5" />
+                  <Database className="w-5 h-5" />
                   <span className="ml-2">Ma banque</span>
                 </button>
-                {openDropdown === 'banque' && (
+
+                {isBankDropdownOpen && (
                   <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-56">
                     <div className="flex flex-col py-2">
-                      <Link
-                        to="/appreciation-bank"
+                      <Link 
+                        to="/appreciation-bank" 
                         className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => setIsBankDropdownOpen(false)}
                       >
-                        Banque d’appréciations
+                        Ma banque d'appréciations
                       </Link>
-                      <Link
-                        to="/lessons-bank"
+                      <Link 
+                        to="/lessons-bank" 
                         className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => setIsBankDropdownOpen(false)}
                       >
-                        Banque de séances
+                        Ma banque de séances
                       </Link>
                     </div>
                   </div>
@@ -170,52 +184,69 @@ export function Header() {
               {/* Menu déroulant "Autres" au clic */}
               <div className="relative dropdown-autres">
                 <button
-                  onClick={() =>
-                    setOpenDropdown(openDropdown === 'autres' ? false : 'autres')
-                  }
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <BookOpen className="w-5 h-5" />
+                  <TrendingUp className="w-5 h-5" />
                   <span className="ml-2">Autres</span>
                 </button>
 
-                {openDropdown === 'autres' && (
+                {isDropdownOpen && (
                   <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
                     <div className="flex flex-col py-2">
-                      <Link to="/communication" className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Link 
+                        to="/communication" 
+                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
                         Communication
                       </Link>
-                      <Link to="/resources" className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <Link 
+                        to="/resources" 
+                        className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
                         Ressources
                       </Link>
                     </div>
                   </div>
                 )}
               </div>
-
-              <div className="flex items-center space-x-3">
-                <Link
-                  to="/buy-tokens"
-                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  Acheter des tokens
-                </Link>
-              </div>
             </nav>
           )}
 
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
+            {/* Affichage du compteur de tokens */}
+            {user && tokenCount !== null && (
+              <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {tokenCount.toLocaleString()} tokens
+                </span>
+              </div>
+            )}
+
+            {/* Bouton Acheter des tokens */}
+            {user && (
+              <Link
+                to="/buy-tokens"
+                className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                Acheter des tokens
+              </Link>
+            )}
+
             {user && (
               <button
                 onClick={handleLogout}
-                className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium"
+                className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 <LogOut className="h-5 w-5" />
               </button>
             )}
             <button
               onClick={toggleTheme}
-              className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-md"
+              className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-md transition-colors"
             >
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
@@ -236,6 +267,16 @@ export function Header() {
       {isMenuOpen && (
         <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
           <div className="px-2 pt-2 pb-3 space-y-1">
+            {/* Compteur de tokens mobile */}
+            {user && tokenCount !== null && (
+              <div className="flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg mx-3 mb-3">
+                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {tokenCount.toLocaleString()} tokens
+                </span>
+              </div>
+            )}
+
             {navigationItems.map((item) => (
               <Link
                 key={item.path}
@@ -252,29 +293,64 @@ export function Header() {
               </Link>
             ))}
 
-            {/* Sous-menu Ma banque mobile */}
+            {/* Menu Ma banque mobile */}
             <div className="block px-3 py-2">
-              <span className="text-gray-700 dark:text-gray-200 font-semibold">Ma banque</span>
-              <div className="ml-2">
-                <Link to="/appreciation-bank" className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                  Banque d’appréciations
+              <span className="text-gray-700 dark:text-gray-200 font-semibold flex items-center">
+                <Database className="w-4 h-4 mr-2" />
+                Ma banque
+              </span>
+              <div className="ml-6 mt-1 space-y-1">
+                <Link 
+                  to="/appreciation-bank" 
+                  className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Ma banque d'appréciations
                 </Link>
-                <Link to="/lessons-bank" className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                  Banque de séances
+                <Link 
+                  to="/lessons-bank" 
+                  className="block px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Ma banque de séances
                 </Link>
               </div>
             </div>
 
-            <Link to="/communication" className="block px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Link 
+              to="/communication" 
+              className="flex items-center px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <MessageSquare className="w-4 h-4 mr-2" />
               Communication
             </Link>
-            <Link to="/resources" className="block px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <Link 
+              to="/resources" 
+              className="flex items-center px-3 py-2 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <TrendingUp className="w-4 h-4 mr-2" />
               Ressources
             </Link>
 
+            {/* Bouton Acheter des tokens mobile */}
+            {user && (
+              <Link
+                to="/buy-tokens"
+                className="block px-3 py-2 mx-3 mt-3 rounded-md text-center text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Acheter des tokens
+              </Link>
+            )}
+
             {user && (
               <button
-                onClick={handleLogout}
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
                 className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
               >
                 <LogOut className="h-5 w-5 mr-2" />
@@ -287,5 +363,4 @@ export function Header() {
     </header>
   );
 }
-
 
