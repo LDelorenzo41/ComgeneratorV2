@@ -108,30 +108,25 @@ async function fetchRSSFeed(feed: { url: string; source: string }) {
     const items = Array.isArray(channel.item) ? channel.item : [channel.item];
     console.log(`Found ${items.length} items in ${feed.source} feed`);
 
-    const articles = await Promise.all(
-      items
-        .filter(item => item && typeof item === 'object')
-        .map(async item => {
-          // Extraire le contenu des éléments XML
-          const title = Array.isArray(item.title) ? item.title[0] : item.title;
-          const description = Array.isArray(item.description) ? item.description[0] : item.description;
-          const link = Array.isArray(item.link) ? item.link[0] : item.link;
-          const pubDate = Array.isArray(item.pubDate) ? item.pubDate[0] : item.pubDate;
-          const content = Array.isArray(item['content:encoded']) ? item['content:encoded'][0] : item['content:encoded'];
-
-          // Extraire l'image
-          const imageUrl = await extractImageFromContent(content || description || '', String(link || ''));
-
-          return {
-            title: cleanHtml(String(title || '')),
-            description: cleanHtml(String(description || '')),
-            link: String(link || '').trim(),
-            source: feed.source,
-            pub_date: parseDate(String(pubDate || '')),
-            image_url: imageUrl
-          };
-        })
-    );
+    // Code NOUVEAU avec feed_id
+const articles = await Promise.all(items.filter((item)=>item && typeof item === 'object').map(async (item)=>{
+  const title = Array.isArray(item.title) ? item.title[0] : item.title;
+  const description = Array.isArray(item.description) ? item.description[0] : item.description;
+  const link = Array.isArray(item.link) ? item.link[0] : item.link;
+  const pubDate = Array.isArray(item.pubDate) ? item.pubDate[0] : item.pubDate;
+  const content = Array.isArray(item['content:encoded']) ? item['content:encoded'][0] : item['content:encoded'];
+  const imageUrl = await extractImageFromContent(content || description || '', String(link || ''));
+  
+  return {
+    title: cleanHtml(String(title || '')),
+    description: cleanHtml(String(description || '')),
+    link: String(link || '').trim(),
+    source: feed.name,
+    feed_id: feed.id, // ← LIGNE AJOUTÉE
+    pub_date: parseDate(String(pubDate || '')),
+    image_url: imageUrl
+  };
+}));
 
     const validArticles = articles.filter(article => article.title && article.link);
     console.log(`Successfully parsed ${validArticles.length} articles from ${feed.source}`);

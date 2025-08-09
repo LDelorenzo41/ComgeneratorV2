@@ -48,14 +48,35 @@ export interface SavedAppreciation {
   createdAt: string;
 }
 
+// Interface pour les flux RSS
+export interface RssFeed {
+  id: string;
+  name: string;
+  category: string | null;
+  url: string;
+  source_domain: string | null;
+  is_active: boolean;
+}
+
+// Interface pour les préférences utilisateur
+export interface UserRssPreference {
+  user_id: string;
+  position: number;
+  feed_id: string;
+  feed?: RssFeed;
+}
+
+// Mise à jour pour inclure image_url et champs optionnels + feed_id obligatoire
 export interface Article {
   id: string;
   title: string;
-  description: string | null;
+  description?: string | null;
   link: string;
-  source: string;
+  source?: string | null;
   pub_date: string;
-  created_at: string;
+  created_at?: string | null;
+  image_url?: string | null;
+  feed_id: string; // ← MODIFIÉ : maintenant obligatoire (non nullable)
 }
 
 export interface BlogArticle {
