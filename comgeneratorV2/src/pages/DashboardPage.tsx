@@ -3,12 +3,13 @@ import { SubjectList } from '../components/dashboard/SubjectList';
 import { AppreciationForm } from '../components/dashboard/AppreciationForm';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Sparkles, User, Target, PenTool, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
   const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  
   const fetchTokenCount = React.useCallback(async () => {
     if (!user) return;
     try {
@@ -43,31 +44,164 @@ export function DashboardPage() {
   React.useEffect(() => {
     fetchTokenCount();
   }, [fetchTokenCount]);
+
+  // Extraire le prénom de l'email si possible, sinon utiliser l'email
+  const getDisplayName = (email: string) => {
+    const name = email.split('@')[0];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Bonjour {user?.email}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header avec accueil personnalisé */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <User className="w-10 h-10 text-white" />
+              </div>
+              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Bonjour {user?.email ? getDisplayName(user.email) : 'Utilisateur'} !
           </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Bienvenue dans votre espace de génération d'appréciations
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+            Bienvenue dans votre espace de génération d'appréciations personnalisées
           </p>
+          
+          {/* Compteur de tokens stylisé */}
+          {tokenCount !== null && (
+            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+              </span>
+            </div>
+          )}
         </div>
 
+        <div className="space-y-12">
+          
+          {/* Section Gestion des matières */}
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div className="mb-8">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                  <Settings className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Gestion des matières et critères
+                </h2>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">
+                Configurez vos matières et définissez les critères d'évaluation pour vos appréciations
+              </p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6">
+              <SubjectList />
+            </div>
+          </div>
 
-        {tokenCount !== null && (
-          <p className="text-right font-semibold text-gray-900 dark:text-gray-100">
-            Crédits restants : {tokenCount.toLocaleString()} tokens
-          </p>
-        )}
+          {/* Section Génération d'appréciations */}
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div className="mb-8">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                  <PenTool className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Générer une appréciation
+                </h2>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">
+                Créez des appréciations personnalisées basées sur vos critères d'évaluation
+              </p>
+            </div>
+            
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6">
+              <AppreciationForm onTokensUpdated={fetchTokenCount} />
+            </div>
+          </div>
 
-        <SubjectList />
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-            Générer une appréciation
-          </h2>
-          <AppreciationForm onTokensUpdated={fetchTokenCount} />
+          {/* Section d'aide/conseils */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-3xl border border-blue-200 dark:border-blue-800 p-8">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                Optimisez vos appréciations
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-2xl mx-auto">
+                Pour des résultats optimaux, assurez-vous d'avoir configuré vos matières avec des critères précis et d'évaluer au moins un critère avant la génération.
+              </p>
+              
+              {/* Liens utiles */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  to="/appreciation-bank"
+                  className="inline-flex items-center px-6 py-3 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 font-semibold rounded-xl border border-blue-200 dark:border-blue-700 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Ma banque d'appréciations
+                </Link>
+                
+                <Link
+                  to="/communication"
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                >
+                  <PenTool className="w-4 h-4 mr-2" />
+                  Outils communication
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats et informations */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                IA Avancée
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Propulsé par GPT pour des appréciations pertinentes
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                Personnalisable
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Adaptez les critères selon vos besoins
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Settings className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                Gain de temps
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Générez des appréciations en quelques clics
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -9,6 +9,19 @@ import { generateAppreciation } from '../../lib/api';
 import { AppreciationResult } from './AppreciationResult';
 import type { AppreciationResult as AppreciationResultType } from '../../lib/types';
 import { RatingBar } from './RatingBar';
+import { 
+  PenTool, 
+  User, 
+  BarChart3, 
+  MessageCircle, 
+  Volume2, 
+  FileText, 
+  Sparkles,
+  RotateCcw,
+  CheckCircle,
+  Target,
+  Settings
+} from 'lucide-react';
 
 const appreciationSchema = z.object({
   subject: z.string().min(1, 'Veuillez sélectionner une matière'),
@@ -255,220 +268,313 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Affichage du compteur de tokens */}
-      {tokenCount !== null && (
-        <div className="mb-6 text-right">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Crédits restants : {tokenCount.toLocaleString()} tokens
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header avec compteur de tokens */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <PenTool className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Générateur d'appréciations
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+            Créez des appréciations personnalisées et pertinentes basées sur vos critères d'évaluation
           </p>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit(handleGenerateClick)} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Matière
-          </label>
-          <select
-            {...register('subject')}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">Sélectionnez une matière</option>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </select>
-          {form.formState.errors.subject && (
-            <p className="text-sm text-red-600 mt-1">
-              {form.formState.errors.subject.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Prénom de l'élève
-          </label>
-          <input
-            type="text"
-            {...register('studentName')}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-          {form.formState.errors.studentName && (
-            <p className="text-sm text-red-600 mt-1">
-              {form.formState.errors.studentName.message}
-            </p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Longueur minimale (caractères)
-            </label>
-            <Controller
-              name="minLength"
-              control={control}
-              render={({ field }) => (
-                <input
-                  type="number"
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(Number(e.target.value));
-                    setIsGenerateClicked(false);
-                  }}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  min="50"
-                  max="500"
-                />
-              )}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Longueur maximale (caractères)
-            </label>
-            <Controller
-              name="maxLength"
-              control={control}
-              render={({ field }) => (
-                <input
-                  type="number"
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(Number(e.target.value));
-                    setIsGenerateClicked(false);
-                  }}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  min="100"
-                  max="1000"
-                />
-              )}
-            />
-          </div>
-        </div>
-
-        <Controller
-          name="criteria"
-          control={control}
-          render={({ field }) => (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Critères d'évaluation</h3>
-              {field.value.map((criterion, index) => (
-                <div key={index} className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                    {criterion.name}
-                  </label>
-                  <RatingBar
-                    value={criterion.value}
-                    onChange={(value) => {
-                      const newCriteria = [...field.value];
-                      newCriteria[index] = { ...criterion, value };
-                      field.onChange(newCriteria);
-                      setIsGenerateClicked(false);
-                    }}
-                  />
-                </div>
-              ))}
+          
+          {/* Compteur de tokens modernisé */}
+          {tokenCount !== null && (
+            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+              </span>
             </div>
           )}
-        />
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Ton de l'appréciation
-          </label>
-          <select
-            {...register('tone')}
-            onChange={(e) => {
-              register('tone').onChange(e);
-              setIsGenerateClicked(false);
-            }}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="bienveillant">Bienveillant</option>
-            <option value="normal">Normal</option>
-            <option value="severe">Sévère</option>
-          </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Notes personnelles
-          </label>
-          <textarea
-            {...register('personalNotes')}
-            onChange={(e) => {
-              register('personalNotes').onChange(e);
-              setIsGenerateClicked(false);
-            }}
-            rows={4}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
+        {/* Formulaire principal modernisé */}
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Paramètres de l'appréciation
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400">
+              Configurez les détails pour générer une appréciation personnalisée
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(handleGenerateClick)} className="space-y-8">
+            
+            {/* Matière et Élève */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <Target className="w-4 h-4 inline mr-2" />
+                  Matière
+                </label>
+                <select
+                  {...register('subject')}
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                >
+                  <option value="">Sélectionnez une matière</option>
+                  {subjects.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </option>
+                  ))}
+                </select>
+                {form.formState.errors.subject && (
+                  <p className="text-sm text-red-600 mt-1 flex items-center">
+                    <span className="mr-1">⚠️</span>
+                    {form.formState.errors.subject.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <User className="w-4 h-4 inline mr-2" />
+                  Prénom de l'élève
+                </label>
+                <input
+                  type="text"
+                  {...register('studentName')}
+                  placeholder="Ex: Marie, Lucas, Emma..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                />
+                {form.formState.errors.studentName && (
+                  <p className="text-sm text-red-600 mt-1 flex items-center">
+                    <span className="mr-1">⚠️</span>
+                    {form.formState.errors.studentName.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Longueurs */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <BarChart3 className="w-4 h-4 inline mr-2" />
+                  Longueur minimale (caractères)
+                </label>
+                <Controller
+                  name="minLength"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="number"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(Number(e.target.value));
+                        setIsGenerateClicked(false);
+                      }}
+                      min="50"
+                      max="500"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    />
+                  )}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  <BarChart3 className="w-4 h-4 inline mr-2" />
+                  Longueur maximale (caractères)
+                </label>
+                <Controller
+                  name="maxLength"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      type="number"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(Number(e.target.value));
+                        setIsGenerateClicked(false);
+                      }}
+                      min="100"
+                      max="1000"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Critères d'évaluation */}
+            <Controller
+              name="criteria"
+              control={control}
+              render={({ field }) => (
+                <div className="space-y-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
+                      <Settings className="w-4 h-4 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Critères d'évaluation
+                    </h3>
+                  </div>
+                  
+                  {field.value.length > 0 ? (
+                    <div className="grid gap-6">
+                      {field.value.map((criterion, index) => (
+                        <div key={index} className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 p-6 rounded-2xl border border-gray-200 dark:border-gray-600">
+                          <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                            {criterion.name}
+                          </label>
+                          <RatingBar
+                            value={criterion.value}
+                            onChange={(value) => {
+                              const newCriteria = [...field.value];
+                              newCriteria[index] = { ...criterion, value };
+                              field.onChange(newCriteria);
+                              setIsGenerateClicked(false);
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
+                      <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400 font-medium">
+                        Sélectionnez une matière pour voir les critères d'évaluation
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            />
+
+            {/* Ton de l'appréciation */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <Volume2 className="w-4 h-4 inline mr-2" />
+                Ton de l'appréciation
+              </label>
+              <select
+                {...register('tone')}
+                onChange={(e) => {
+                  register('tone').onChange(e);
+                  setIsGenerateClicked(false);
+                }}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              >
+                <option value="bienveillant">Bienveillant</option>
+                <option value="normal">Normal</option>
+                <option value="severe">Sévère</option>
+              </select>
+            </div>
+
+            {/* Notes personnelles */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <FileText className="w-4 h-4 inline mr-2" />
+                Notes personnelles (optionnel)
+              </label>
+              <textarea
+                {...register('personalNotes')}
+                onChange={(e) => {
+                  register('personalNotes').onChange(e);
+                  setIsGenerateClicked(false);
+                }}
+                rows={4}
+                placeholder="Ajoutez des observations particulières, des points à mentionner..."
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"
+              />
+            </div>
+
+            {/* Erreur */}
+            {error && (
+              <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <p className="text-red-700 dark:text-red-300 font-medium">❌ {error}</p>
+              </div>
+            )}
+
+            {/* Boutons d'action */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                <span className="relative flex items-center justify-center">
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin w-5 h-5 mr-3" />
+                      Génération en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5 mr-3" />
+                      {isGenerateClicked ? "Confirmer la génération" : "Générer les appréciations"}
+                    </>
+                  )}
+                </span>
+              </button>
+              
+              {result && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-6 py-4 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border-2 border-gray-300 dark:border-gray-500 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
+                >
+                  <RotateCcw className="w-5 h-5 mr-2 inline" />
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+          </form>
         </div>
 
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+        {/* Résultats générés */}
+        {result && (
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div className="mb-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Appréciations générées
+                </h2>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">
+                Vos appréciations sont prêtes ! Vous pouvez les éditer si nécessaire
+              </p>
+            </div>
+
+            <AppreciationResult
+              detailed={editableDetailed}
+              summary={editableSummary}
+              setDetailed={setEditableDetailed}
+              setSummary={setEditableSummary}
+            />
+
+            {/* Messages de feedback */}
+            <div className="mt-6 space-y-4">
+              {saveError && (
+                <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                  <p className="text-red-700 dark:text-red-300 font-medium">❌ {saveError}</p>
+                </div>
+              )}
+              {saveSuccess && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+                  <p className="text-green-700 dark:text-green-300 font-medium">✅ {saveSuccess}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5" />
-                Génération en cours...
-              </>
-            ) : (
-              <>
-                <Send className="-ml-1 mr-2 h-5 w-5" />
-                {isGenerateClicked ? "Confirmer la génération" : "Générer les appréciations"}
-              </>
-            )}
-          </button>
-          {result && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Réinitialiser
-            </button>
-          )}
-        </div>
-      </form>
-
-      {result && (
-        <>
-          <AppreciationResult
-            detailed={editableDetailed}
-            summary={editableSummary}
-            setDetailed={setEditableDetailed}
-            setSummary={setEditableSummary}
-          />
-
-          <div className="mt-6 space-y-4">
-            {saveError && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-700">{saveError}</div>
-              </div>
-            )}
-            {saveSuccess && (
-              <div className="rounded-md bg-green-50 p-4">
-                <div className="text-sm text-green-700">{saveSuccess}</div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+        
+      </div>
     </div>
   );
 }
