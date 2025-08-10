@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
+import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header'; // AJOUT
 
 const useTokenBalance = () => {
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
@@ -26,9 +27,10 @@ const useTokenBalance = () => {
       fetchBalance();
     };
 
-    window.addEventListener('TOKEN_UPDATED', handleUpdate);
+    // MODIFICATION : Remplacer window.addEventListener par tokenUpdateEvent
+    tokenUpdateEvent.addEventListener(TOKEN_UPDATED, handleUpdate);
     return () => {
-      window.removeEventListener('TOKEN_UPDATED', handleUpdate);
+      tokenUpdateEvent.removeEventListener(TOKEN_UPDATED, handleUpdate);
     };
   }, [user]);
 

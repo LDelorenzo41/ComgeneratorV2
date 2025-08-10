@@ -2,48 +2,15 @@ import React from 'react';
 import { SubjectList } from '../components/dashboard/SubjectList';
 import { AppreciationForm } from '../components/dashboard/AppreciationForm';
 import { useAuthStore } from '../lib/store';
-import { supabase } from '../lib/supabase';
-import { AlertCircle, Sparkles, User, Target, PenTool, Settings } from 'lucide-react';
+import useTokenBalance from '../hooks/useTokenBalance'; // MODIFICATION : Remplacement de la logique locale
+import { AlertCircle, Sparkles, User, Target, PenTool, Settings, CreditCard } from 'lucide-react'; // AJOUT : CreditCard
 import { Link } from 'react-router-dom';
 
 export function DashboardPage() {
   const { user } = useAuthStore();
-  const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  const tokenCount = useTokenBalance(); // MODIFICATION : Utilisation du hook au lieu de l'état local
   
-  const fetchTokenCount = React.useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (error) {
-        // If profile doesn't exist (PGRST116 error), create it
-        if (error.code === 'PGRST116') {
-          const { data: newProfile, error: insertError } = await supabase
-            .from('profiles')
-            .insert({ user_id: user.id, tokens: 100000 })
-            .select('tokens')
-            .single();
-          
-          if (insertError) throw insertError;
-          setTokenCount(newProfile?.tokens ?? 100000);
-          return;
-        }
-        throw error;
-      }
-
-      setTokenCount(data?.tokens ?? 0);
-    } catch (err) {
-      console.error('Erreur lors de la récupération du solde de tokens:', err);
-    }
-  }, [user]);
-
-  React.useEffect(() => {
-    fetchTokenCount();
-  }, [fetchTokenCount]);
+  // SUPPRESSION : fetchTokenCount et useEffect - remplacés par useTokenBalance
 
   // Extraire le prénom de l'email si possible, sinon utiliser l'email
   const getDisplayName = (email: string) => {
@@ -75,12 +42,38 @@ export function DashboardPage() {
             Bienvenue dans votre espace de génération d'appréciations personnalisées
           </p>
           
-          {/* Compteur de tokens stylisé */}
+          {/* Compteur de tokens stylisé avec alerte si 0 tokens */}
           {tokenCount !== null && (
-            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+            <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
+              tokenCount === 0 
+                ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
+              {tokenCount === 0 ? (
+                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              )}
+              <span className={`text-sm font-medium ${
+                tokenCount === 0 
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                {tokenCount === 0 ? (
+                  <>
+                    <span className="font-bold">Crédits épuisés !</span>
+                    <Link 
+                      to="/buy-tokens" 
+                      className="ml-2 underline hover:no-underline"
+                    >
+                      Recharger →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -88,6 +81,30 @@ export function DashboardPage() {
 
         <div className="space-y-12">
           
+          {/* AJOUT : Alerte tokens épuisés */}
+          {tokenCount === 0 && (
+            <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-red-700 dark:text-red-300 mb-4">
+                  Crédits épuisés
+                </h2>
+                <p className="text-red-600 dark:text-red-400 mb-6 max-w-2xl mx-auto">
+                  Vous avez utilisé tous vos tokens. Pour continuer à générer des appréciations, veuillez recharger votre compte.
+                </p>
+                <Link
+                  to="/buy-tokens"
+                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                >
+                  <CreditCard className="w-5 h-5 mr-3" />
+                  Recharger mes crédits
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Section Gestion des matières */}
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
             <div className="mb-8">
@@ -110,7 +127,9 @@ export function DashboardPage() {
           </div>
 
           {/* Section Génération d'appréciations */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+          <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 ${
+            tokenCount === 0 ? 'opacity-50' : ''
+          }`}>
             <div className="mb-8">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
@@ -119,14 +138,26 @@ export function DashboardPage() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Générer une appréciation
                 </h2>
+                {/* AJOUT : Badge "Indisponible" si 0 tokens */}
+                {tokenCount === 0 && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    Indisponible
+                  </span>
+                )}
               </div>
               <p className="text-gray-600 dark:text-gray-400">
-                Créez des appréciations personnalisées basées sur vos critères d'évaluation
+                {tokenCount === 0 
+                  ? 'Rechargez vos crédits pour créer des appréciations personnalisées'
+                  : 'Créez des appréciations personnalisées basées sur vos critères d\'évaluation'
+                }
               </p>
             </div>
             
             <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6">
-              <AppreciationForm onTokensUpdated={fetchTokenCount} />
+              <AppreciationForm 
+                onTokensUpdated={() => {}} // MODIFICATION : Suppression car useTokenBalance gère automatiquement
+                tokensAvailable={tokenCount ?? 0} // AJOUT : Passage du nombre de tokens au composant
+              />
             </div>
           </div>
 

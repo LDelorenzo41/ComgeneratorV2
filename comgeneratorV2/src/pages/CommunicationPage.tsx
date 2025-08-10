@@ -6,7 +6,10 @@ import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import copyToClipboard from '../lib/copyToClipboard';
 import { generateCommunication } from '../lib/generateCommunication';
+import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 import { generateReply } from '../lib/generateReply';
+import { supabase } from '../lib/supabase'; // ✅ AJOUT
+
 import { 
   MessageSquare, 
   Send, 
@@ -17,7 +20,9 @@ import {
   Volume2, 
   FileText, 
   RefreshCw, 
-  CheckCircle 
+  CheckCircle,
+  CreditCard, // ✅ AJOUT
+  AlertCircle // ✅ AJOUT
 } from 'lucide-react';
 
 export function CommunicationPage() {
@@ -40,7 +45,21 @@ export function CommunicationPage() {
   const [loadingReply, setLoadingReply] = React.useState(false);
   const [replyError, setReplyError] = React.useState<string | null>(null);
 
+  // ✅ AJOUT: État pour tracking des tokens locaux
+  const [tokenCount, setTokenCount] = React.useState<number>(0);
+
+  // ✅ AJOUT: Synchronisation des tokens
+  React.useEffect(() => {
+    setTokenCount(tokenBalance ?? 0);
+  }, [tokenBalance]);
+
   const handleGenerate = async () => {
+    // ✅ MODIFICATION: Nouvelle logique de vérification des tokens
+    if (tokenCount === 0) {
+      setError('Crédits insuffisants pour générer une communication.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setGeneratedContent('');
@@ -48,7 +67,29 @@ export function CommunicationPage() {
     try {
       const text = await generateCommunication({ destinataire, ton, contenu });
       setGeneratedContent(text);
-      window.dispatchEvent(new Event('TOKEN_UPDATED'));
+      
+      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tokens')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile) {
+          const usedTokens = 1; // Ou calculé selon la logique métier
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            })
+            .eq('user_id', user.id);
+
+          if (!updateError) {
+            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+          }
+        }
+      }
 
     } catch (err: any) {
       setError('Erreur lors de la génération');
@@ -59,6 +100,12 @@ export function CommunicationPage() {
   };
 
   const handleGenerateReply = async () => {
+    // ✅ MODIFICATION: Nouvelle logique de vérification des tokens
+    if (tokenCount === 0) {
+      setReplyError('Crédits insuffisants pour générer une réponse.');
+      return;
+    }
+
     setLoadingReply(true);
     setReplyError(null);
     setGeneratedReply('');
@@ -71,7 +118,29 @@ export function CommunicationPage() {
       });
 
       setGeneratedReply(reply);
-      window.dispatchEvent(new Event('TOKEN_UPDATED'));
+      
+      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tokens')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile) {
+          const usedTokens = 1; // Ou calculé selon la logique métier
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            })
+            .eq('user_id', user.id);
+
+          if (!updateError) {
+            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+          }
+        }
+      }
     } catch (err: any) {
       setReplyError('Erreur lors de la génération de la réponse.');
       console.error(err);
@@ -211,7 +280,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={loading}
+                disabled={loading || tokenCount === 0} // ✅ MODIFICATION: Ajout condition tokens
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -220,6 +289,11 @@ export function CommunicationPage() {
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
+                    </>
+                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION: Condition pour crédits épuisés
+                    <>
+                      <CreditCard className="w-5 h-5 mr-3" />
+                      Crédits épuisés
                     </>
                   ) : (
                     <>
@@ -344,7 +418,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerateReply}
-                disabled={loadingReply}
+                disabled={loadingReply || tokenCount === 0} // ✅ MODIFICATION: Ajout condition tokens
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -353,6 +427,11 @@ export function CommunicationPage() {
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
+                    </>
+                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION: Condition pour crédits épuisés
+                    <>
+                      <CreditCard className="w-5 h-5 mr-3" />
+                      Crédits épuisés
                     </>
                   ) : (
                     <>

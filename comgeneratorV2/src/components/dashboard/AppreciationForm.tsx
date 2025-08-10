@@ -9,6 +9,9 @@ import { generateAppreciation } from '../../lib/api';
 import { AppreciationResult } from './AppreciationResult';
 import type { AppreciationResult as AppreciationResultType } from '../../lib/types';
 import { RatingBar } from './RatingBar';
+import { subjectUpdateEvent, SUBJECT_UPDATED } from './SubjectList';
+import { tokenUpdateEvent, TOKEN_UPDATED } from '../layout/Header';
+import useTokenBalance from '../../hooks/useTokenBalance'; // ✅ AJOUT
 import { 
   PenTool, 
   User, 
@@ -20,8 +23,11 @@ import {
   RotateCcw,
   CheckCircle,
   Target,
-  Settings
+  Settings,
+  AlertCircle, // ✅ AJOUT
+  CreditCard // ✅ AJOUT
 } from 'lucide-react';
+import { Link } from 'react-router-dom'; // ✅ AJOUT
 
 const appreciationSchema = z.object({
   subject: z.string().min(1, 'Veuillez sélectionner une matière'),
@@ -53,9 +59,10 @@ interface Subject {
 
 interface AppreciationFormProps {
   onTokensUpdated?: () => void;
+  tokensAvailable?: number; // ✅ PROP pour recevoir le nombre de tokens
 }
 
-export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
+export function AppreciationForm({ onTokensUpdated, tokensAvailable }: AppreciationFormProps) {
   const { user } = useAuthStore();
   const [subjects, setSubjects] = React.useState<Subject[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -67,9 +74,16 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [editableDetailed, setEditableDetailed] = React.useState('');
   const [editableSummary, setEditableSummary] = React.useState('');
+  const [subjectsRefreshKey, setSubjectsRefreshKey] = React.useState(0);
   
-  // État pour le compteur de tokens
-  const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  // ✅ MODIFICATION : Remplacement de la logique locale par useTokenBalance
+  const tokenBalance = useTokenBalance();
+  const [tokenCount, setTokenCount] = React.useState<number>(0);
+
+  // ✅ AJOUT : Synchronisation des tokens
+  React.useEffect(() => {
+    setTokenCount(tokenBalance ?? 0);
+  }, [tokenBalance]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(appreciationSchema),
@@ -86,40 +100,6 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
   const { register, control, handleSubmit, watch, setValue, reset } = form;
   const selectedSubject = watch('subject');
-
-  // Fonction pour récupérer le compteur de tokens
-  const fetchTokenCount = React.useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .insert({ user_id: user.id, tokens: 100000 })
-            .select('tokens')
-            .single();
-          setTokenCount(newProfile?.tokens ?? 100000);
-          return;
-        }
-        throw error;
-      }
-
-      setTokenCount(data?.tokens ?? 0);
-    } catch (err) {
-      console.error('Erreur lors de la récupération des tokens:', err);
-    }
-  }, [user]);
-
-  // Effet pour charger le compteur de tokens
-  React.useEffect(() => {
-    fetchTokenCount();
-  }, [fetchTokenCount]);
 
   const saveAppreciation = React.useCallback(
     async (tagValue: string, _generated?: AppreciationResultType) => {
@@ -165,10 +145,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             importance
           )
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (subjectsError) throw subjectsError;
       setSubjects(subjectsData || []);
+      console.log('Matières récupérées:', subjectsData);
     } catch (error) {
       console.error('Erreur lors de la récupération des matières:', error);
       setError('Erreur lors de la récupération des matières. Veuillez réessayer.');
@@ -177,6 +159,20 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
   React.useEffect(() => {
     fetchSubjects();
+  }, [fetchSubjects, subjectsRefreshKey]);
+
+  React.useEffect(() => {
+    const handleSubjectUpdate = () => {
+      console.log('Événement SUBJECT_UPDATED reçu - refresh des matières');
+      setSubjectsRefreshKey(prev => prev + 1);
+      fetchSubjects();
+    };
+
+    subjectUpdateEvent.addEventListener(SUBJECT_UPDATED, handleSubjectUpdate);
+    
+    return () => {
+      subjectUpdateEvent.removeEventListener(SUBJECT_UPDATED, handleSubjectUpdate);
+    };
   }, [fetchSubjects]);
 
   React.useEffect(() => {
@@ -193,6 +189,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
   }, [selectedSubject, subjects, setValue]);
 
   const handleGenerateClick = async (data: FormData) => {
+    // ✅ MODIFICATION : Nouvelle logique de vérification des tokens
+    if (tokenCount === 0) {
+      setError('Crédits insuffisants pour générer une appréciation.');
+      return;
+    }
+
     if (!isGenerateClicked) {
       setIsGenerateClicked(true);
       return;
@@ -225,20 +227,26 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
 
       const usedTokens = generatedResult.usedTokens;
 
-      // Vérification et mise à jour des tokens
-      if (tokenCount && tokenCount < usedTokens) {
-        throw new Error('Solde de tokens insuffisant');
-      }
+      // ✅ MODIFICATION : Nouvelle logique de mise à jour des tokens
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tokens')
+          .eq('user_id', user.id)
+          .single();
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ tokens: Math.max(0, (tokenCount || 0) - usedTokens) })
-        .eq('user_id', user!.id);
+        if (profile) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            })
+            .eq('user_id', user.id);
 
-      if (updateError) {
-        console.error('Erreur lors de la mise à jour du compteur de tokens:', updateError);
-      } else {
-        fetchTokenCount(); // Refresh automatique
+          if (!updateError) {
+            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+          }
+        }
       }
 
       onTokensUpdated?.();
@@ -285,25 +293,86 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             Créez des appréciations personnalisées et pertinentes basées sur vos critères d'évaluation
           </p>
           
-          {/* Compteur de tokens modernisé */}
-          {tokenCount !== null && (
-            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+          {/* Compteur de tokens modernisé avec alerte si 0 tokens */}
+          {tokenBalance !== null && (
+            <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
+              tokenCount === 0 
+                ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
+              {tokenCount === 0 ? (
+                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              )}
+              <span className={`text-sm font-medium ${
+                tokenCount === 0 
+                  ? 'text-red-700 dark:text-red-300'
+                  : 'text-gray-700 dark:text-gray-300'
+              }`}>
+                {tokenCount === 0 ? (
+                  <>
+                    <span className="font-bold">Crédits épuisés !</span>
+                    <Link 
+                      to="/buy-tokens" 
+                      className="ml-2 underline hover:no-underline"
+                    >
+                      Recharger →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+                  </>
+                )}
               </span>
             </div>
           )}
         </div>
 
+        {/* ✅ AJOUT : Alerte tokens épuisés */}
+        {tokenCount === 0 && (
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8 mb-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <CreditCard className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-red-700 dark:text-red-300 mb-4">
+                Génération indisponible
+              </h2>
+              <p className="text-red-600 dark:text-red-400 mb-6 max-w-2xl mx-auto">
+                Vous avez utilisé tous vos tokens. Pour continuer à générer des appréciations, veuillez recharger votre compte.
+              </p>
+              <Link
+                to="/buy-tokens"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+              >
+                <CreditCard className="w-5 h-5 mr-3" />
+                Recharger mes crédits
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Formulaire principal modernisé */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
+        <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8 ${
+          tokenCount === 0 ? 'opacity-50' : ''
+        }`}>
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Paramètres de l'appréciation
+              {/* ✅ AJOUT : Badge "Indisponible" si 0 tokens */}
+              {tokenCount === 0 && (
+                <span className="ml-3 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                  Indisponible
+                </span>
+              )}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Configurez les détails pour générer une appréciation personnalisée
+              {tokenCount === 0 
+                ? 'Rechargez vos crédits pour générer une appréciation personnalisée'
+                : 'Configurez les détails pour générer une appréciation personnalisée'
+              }
             </p>
           </div>
 
@@ -318,7 +387,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                 </label>
                 <select
                   {...register('subject')}
-                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  key={`subject-select-${subjectsRefreshKey}`}
+                  disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Sélectionnez une matière</option>
                   {subjects.map((subject) => (
@@ -327,6 +398,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                     </option>
                   ))}
                 </select>
+                {subjects.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-1 flex items-center">
+                    <span className="mr-1">ℹ️</span>
+                    Aucune matière disponible. Créez une matière ci-dessus.
+                  </p>
+                )}
                 {form.formState.errors.subject && (
                   <p className="text-sm text-red-600 mt-1 flex items-center">
                     <span className="mr-1">⚠️</span>
@@ -343,8 +420,9 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                 <input
                   type="text"
                   {...register('studentName')}
+                  disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
                   placeholder="Ex: Marie, Lucas, Emma..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {form.formState.errors.studentName && (
                   <p className="text-sm text-red-600 mt-1 flex items-center">
@@ -369,13 +447,14 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                     <input
                       type="number"
                       {...field}
+                      disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
                       onChange={(e) => {
                         field.onChange(Number(e.target.value));
                         setIsGenerateClicked(false);
                       }}
                       min="50"
                       max="500"
-                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   )}
                 />
@@ -393,13 +472,14 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                     <input
                       type="number"
                       {...field}
+                      disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
                       onChange={(e) => {
                         field.onChange(Number(e.target.value));
                         setIsGenerateClicked(false);
                       }}
                       min="100"
                       max="1000"
-                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   )}
                 />
@@ -430,7 +510,7 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                           </label>
                           <RatingBar
                             value={criterion.value}
-                            onChange={(value) => {
+                            onChange={tokenCount === 0 ? () => {} : (value) => {
                               const newCriteria = [...field.value];
                               newCriteria[index] = { ...criterion, value };
                               field.onChange(newCriteria);
@@ -460,11 +540,12 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
               </label>
               <select
                 {...register('tone')}
+                disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
                 onChange={(e) => {
                   register('tone').onChange(e);
                   setIsGenerateClicked(false);
                 }}
-                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="bienveillant">Bienveillant</option>
                 <option value="normal">Normal</option>
@@ -480,13 +561,14 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
               </label>
               <textarea
                 {...register('personalNotes')}
+                disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
                 onChange={(e) => {
                   register('personalNotes').onChange(e);
                   setIsGenerateClicked(false);
                 }}
                 rows={4}
                 placeholder="Ajoutez des observations particulières, des points à mentionner..."
-                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -501,7 +583,7 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || tokenCount === 0} // ✅ MODIFICATION : Désactivation si 0 tokens
                 className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -510,6 +592,11 @@ export function AppreciationForm({ onTokensUpdated }: AppreciationFormProps) {
                     <>
                       <Loader2 className="animate-spin w-5 h-5 mr-3" />
                       Génération en cours...
+                    </>
+                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION : Condition pour crédits épuisés
+                    <>
+                      <CreditCard className="w-5 h-5 mr-3" />
+                      Crédits épuisés
                     </>
                   ) : (
                     <>

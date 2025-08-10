@@ -141,49 +141,51 @@ export function ResourcesPage() {
 
   // ----- Sauvegarde des préférences -----
   const savePrefs = async () => {
-    if (!user) return;
-    
+  if (!user) return;
+  
+  try {
     const selected = selection.slice(0, 3);
-    const rows = selected.map((feedId, idx) => ({
-      user_id: user.id,
-      position: idx + 1,
-      feed_id: feedId
-    }));
-
-    const { error: upsertError } = await supabase
+    
+    // Supprimer d'abord TOUTES les préférences existantes de l'utilisateur
+    const { error: deleteAllError } = await supabase
       .from('user_rss_preferences')
-      .upsert(rows, { onConflict: 'user_id,position' });
+      .delete()
+      .eq('user_id', user.id);
 
-    if (upsertError) {
-      alert('Erreur lors de la sauvegarde des préférences.');
-      console.error(upsertError);
+    if (deleteAllError) {
+      console.error('Erreur lors de la suppression des anciennes préférences:', deleteAllError);
+      alert('Erreur lors de la suppression des anciennes préférences.');
       return;
     }
 
+    // Ensuite, insérer les nouvelles préférences seulement si il y en a
     if (selected.length > 0) {
-      const { error: delError } = await supabase
-        .from('user_rss_preferences')
-        .delete()
-        .eq('user_id', user.id)
-        .not('feed_id', 'in', `(${selected.join(',')})`);
+      const rows = selected.map((feedId, idx) => ({
+        user_id: user.id,
+        position: idx + 1,
+        feed_id: feedId
+      }));
 
-      if (delError) {
-        console.warn('Nettoyage des anciennes préférences échoué (non bloquant):', delError);
-      }
-    } else {
-      const { error: delError } = await supabase
+      const { error: insertError } = await supabase
         .from('user_rss_preferences')
-        .delete()
-        .eq('user_id', user.id);
+        .insert(rows);
 
-      if (delError) {
-        console.warn('Suppression de toutes les préférences échouée:', delError);
+      if (insertError) {
+        console.error('Erreur lors de l\'insertion des nouvelles préférences:', insertError);
+        alert('Erreur lors de la sauvegarde des nouvelles préférences.');
+        return;
       }
     }
 
+    // Recharger les préférences et fermer le picker
     await fetchPrefs();
     setPickerOpen(false);
-  };
+    
+  } catch (error) {
+    console.error('Erreur générale lors de la sauvegarde:', error);
+    alert('Une erreur inattendue est survenue lors de la sauvegarde.');
+  }
+};
 
   // ----- Handlers UI -----
   const toggleSelection = (id: string) => {

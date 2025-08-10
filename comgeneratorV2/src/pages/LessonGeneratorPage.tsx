@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-// Import correct pour jsPDF v2.x
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -12,6 +11,8 @@ import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
+import useTokenBalance from '../hooks/useTokenBalance';
+import { Link } from 'react-router-dom';
 import { 
   BookOpen, 
   Copy, 
@@ -23,7 +24,9 @@ import {
   Sparkles,
   Clock,
   Users,
-  Target
+  Target,
+  AlertCircle,
+  CreditCard
 } from 'lucide-react';
 
 const pedagogies = [
@@ -74,7 +77,6 @@ const pedagogies = [
   }
 ];
 
-// Créneaux de 45 min à 180 min par pas de 15 min
 const durationOptions = Array.from({ length: 10 }, (_, i) => {
   const value = (45 + i * 15).toString();
   return {
@@ -93,13 +95,13 @@ const lessonSchema = z.object({
 
 type LessonFormData = z.infer<typeof lessonSchema>;
 
-// Composant éditeur markdown avec prévisualisation modernisé
 const MarkdownEditor: React.FC<{
   content: string;
   onChange: (content: string) => void;
   onSaveToBank: (content: string) => void;
   isSaving?: boolean;
-}> = ({ content, onChange, onSaveToBank, isSaving = false }) => {
+  tokensAvailable?: number;
+}> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0 }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(content);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -128,7 +130,6 @@ const MarkdownEditor: React.FC<{
       const maxWidth = pageWidth - 2 * margin;
       let yPosition = margin;
 
-      // Fonction pour ajouter du texte avec gestion des sauts de page
       const addText = (text: string, fontSize: number, isBold: boolean = false, isItalic: boolean = false) => {
         if (yPosition > pageHeight - 20) {
           pdf.addPage();
@@ -152,10 +153,9 @@ const MarkdownEditor: React.FC<{
           pdf.text(line, margin, yPosition);
           yPosition += fontSize * 0.5 + 2;
         });
-        yPosition += 3; // Espacement après le texte
+        yPosition += 3;
       };
 
-      // Fonction pour parser le markdown et convertir en PDF
       const parseMarkdownToPDF = (markdownContent: string) => {
         const lines = markdownContent.split('\n');
         
@@ -167,53 +167,43 @@ const MarkdownEditor: React.FC<{
             return;
           }
           
-          // Titres H1
           if (trimmedLine.startsWith('# ')) {
             const title = trimmedLine.substring(2);
             addText(title, 16, true);
             yPosition += 3;
           }
-          // Titres H2
           else if (trimmedLine.startsWith('## ')) {
             const title = trimmedLine.substring(3);
             addText(title, 14, true);
             yPosition += 2;
           }
-          // Titres H3
           else if (trimmedLine.startsWith('### ')) {
             const title = trimmedLine.substring(4);
             addText(title, 12, true);
             yPosition += 1;
           }
-          // Listes à puces
           else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
             const listItem = '• ' + trimmedLine.substring(2);
             addText(listItem, 10);
           }
-          // Listes numérotées (basique)
           else if (/^\d+\.\s/.test(trimmedLine)) {
             addText(trimmedLine, 10);
           }
-          // Citations
           else if (trimmedLine.startsWith('> ')) {
             const quote = trimmedLine.substring(2);
             addText('"' + quote + '"', 10, false, true);
           }
-          // Texte avec formatage basique
           else {
             let processedText = trimmedLine;
             
-            // Gérer le gras **texte** (simple)
             if (processedText.includes('**')) {
               const parts = processedText.split(/\*\*(.*?)\*\*/g);
               let currentText = '';
               
               for (let i = 0; i < parts.length; i++) {
                 if (i % 2 === 0) {
-                  currentText += parts[i]; // Texte normal
+                  currentText += parts[i];
                 } else {
-                  // Pour simplifier, on garde le texte en gras mais on ne peut pas mixer
-                  // dans une même ligne avec jsPDF basique
                   currentText += parts[i];
                 }
               }
@@ -225,7 +215,6 @@ const MarkdownEditor: React.FC<{
         });
       };
 
-      // En-tête du document
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(18);
       pdf.text('Séance Pédagogique', margin, yPosition);
@@ -236,14 +225,11 @@ const MarkdownEditor: React.FC<{
       pdf.text(`Générée le ${new Date().toLocaleDateString('fr-FR')}`, margin, yPosition);
       yPosition += 10;
       
-      // Ligne de séparation
       pdf.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 10;
 
-      // Contenu principal
       parseMarkdownToPDF(content);
 
-      // Pied de page sur chaque page
       const pdfInternal = pdf.internal as any;
       const totalPages = pdfInternal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
@@ -257,7 +243,6 @@ const MarkdownEditor: React.FC<{
         );
       }
 
-      // Télécharger le PDF
       const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
       pdf.save(`seance-pedagogique-${date}.pdf`);
       
@@ -435,13 +420,13 @@ const MarkdownEditor: React.FC<{
 
 export function LessonGeneratorPage() {
   const { user, loading: authLoading } = useAuthStore();
-  const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  const tokenCount = useTokenBalance();
   const [generatedContent, setGeneratedContent] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [savingToBank, setSavingToBank] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [selectedPedagogy, setSelectedPedagogy] = React.useState<string>('');
-  const [selectedDuration, setSelectedDuration] = React.useState<string>('60'); // Valeur initiale 60 min
+  const [selectedDuration, setSelectedDuration] = React.useState<string>('60');
   const [lastFormData, setLastFormData] = React.useState<LessonFormData | null>(null);
 
   const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<LessonFormData>({
@@ -455,38 +440,14 @@ export function LessonGeneratorPage() {
     }
   });
 
-  const fetchTokenCount = React.useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) throw error;
-      setTokenCount(data?.tokens ?? 0);
-    } catch (err) {
-      console.error('Erreur lors de la récupération du solde de tokens:', err);
-    }
-  }, [user]);
-
-  React.useEffect(() => {
-    fetchTokenCount();
-  }, [fetchTokenCount]);
-
-  React.useEffect(() => {
-    const handleTokenUpdate = () => {
-      fetchTokenCount();
-    };
-    tokenUpdateEvent.addEventListener(TOKEN_UPDATED, handleTokenUpdate);
-    return () => {
-      tokenUpdateEvent.removeEventListener(TOKEN_UPDATED, handleTokenUpdate);
-    };
-  }, [fetchTokenCount]);
-
   const onSubmit = async (data: LessonFormData) => {
     if (!user) return;
+    
+    if (tokenCount === 0) {
+      setError('INSUFFICIENT_TOKENS');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setGeneratedContent('');
@@ -516,41 +477,53 @@ export function LessonGeneratorPage() {
       setGeneratedContent(content);
 
       const usedTokens: number = result.usage?.total_tokens ?? 0;
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
 
-      if (profileError) throw new Error("Impossible de vérifier votre solde de tokens");
-      if ((profile?.tokens ?? 0) < usedTokens) throw new Error('Solde de tokens insuffisant');
+      if (usedTokens > 0 && user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('tokens')
+          .eq('user_id', user.id)
+          .single();
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ tokens: (profile.tokens || 0) - usedTokens })
-        .eq('user_id', user.id);
-      if (updateError) throw new Error('Échec de la mise à jour du solde de tokens');
+        if (!profileError && profile) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ 
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            })
+            .eq('user_id', user.id);
 
-      tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+          if (!updateError) {
+            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+          }
+        }
+      }
 
-      const { error: insertError } = await supabase.from('lessons').insert({
-        user_id: user.id,
-        subject: data.subject,
-        topic: data.topic,
-        level: data.level,
-        pedagogy_type: data.pedagogy_type,
-        duration: parseInt(data.duration, 10),
-        content,
-        created_at: new Date().toISOString()
-      });
-      if (insertError) throw insertError;
+      const remainingTokens = Math.max(0, (tokenCount || 0) - usedTokens);
+      if (remainingTokens >= 0) {
+        const { error: insertError } = await supabase.from('lessons').insert({
+          user_id: user.id,
+          subject: data.subject,
+          topic: data.topic,
+          level: data.level,
+          pedagogy_type: data.pedagogy_type,
+          duration: parseInt(data.duration, 10),
+          content,
+          created_at: new Date().toISOString()
+        });
+        if (insertError) console.error('Erreur lors de la sauvegarde automatique:', insertError);
+      }
 
-      // Sauvegarder les données du formulaire pour la banque de séances
       setLastFormData(data);
       reset();
     } catch (err: any) {
       console.error('Erreur lors de la génération:', err);
-      setError(err.message || 'Une erreur est survenue lors de la génération.');
+      
+      if (err.message === 'INSUFFICIENT_TOKENS') {
+        setError('INSUFFICIENT_TOKENS');
+      } else {
+        setError(err.message || 'Une erreur est survenue lors de la génération.');
+      }
     } finally {
       setLoading(false);
     }
@@ -558,7 +531,6 @@ export function LessonGeneratorPage() {
 
   const handleContentChange = (newContent: string) => {
     setGeneratedContent(newContent);
-    // Optionnel : sauvegarder automatiquement en BDD
   };
 
   const handleSaveToBank = async (contentToSave: string) => {
@@ -584,7 +556,6 @@ export function LessonGeneratorPage() {
 
       if (error) throw error;
 
-      // Success feedback plus discret et professionnel
       const successDiv = document.createElement('div');
       successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
       successDiv.innerHTML = '✅ Séance ajoutée à votre banque !';
@@ -611,7 +582,6 @@ export function LessonGeneratorPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header moderne */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
@@ -625,32 +595,70 @@ export function LessonGeneratorPage() {
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
           
-          {/* Stats */}
           {tokenCount !== null && (
-            <div className="inline-flex items-center bg-white dark:bg-gray-800 px-6 py-3 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-              <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+            <div className={tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}>
+              {tokenCount === 0 ? (
+                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
+              ) : (
+                <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
+              )}
+              <span className={tokenCount === 0 ? 'text-sm font-medium text-red-700 dark:text-red-300' : 'text-sm font-medium text-gray-700 dark:text-gray-300'}>
+                {tokenCount === 0 ? (
+                  <span>
+                    <span className="font-bold">Crédits épuisés !</span>
+                    <Link to="/buy-tokens" className="ml-2 underline hover:no-underline">
+                      Recharger →
+                    </Link>
+                  </span>
+                ) : (
+                  <span>
+                    Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
+                  </span>
+                )}
               </span>
             </div>
           )}
         </div>
 
-        {/* Formulaire modernisé */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8">
+        {tokenCount === 0 && (
+          <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8 mb-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <CreditCard className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-red-700 dark:text-red-300 mb-4">
+                Génération indisponible
+              </h2>
+              <p className="text-red-600 dark:text-red-400 mb-6 max-w-2xl mx-auto">
+                Vous avez utilisé tous vos tokens. Pour continuer à générer des séances, veuillez recharger votre compte.
+              </p>
+              <Link
+                to="/buy-tokens"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+              >
+                <CreditCard className="w-5 h-5 mr-3" />
+                Recharger mes crédits
+              </Link>
+            </div>
+          </div>
+        )}
+
+        <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8 ${tokenCount === 0 ? 'opacity-50' : ''}`}>
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Paramètres de la séance
+              {tokenCount === 0 && (
+                <span className="ml-3 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                  Indisponible
+                </span>
+              )}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              Configurez les détails de votre séance pédagogique
+              {tokenCount === 0 ? 'Rechargez vos crédits pour générer des séances pédagogiques' : 'Configurez les détails de votre séance pédagogique'}
             </p>
           </div>
 
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="space-y-8"
-          >
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
@@ -660,8 +668,9 @@ export function LessonGeneratorPage() {
                 <Input
                   id="subject"
                   {...register('subject')}
+                  disabled={tokenCount === 0}
                   error={errors.subject?.message}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Ex: Mathématiques, Français, Histoire..."
                 />
               </div>
@@ -674,8 +683,9 @@ export function LessonGeneratorPage() {
                 <Input
                   id="topic"
                   {...register('topic')}
+                  disabled={tokenCount === 0}
                   error={errors.topic?.message}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Ex: Les fractions, La Renaissance, L'écosystème..."
                 />
               </div>
@@ -690,8 +700,9 @@ export function LessonGeneratorPage() {
                 <Input
                   id="level"
                   {...register('level')}
+                  disabled={tokenCount === 0}
                   error={errors.level?.message}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Ex: CE2, 6ème, Terminale S..."
                 />
               </div>
@@ -708,9 +719,10 @@ export function LessonGeneratorPage() {
                     setValue('duration', e.target.value);
                   }}
                   value={selectedDuration}
+                  disabled={tokenCount === 0}
                   options={durationOptions}
                   error={errors.duration?.message}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -726,9 +738,10 @@ export function LessonGeneratorPage() {
                   setSelectedPedagogy(e.target.value);
                   setValue('pedagogy_type', e.target.value);
                 }}
+                disabled={tokenCount === 0}
                 options={pedagogies.map(p => ({ value: p.value, label: p.label }))}
                 error={errors.pedagogy_type?.message}
-                className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {selectedPedagogy && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
@@ -741,34 +754,56 @@ export function LessonGeneratorPage() {
 
             {error && (
               <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-                <p className="text-red-700 dark:text-red-300 font-medium">❌ {error}</p>
+                {error === 'INSUFFICIENT_TOKENS' ? (
+                  <div className="text-center">
+                    <p className="text-red-700 dark:text-red-300 font-medium mb-4">
+                      ❌ Crédits insuffisants pour cette génération
+                    </p>
+                    <p className="text-red-600 dark:text-red-400 text-sm mb-4">
+                      Cette séance nécessite plus de tokens que votre solde actuel.
+                    </p>
+                    <Link
+                      to="/buy-tokens"
+                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Recharger mes crédits
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-red-700 dark:text-red-300 font-medium">❌ {error}</p>
+                )}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || tokenCount === 0}
               className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
               <span className="relative flex items-center justify-center">
                 {loading ? (
-                  <>
+                  <span className="flex items-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                     Génération en cours...
-                  </>
+                  </span>
+                ) : tokenCount === 0 ? (
+                  <span className="flex items-center">
+                    <CreditCard className="w-5 h-5 mr-3" />
+                    Crédits épuisés
+                  </span>
                 ) : (
-                  <>
+                  <span className="flex items-center">
                     <Sparkles className="w-5 h-5 mr-3" />
                     Générer la séance pédagogique
-                  </>
+                  </span>
                 )}
               </span>
             </button>
           </form>
         </div>
 
-        {/* Résultat généré */}
         {generatedContent && (
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
             <MarkdownEditor
@@ -776,6 +811,7 @@ export function LessonGeneratorPage() {
               onChange={handleContentChange}
               onSaveToBank={handleSaveToBank}
               isSaving={savingToBank}
+              tokensAvailable={tokenCount ?? 0}
             />
           </div>
         )}
