@@ -4,21 +4,33 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase, checkProjectStatus, isSupabaseConfigured } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { LogIn, AlertCircle, Wifi, WifiOff, Mail, CheckCircle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères')
 });
 
+const resetSchema = z.object({
+  email: z.string().email('Email invalide')
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
+type ResetFormData = z.infer<typeof resetSchema>;
 
 export function LoginForm() {
   const navigate = useNavigate();
   const [error, setError] = React.useState<string | null>(null);
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+  const [showResetForm, setShowResetForm] = React.useState(false);
+  const [resetSuccess, setResetSuccess] = React.useState(false);
+  
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema)
+  });
+
+  const { register: registerReset, handleSubmit: handleSubmitReset, formState: { errors: resetErrors, isSubmitting: isResetting } } = useForm<ResetFormData>({
+    resolver: zodResolver(resetSchema)
   });
 
   // Monitor online status
@@ -113,6 +125,140 @@ export function LoginForm() {
     }
   };
 
+  const onResetSubmit = async (data: ResetFormData) => {
+    try {
+      setError(null);
+
+      // Check if user is online
+      if (!navigator.onLine) {
+        throw new Error('Vous êtes hors ligne. Veuillez vérifier votre connexion internet.');
+      }
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      setResetSuccess(true);
+    } catch (error: any) {
+      const errorMessage = getDetailedErrorMessage(error);
+      setError(errorMessage);
+    }
+  };
+
+  // Si la réinitialisation a réussi
+  if (resetSuccess) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800">
+          <div className="flex">
+            <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
+                Email envoyé !
+              </h3>
+              <div className="mt-2 text-sm text-green-700 dark:text-green-300">
+                Nous avons envoyé un lien de réinitialisation à votre adresse email. 
+                Vérifiez votre boîte de réception et suivez les instructions.
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <button
+          onClick={() => {
+            setShowResetForm(false);
+            setResetSuccess(false);
+          }}
+          className="mt-4 w-full text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          ← Retour à la connexion
+        </button>
+      </div>
+    );
+  }
+
+  // Si on affiche le formulaire de réinitialisation
+  if (showResetForm) {
+    return (
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-4">
+          <Mail className="mx-auto h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            Mot de passe oublié ?
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Entrez votre email pour recevoir un lien de réinitialisation
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmitReset(onResetSubmit)} className="space-y-4">
+          <div>
+            <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              Email
+            </label>
+            <input
+              {...registerReset('email')}
+              type="email"
+              id="reset-email"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              placeholder="votre.email@example.com"
+            />
+            {resetErrors.email && (
+              <p className="mt-1 text-sm text-red-600">{resetErrors.email.message}</p>
+            )}
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
+              <div className="flex">
+                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                    Erreur
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                    <pre className="whitespace-pre-wrap font-sans">{error}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isResetting || !isOnline}
+            className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isResetting ? (
+              <span className="flex items-center">
+                <Mail className="animate-pulse -ml-1 mr-2 h-4 w-4" />
+                Envoi en cours...
+              </span>
+            ) : (
+              'Envoyer le lien'
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowResetForm(false);
+              setError(null);
+            }}
+            className="w-full text-sm text-gray-600 hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-300"
+          >
+            ← Retour à la connexion
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // Formulaire de connexion principal
   return (
     <div className="w-full max-w-sm">
       {/* Connection status indicator */}
@@ -143,9 +289,21 @@ export function LoginForm() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Mot de passe
-          </label>
+          <div className="flex justify-between items-center">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              Mot de passe
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowResetForm(true);
+                setError(null);
+              }}
+              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Mot de passe oublié ?
+            </button>
+          </div>
           <input
             {...register('password')}
             type="password"
