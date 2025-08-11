@@ -20,7 +20,6 @@ export function BuyTokensPage() {
   ];
 
   const bankFeatures = [
-    'Sauvegarde de toutes vos créations',
     'Banque d\'appréciations avec tags',
     'Banque de séances archivées',
     'Recherche dans vos contenus',
@@ -36,20 +35,20 @@ export function BuyTokensPage() {
       tokens: '200 000',
       basePrice: 3.50,
       description: 'Parfait pour un usage régulier',
-      // Basé sur 200k tokens : ~285 appréciations OU ~222 synthèses OU ~500 communications OU ~133 séances
+      // Basé sur 200k tokens : ~133 appréciations OU ~111 synthèses OU ~200 communications OU ~57 séances
       examples: {
         withBank: [
-          '🎯 285 appréciations détaillées',
-          '💬 200 communications + 140 appréciations',
-          '📄 100 synthèses + 100 appréciations',
-          '📚 50 séances + 210 appréciations',
+          '🎯 133 appréciations détaillées',
+          '💬 100 communications + 67 appréciations',
+          '📄 56 synthèses + 33 appréciations',
+          '📚 29 séances + 32 appréciations',
           '🔄 Mix équilibré selon vos besoins'
         ],
         withoutBank: [
-          '🎯 285 appréciations détaillées',
-          '💬 200 communications + 140 appréciations', 
-          '📄 100 synthèses + 100 appréciations',
-          '📚 50 séances + 210 appréciations',
+          '🎯 133 appréciations détaillées',
+          '💬 100 communications + 67 appréciations', 
+          '📄 56 synthèses + 33 appréciations',
+          '📚 29 séances + 32 appréciations',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -63,20 +62,20 @@ export function BuyTokensPage() {
       tokens: '400 000',
       basePrice: 6.00,
       description: 'Usage intensif avec plus de flexibilité',
-      // Basé sur 400k tokens : ~571 appréciations OU ~444 synthèses OU ~1000 communications OU ~266 séances
+      // Basé sur 400k tokens : ~267 appréciations OU ~222 synthèses OU ~400 communications OU ~114 séances
       examples: {
         withBank: [
-          '🎯 571 appréciations détaillées',
-          '💬 500 communications + 280 appréciations',
-          '📄 200 synthèses + 200 appréciations',
-          '📚 100 séances + 420 appréciations',
+          '🎯 267 appréciations détaillées',
+          '💬 200 communications + 134 appréciations',
+          '📄 111 synthèses + 67 appréciations',
+          '📚 57 séances + 67 appréciations',
           '🔥 Usage intensif toute l\'année'
         ],
         withoutBank: [
-          '🎯 571 appréciations détaillées',
-          '💬 500 communications + 280 appréciations',
-          '📄 200 synthèses + 200 appréciations', 
-          '📚 100 séances + 420 appréciations',
+          '🎯 267 appréciations détaillées',
+          '💬 200 communications + 134 appréciations',
+          '📄 111 synthèses + 67 appréciations', 
+          '📚 57 séances + 67 appréciations',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -132,25 +131,25 @@ export function BuyTokensPage() {
             </div>
             
             <p className="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Un token = unité de mesure pour l'IA (environ 4 caractères de texte généré)
+              Un token = unité de mesure pour l'IA (environ 4 caractères de texte). Les estimations incluent la consommation complète : votre demande + la réponse générée.
             </p>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
               <div className="flex items-center">
                 <PenTool className="w-4 h-4 text-green-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Appréciation: 700 tokens</span>
+                <span className="text-gray-600 dark:text-gray-400">Appréciation: 1500 tokens</span>
               </div>
               <div className="flex items-center">
                 <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Synthèse: 900 tokens</span>
+                <span className="text-gray-600 dark:text-gray-400">Synthèse: 1800 tokens</span>
               </div>
               <div className="flex items-center">
                 <MessageCircle className="w-4 h-4 text-purple-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Communication: 400 tokens</span>
+                <span className="text-gray-600 dark:text-gray-400">Communication: 1000 tokens</span>
               </div>
               <div className="flex items-center">
                 <BookOpen className="w-4 h-4 text-orange-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Séance: 1500 tokens</span>
+                <span className="text-gray-600 dark:text-gray-400">Séance: 3500 tokens</span>
               </div>
             </div>
             
