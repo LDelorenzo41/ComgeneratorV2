@@ -454,8 +454,147 @@ export function LessonGeneratorPage() {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
 
-    const prompt = `Tu es un expert de l'enseignement primaire et secondaire, spécialiste en didactique et en pédagogie. Génère une **séance pédagogique complète** d'une durée de ${data.duration} minutes pour un cours de ${data.subject} avec une classe de niveau ${data.level}, selon la pédagogie suivante : ${pedagogyDescription}. Le **thème** de cette séance est : **${data.topic}**. Structure la séance avec un **objectif clair**, une **mise en activité**, une **phase principale**, une **évaluation finale** et **des prolongements éventuels**. Adopte un style **pédagogique clair, structuré et directement exploitable**. Formate ta réponse en Markdown avec des titres, sous-titres et listes pour une meilleure lisibilité.`;
+// Remplacement de la section "Déroulé détaillé" dans le prompt :
 
+// ❌ ANCIEN (problématique) :
+// ## ⏰ Déroulé détaillé de la séance
+// | Phase | Durée | Activité | Modalité | Rôle enseignant | Rôle élèves |
+// |-------|-------|----------|----------|-----------------|-------------|
+
+// ✅ NOUVEAU (plus lisible) :
+const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
+
+**CONTEXTE DE LA SÉANCE :**
+- Matière : ${data.subject}
+- Thème/Notion : ${data.topic}
+- Niveau : ${data.level}
+- Durée : ${data.duration} minutes
+- Approche pédagogique : ${pedagogyDescription}
+
+**CONSIGNES DE STRUCTURATION :**
+Génère une séance pédagogique complète et directement exploitable en respectant OBLIGATOIREMENT cette structure Markdown :
+
+# 📚 [Titre accrocheur de la séance]
+**Niveau :** ${data.level} | **Durée :** ${data.duration} min | **Matière :** ${data.subject}
+
+## 🎯 Objectifs et compétences visées
+### Objectifs d'apprentissage
+- [3-4 objectifs précis et mesurables]
+
+### Compétences du socle/programmes officiels
+- [Références aux programmes en vigueur]
+
+## 🛠️ Matériel et supports nécessaires
+### Pour l'enseignant
+- [Liste détaillée]
+
+### Pour les élèves
+- [Liste détaillée]
+
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 
+`### Espace et terrain
+- [Configuration spatiale nécessaire]
+- [Matériel sportif requis]` : ''}
+
+## 🏫 Organisation spatiale de la classe
+> **💡 Configuration adaptée à la pédagogie ${data.pedagogy_type}**
+- [Description précise de l'aménagement de l'espace selon la pédagogie choisie]
+- [Disposition des élèves, des tables, des espaces de travail]
+
+## ⏰ Déroulé détaillé de la séance
+
+### 🚀 **Phase 1 : Accroche/Situation déclenchante** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+---
+
+### 🔍 **Phase 2 : [Nom de la phase]** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+---
+
+### 🏗️ **Phase 3 : [Nom de la phase]** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+---
+
+### 📝 **Phase 4 : Synthèse/Institutionnalisation** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+## 🎨 Différenciation et adaptations
+
+### 🟢 Pour les élèves en difficulté
+- [3-4 adaptations concrètes]
+
+### 🔵 Pour les élèves à l'aise
+- [3-4 enrichissements possibles]
+
+### ♿ Adaptations inclusives
+- [Adaptations pour élèves à besoins particuliers]
+
+## 📊 Évaluation et critères de réussite
+
+### Critères de réussite observables
+- **Critère 1 :** [Comportement/production attendue]
+- **Critère 2 :** [Comportement/production attendue]
+- **Critère 3 :** [Comportement/production attendue]
+
+### Modalités d'évaluation
+- [Formative/Sommative/Auto-évaluation/Etc.]
+
+## 💡 Conseils pratiques et anticipation
+
+### ⚠️ Points de vigilance
+- [Difficultés prévisibles et solutions]
+
+### 🗣️ Questions types à poser
+- [5-6 questions pour guider les élèves]
+
+### 🔄 Variantes possibles
+- [Adaptations selon le contexte]
+
+## 📈 Prolongements possibles
+- **Séance suivante :** [Piste pour la continuité]
+- **Interdisciplinarité :** [Liens avec d'autres matières]
+- **À la maison :** [Travail personnel éventuel]
+
+---
+> **💻 Ressources numériques :** [Sites, apps, outils TICE recommandés]
+> **📚 Pour aller plus loin :** [Ressources pédagogiques complémentaires]
+
+**EXIGENCES QUALITÉ :**
+1. Chaque timing doit être précis et la somme doit correspondre à ${data.duration} minutes
+2. Les activités doivent être concrètes et directement réalisables
+3. La pédagogie ${data.pedagogy_type} doit être clairement visible dans les modalités
+4. Les consignes aux élèves doivent être formulées simplement
+5. Prévoir des transitions fluides entre les phases
+6. Intégrer des éléments de différenciation naturelle
+
+Génère maintenant cette séance en respectant scrupuleusement cette structure et en étant très concret dans toutes les descriptions.`;
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',

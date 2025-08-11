@@ -2,13 +2,15 @@ import React from 'react';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import Textarea from '../components/ui/Textarea';
+import { SignatureManager } from '../components/SignatureManager';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import copyToClipboard from '../lib/copyToClipboard';
 import { generateCommunication } from '../lib/generateCommunication';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 import { generateReply } from '../lib/generateReply';
-import { supabase } from '../lib/supabase'; // ✅ AJOUT
+import { supabase } from '../lib/supabase';
+import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer'; // AJOUT : Import du disclaimer
 
 import { 
   MessageSquare, 
@@ -21,9 +23,19 @@ import {
   FileText, 
   RefreshCw, 
   CheckCircle,
-  CreditCard, // ✅ AJOUT
-  AlertCircle // ✅ AJOUT
+  CreditCard,
+  AlertCircle,
+  PenTool,
+  X
 } from 'lucide-react';
+
+// ✅ AJOUT: Interface pour les signatures
+interface Signature {
+  id: string;
+  name: string;
+  content: string;
+  is_default: boolean;
+}
 
 export function CommunicationPage() {
   const { user } = useAuthStore();
@@ -45,6 +57,12 @@ export function CommunicationPage() {
   const [loadingReply, setLoadingReply] = React.useState(false);
   const [replyError, setReplyError] = React.useState<string | null>(null);
 
+  // ✅ AJOUT: États pour la gestion des signatures
+  const [signatures, setSignatures] = React.useState<Signature[]>([]);
+  const [selectedSignatureOutgoing, setSelectedSignatureOutgoing] = React.useState<string>('');
+  const [selectedSignatureIncoming, setSelectedSignatureIncoming] = React.useState<string>('');
+  const [showSignatureModal, setShowSignatureModal] = React.useState(false);
+
   // ✅ AJOUT: État pour tracking des tokens locaux
   const [tokenCount, setTokenCount] = React.useState<number>(0);
 
@@ -53,8 +71,31 @@ export function CommunicationPage() {
     setTokenCount(tokenBalance ?? 0);
   }, [tokenBalance]);
 
+  // ✅ AJOUT: Récupération des signatures de l'utilisateur
+  const fetchSignatures = React.useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('signatures')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('name');
+
+      if (error) throw error;
+      setSignatures(data || []);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des signatures:', error);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    fetchSignatures();
+  }, [fetchSignatures]);
+
+  // ✅ MODIFICATION: Fonction handleGenerate avec signature
   const handleGenerate = async () => {
-    // ✅ MODIFICATION: Nouvelle logique de vérification des tokens
     if (tokenCount === 0) {
       setError('Crédits insuffisants pour générer une communication.');
       return;
@@ -65,7 +106,18 @@ export function CommunicationPage() {
     setGeneratedContent('');
 
     try {
-      const text = await generateCommunication({ destinataire, ton, contenu });
+      // ✅ AJOUT: Récupération de la signature sélectionnée
+      const selectedSignature = selectedSignatureOutgoing 
+        ? signatures.find(s => s.id === selectedSignatureOutgoing)
+        : null;
+
+      // ✅ MODIFICATION: Ajout de la signature dans les paramètres
+      const text = await generateCommunication({ 
+        destinataire, 
+        ton, 
+        contenu,
+        signature: selectedSignature ? selectedSignature.content : null
+      });
       setGeneratedContent(text);
       
       // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
@@ -99,8 +151,8 @@ export function CommunicationPage() {
     }
   };
 
+  // ✅ MODIFICATION: Fonction handleGenerateReply avec signature
   const handleGenerateReply = async () => {
-    // ✅ MODIFICATION: Nouvelle logique de vérification des tokens
     if (tokenCount === 0) {
       setReplyError('Crédits insuffisants pour générer une réponse.');
       return;
@@ -111,10 +163,17 @@ export function CommunicationPage() {
     setGeneratedReply('');
 
     try {
+      // ✅ AJOUT: Récupération de la signature sélectionnée
+      const selectedSignature = selectedSignatureIncoming 
+        ? signatures.find(s => s.id === selectedSignatureIncoming)
+        : null;
+
+      // ✅ MODIFICATION: Ajout de la signature dans les paramètres
       const reply = await generateReply({
         message: messageRecu,
         ton: tonReponse,
-        objectifs: objectifsReponse
+        objectifs: objectifsReponse,
+        signature: selectedSignature ? selectedSignature.content : null
       });
 
       setGeneratedReply(reply);
@@ -214,6 +273,9 @@ export function CommunicationPage() {
             </div>
 
             <div className="space-y-6">
+              {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
+              {tokenCount > 0 && <AICommunicationDisclaimer />}
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
@@ -257,6 +319,44 @@ export function CommunicationPage() {
                 </div>
               </div>
 
+              {/* ✅ AJOUT: Menu déroulant pour signature sortante avec bouton de gestion */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    <PenTool className="w-4 h-4 inline mr-2" />
+                    Signature
+                  </label>
+                  <button
+                    onClick={() => setShowSignatureModal(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                  >
+                    + Gérer les signatures
+                  </button>
+                </div>
+                <Select
+                  id="signature-outgoing"
+                  value={selectedSignatureOutgoing}
+                  onChange={(e) => setSelectedSignatureOutgoing(e.target.value)}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  options={[
+                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    ...signatures.map(signature => ({
+                      value: signature.id,
+                      label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
+                    }))
+                  ]}
+                />
+                {/* ✅ AJOUT: Aperçu de la signature */}
+                {selectedSignatureOutgoing && (
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Aperçu de la signature :</p>
+                    <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">
+                      {signatures.find(s => s.id === selectedSignatureOutgoing)?.content}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <FileText className="w-4 h-4 inline mr-2" />
@@ -280,7 +380,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={loading || tokenCount === 0} // ✅ MODIFICATION: Ajout condition tokens
+                disabled={loading || tokenCount === 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -290,7 +390,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION: Condition pour crédits épuisés
+                  ) : tokenCount === 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -362,6 +462,47 @@ export function CommunicationPage() {
             </div>
 
             <div className="space-y-6">
+              {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
+              {tokenCount > 0 && <AICommunicationDisclaimer />}
+
+              {/* ✅ AJOUT: Menu déroulant pour signature entrante avec bouton de gestion */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    <PenTool className="w-4 h-4 inline mr-2" />
+                    Signature pour la réponse
+                  </label>
+                  <button
+                    onClick={() => setShowSignatureModal(true)}
+                    className="text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium transition-colors"
+                  >
+                    + Gérer les signatures
+                  </button>
+                </div>
+                <Select
+                  id="signature-incoming"
+                  value={selectedSignatureIncoming}
+                  onChange={(e) => setSelectedSignatureIncoming(e.target.value)}
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+                  options={[
+                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    ...signatures.map(signature => ({
+                      value: signature.id,
+                      label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
+                    }))
+                  ]}
+                />
+                {/* ✅ AJOUT: Aperçu de la signature */}
+                {selectedSignatureIncoming && (
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Aperçu de la signature :</p>
+                    <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">
+                      {signatures.find(s => s.id === selectedSignatureIncoming)?.content}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <MessageSquare className="w-4 h-4 inline mr-2" />
@@ -418,7 +559,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerateReply}
-                disabled={loadingReply || tokenCount === 0} // ✅ MODIFICATION: Ajout condition tokens
+                disabled={loadingReply || tokenCount === 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -428,7 +569,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION: Condition pour crédits épuisés
+                  ) : tokenCount === 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -502,6 +643,34 @@ export function CommunicationPage() {
 
         </div>
       </div>
+
+      {/* ✅ NOUVEAU: Modal de gestion des signatures */}
+      {showSignatureModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center">
+                    <PenTool className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Gestion des signatures
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setShowSignatureModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                  title="Fermer"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <SignatureManager onSignatureChange={fetchSignatures} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

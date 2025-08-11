@@ -375,9 +375,74 @@ export function LessonsBankPage() {
                 </div>
 
                 {/* Contenu */}
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-4 mb-4">
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown>
+                <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden mb-4">
+                  <div className={`prose prose-sm max-w-none dark:prose-invert p-6 ${
+                    expandedItems.has(lesson.id) ? '' : 'max-h-96 overflow-hidden'
+                  }`}>
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => (
+                          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
+                            {children}
+                          </h3>
+                        ),
+                        p: ({ children }) => (
+                          <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
+                            {children}
+                          </p>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="mb-1">
+                            {children}
+                          </li>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-gray-900 dark:text-gray-100">
+                            {children}
+                          </strong>
+                        ),
+                        em: ({ children }) => (
+                          <em className="italic text-gray-800 dark:text-gray-200">
+                            {children}
+                          </em>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">
+                            {children}
+                          </blockquote>
+                        ),
+                        code: ({ children }) => (
+                          <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">
+                            {children}
+                          </code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">
+                            {children}
+                          </pre>
+                        )
+                      }}
+                    >
                       {expandedItems.has(lesson.id) 
                         ? lesson.content 
                         : getTruncatedContent(lesson.content, viewMode === 'grid' ? 200 : 300)
@@ -386,13 +451,15 @@ export function LessonsBankPage() {
                   </div>
                   
                   {lesson.content.length > (viewMode === 'grid' ? 200 : 300) && (
-                    <button
-                      onClick={() => toggleExpanded(lesson.id)}
-                      className="mt-3 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 font-medium flex items-center"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      {expandedItems.has(lesson.id) ? 'Réduire' : 'Voir plus'}
-                    </button>
+                    <div className="px-6 pb-4">
+                      <button
+                        onClick={() => toggleExpanded(lesson.id)}
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 font-medium flex items-center bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all duration-200"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        {expandedItems.has(lesson.id) ? 'Réduire' : 'Voir plus'}
+                      </button>
+                    </div>
                   )}
                 </div>
 

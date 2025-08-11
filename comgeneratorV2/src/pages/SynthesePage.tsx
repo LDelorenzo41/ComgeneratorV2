@@ -141,7 +141,9 @@ export function SynthesePage() {
       return;
     }
 
-    const prompt = `
+    // ❌ ANCIEN PROMPT (version simple) dans SynthesePage.tsx :
+/*
+const prompt = `
 Voici plusieurs commentaires de professeurs extraits d'un bulletin scolaire.
 
 Tu dois générer une appréciation globale en identifiant les grandes tendances : points forts, difficultés éventuelles, éléments positifs. Ne cite pas les professeurs mais tu peux mentionner les matières. Utilise un ton fluide, synthétique et pertinent.
@@ -151,6 +153,101 @@ La synthèse doit respecter la limite maximale de ${maxChars} caractères.
 Commentaires :
 ${extracted}
 `;
+*/
+
+// ✅ NOUVEAU PROMPT AMÉLIORÉ (à remplacer ligne ~118 dans SynthesePage.tsx) :
+
+const prompt = `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
+
+**CONTEXTE ET MISSION :**
+Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et rédiger une appréciation générale cohérente et professionnelle qui sera placée en pied de bulletin.
+
+**COMMENTAIRES À ANALYSER :**
+"""
+${extracted}
+"""
+
+**INSTRUCTIONS D'ANALYSE :**
+
+1. **Identification des tendances pédagogiques :**
+   - Repère les points forts récurrents dans les différentes matières
+   - Identifie les difficultés ou axes d'amélioration mentionnés
+   - Détecte les compétences transversales (autonomie, participation, méthode, etc.)
+   - Évalue l'évolution ou la progression de l'élève si mentionnée
+
+2. **Analyse des domaines de compétences :**
+   - **Savoirs disciplinaires :** Connaissances et compétences spécifiques aux matières
+   - **Savoir-faire méthodologiques :** Organisation, rigueur, présentation des travaux
+   - **Savoir-être comportementaux :** Participation, attitude, relations avec autrui
+   - **Compétences transversales :** Raisonnement, créativité, esprit critique
+
+3. **Cohérence pédagogique :**
+   - Identifie les convergences entre les appréciations des différents professeurs
+   - Repère les spécificités selon les types de matières (littéraires, scientifiques, artistiques)
+   - Détecte les compétences qui se confirment ou s'infirment selon les disciplines
+
+**INSTRUCTIONS DE RÉDACTION :**
+
+4. **Structure de l'appréciation générale :**
+   - **Ouverture :** Bilan global du trimestre/semestre en 1-2 phrases
+   - **Points forts :** Mise en valeur des réussites et qualités de l'élève
+   - **Axes d'amélioration :** Formulation constructive des difficultés avec pistes de progrès
+   - **Conclusion :** Encouragements et objectifs pour la suite
+
+5. **Ton et registre :**
+   - Adopte un ton bienveillant mais objectif
+   - Utilise un vocabulaire pédagogique professionnel
+   - Évite les jugements de valeur et privilégie les observations factuelles
+   - Maintiens une perspective encourageante même en cas de difficultés
+
+6. **Formulation pédagogique :**
+   - Utilise des tournures positives même pour les points d'amélioration
+   - Privilégie "Il serait profitable de..." plutôt que "Il faut absolument..."
+   - Emploie le vocabulaire des compétences et de la progression
+   - Évite les répétitions avec les commentaires disciplinaires
+
+**CONTRAINTES TECHNIQUES :**
+- **Limite stricte :** ${maxChars} caractères maximum (espaces compris)
+- **Références aux matières :** Tu PEUX mentionner les disciplines sans citer nommément les professeurs
+- **Cohérence :** L'appréciation doit être en accord avec l'ensemble des commentaires analysés
+- **Lisibilité :** Phrases fluides et accessibles aux parents et à l'élève
+
+**PRINCIPES PÉDAGOGIQUES À RESPECTER :**
+- **Bienveillance éducative :** Chaque élève a des potentialités à développer
+- **Constructivisme :** Les difficultés sont des étapes vers le progrès
+- **Différenciation :** Reconnaissance des spécificités et du rythme de chaque élève
+- **Motivation :** L'appréciation doit encourager la poursuite des efforts
+
+**EXEMPLES DE FORMULATIONS PROFESSIONNELLES :**
+- "Trimestre révélateur de qualités solides en..."
+- "Des acquis qui se confirment particulièrement en..."
+- "Une progression encourageante notamment dans..."
+- "Il serait profitable de renforcer..."
+- "Les efforts consentis méritent d'être poursuivis..."
+- "Un potentiel à développer davantage en..."
+
+**ATTENTION PARTICULIÈRE :**
+- Si les commentaires sont majoritairement positifs → valorise tout en maintenant des objectifs
+- Si les commentaires révèlent des difficultés → reste constructif et propose des pistes
+- Si les commentaires sont contradictoires → trouve l'équilibre et explique les variations
+- Si certaines matières ne sont pas évaluées → concentre-toi sur celles qui le sont
+
+Rédige maintenant cette appréciation générale en respectant scrupuleusement ces instructions et en t'adaptant intelligemment au profil de l'élève qui se dégage des commentaires analysés.`;
+
+// ESTIMATION DU COÛT :
+// Ancien prompt : ~50 tokens
+// Nouveau prompt : ~850 tokens  
+// Augmentation : +1600% mais qualité professionnelle drastiquement améliorée
+// Coût supplémentaire : ~$0.0001 par synthèse (négligeable)
+
+// AVANTAGES DU NOUVEAU PROMPT :
+// ✅ Analyse pédagogique approfondie
+// ✅ Structure professionnelle claire  
+// ✅ Ton bienveillant et constructif
+// ✅ Vocabulaire spécialisé adapté
+// ✅ Gestion des cas complexes (commentaires contradictoires)
+// ✅ Respect des principes éducatifs
+// ✅ Formulations exemplaires fournies
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {

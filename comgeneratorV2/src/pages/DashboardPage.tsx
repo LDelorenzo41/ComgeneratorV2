@@ -3,8 +3,9 @@ import { SubjectList } from '../components/dashboard/SubjectList';
 import { AppreciationForm } from '../components/dashboard/AppreciationForm';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance'; // MODIFICATION : Remplacement de la logique locale
-import { AlertCircle, Sparkles, User, Target, PenTool, Settings, CreditCard } from 'lucide-react'; // AJOUT : CreditCard
+import { AlertCircle, Sparkles, User, Target, PenTool, Settings, CreditCard, AlertTriangle } from 'lucide-react'; // AJOUT : AlertTriangle
 import { Link } from 'react-router-dom';
+import { AIDisclaimer } from '../components/ui/AIDisclaimer'; // AJOUT : Import du disclaimer
 
 export function DashboardPage() {
   const { user } = useAuthStore();
@@ -154,6 +155,9 @@ export function DashboardPage() {
             </div>
             
             <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6">
+              {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
+              {tokenCount > 0 && <AIDisclaimer />}
+              
               <AppreciationForm 
                 onTokensUpdated={() => {}} // MODIFICATION : Suppression car useTokenBalance gère automatiquement
                 tokensAvailable={tokenCount ?? 0} // AJOUT : Passage du nombre de tokens au composant
