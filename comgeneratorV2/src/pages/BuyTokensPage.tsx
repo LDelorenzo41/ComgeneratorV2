@@ -1,7 +1,13 @@
 import React from 'react';
 import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { useAuthStore } from '../lib/store';
+
+// Initialisation de Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export function BuyTokensPage() {
+  const { user } = useAuthStore();
   const [selectedOptions, setSelectedOptions] = React.useState<{
     professor: { withBank: boolean };
     principal: { withBank: boolean };
@@ -9,6 +15,8 @@ export function BuyTokensPage() {
     professor: { withBank: true },
     principal: { withBank: true }
   });
+
+  const [loading, setLoading] = React.useState<string | null>(null);
 
   const baseFeatures = [
     'Génération d\'appréciations personnalisées',
@@ -90,14 +98,75 @@ export function BuyTokensPage() {
     }));
   };
 
-  const handlePlanSelect = (planId: 'professor' | 'principal') => {
+  const handlePlanSelect = async (planId: 'professor' | 'principal') => {
+    if (!user) {
+      alert('Vous devez être connecté pour acheter des tokens');
+      return;
+    }
+
     const withBank = selectedOptions[planId].withBank;
     const plan = plans.find(p => p.id === planId);
     const totalPrice = plan!.basePrice + (withBank ? 1.00 : 0);
     
-    // TODO: Intégration Stripe avec produit spécifique
-    const stripeProductId = `${planId}_${withBank ? 'with' : 'without'}_bank`;
-    console.log(`Plan sélectionné: ${planId}, Banque: ${withBank}, Prix: ${totalPrice}€, Produit Stripe: ${stripeProductId}`);
+    // Mapping vers les Price ID Stripe
+    const priceIdMapping = {
+      professor_false: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K,
+      professor_true: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK,
+      principal_false: import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K,
+      principal_true: import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K_BANK,
+    };
+
+    const priceId = priceIdMapping[`${planId}_${withBank}` as keyof typeof priceIdMapping];
+
+    if (!priceId) {
+      console.error('Price ID not found for:', planId, withBank);
+      alert('Erreur de configuration du produit');
+      return;
+    }
+
+    setLoading(`${planId}_${withBank}`);
+
+    try {
+      // Appel à votre Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création de la session');
+      }
+
+      const { sessionId, url } = await response.json();
+
+      // Redirection vers Stripe Checkout
+      if (url) {
+        window.location.href = url;
+      } else {
+        // Fallback avec Stripe.js
+        const stripe = await stripePromise;
+        if (stripe) {
+          const { error } = await stripe.redirectToCheckout({ sessionId });
+          if (error) {
+            console.error('Erreur Stripe:', error);
+            alert('Erreur lors de la redirection vers le paiement');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'achat:', error);
+      alert('Erreur lors de la création de la session de paiement. Veuillez réessayer.');
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -164,6 +233,7 @@ export function BuyTokensPage() {
           {plans.map((plan) => {
             const withBank = selectedOptions[plan.id as keyof typeof selectedOptions].withBank;
             const totalPrice = plan.basePrice + (withBank ? 1.00 : 0);
+            const isLoading = loading === `${plan.id}_${withBank}`;
             
             const colorClasses = {
               blue: {
@@ -231,6 +301,7 @@ export function BuyTokensPage() {
                             checked={withBank}
                             onChange={() => toggleBankOption(plan.id as 'professor' | 'principal')}
                             className="sr-only"
+                            disabled={isLoading}
                           />
                           <div className={`relative w-10 h-6 rounded-full transition-colors ${
                             withBank ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
@@ -316,9 +387,19 @@ export function BuyTokensPage() {
                   {/* CTA Button */}
                   <button
                     onClick={() => handlePlanSelect(plan.id as 'professor' | 'principal')}
-                    className={`w-full py-4 px-6 rounded-2xl text-white font-semibold ${colors.button} transition-all duration-300 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-blue-500/50`}
+                    disabled={isLoading || !user}
+                    className={`w-full py-4 px-6 rounded-2xl text-white font-semibold ${colors.button} transition-all duration-300 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
                   >
-                    {withBank ? 'Choisir avec Banque' : 'Choisir sans Banque'} - {totalPrice.toFixed(2)}€
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                        Redirection en cours...
+                      </div>
+                    ) : !user ? (
+                      'Connectez-vous pour acheter'
+                    ) : (
+                      `${withBank ? 'Choisir avec Banque' : 'Choisir sans Banque'} - ${totalPrice.toFixed(2)}€`
+                    )}
                   </button>
                 </div>
               </div>

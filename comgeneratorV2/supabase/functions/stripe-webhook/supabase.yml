@@ -1,0 +1,11 @@
+version: v1beta1
+cors:
+  origin: '*'
+  headers:
+    - authorization
+    - x-client-info
+    - apikey
+    - content-type
+    - stripe-signature
+auth:
+  required: false
