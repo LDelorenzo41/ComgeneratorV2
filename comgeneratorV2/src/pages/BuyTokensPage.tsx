@@ -106,7 +106,11 @@ export function BuyTokensPage() {
     const plan = plans.find(p => p.id === planId);
     const totalPrice = plan!.basePrice + (withBank ? 1.00 : 0);
     
+<<<<<<< HEAD
     // ✅ MAPPING VERS LES PRICE ID STRIPE - UTILISATION DIRECTE DES VARIABLES D'ENVIRONNEMENT
+=======
+    // Mapping vers les Price ID Stripe
+>>>>>>> a32141b (WIP: Avancement sur nouvelle fonctionnalité)
     const priceIdMapping = {
       professor_false: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K,
       professor_true: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK,
@@ -116,6 +120,7 @@ export function BuyTokensPage() {
 
     const priceId = priceIdMapping[`${planId}_${withBank}` as keyof typeof priceIdMapping];
 
+<<<<<<< HEAD
     // ✅ DÉBOGAGE : Affichage de toutes les variables d'environnement
     console.log('🔍 DÉBOGAGE VARIABLES ENV:');
     console.log('PROFESSOR_200K:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K);
@@ -130,12 +135,19 @@ export function BuyTokensPage() {
     if (!priceId) {
       console.error('❌ Price ID not found for:', planId, withBank);
       console.error('❌ Mapping disponible:', Object.keys(priceIdMapping));
+=======
+    if (!priceId) {
+      console.error('Price ID not found for:', planId, withBank);
+>>>>>>> a32141b (WIP: Avancement sur nouvelle fonctionnalité)
       alert('Erreur de configuration du produit');
       return;
     }
 
+<<<<<<< HEAD
     console.log('✅ Price ID sélectionné:', priceId, 'pour', planId, withBank ? 'avec banque' : 'sans banque');
 
+=======
+>>>>>>> a32141b (WIP: Avancement sur nouvelle fonctionnalité)
     setLoading(`${planId}_${withBank}`);
 
     try {
