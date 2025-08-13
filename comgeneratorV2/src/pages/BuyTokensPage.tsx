@@ -1,7 +1,13 @@
 import React from 'react';
 import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { useAuthStore } from '../lib/store';
+
+// Initialisation de Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export function BuyTokensPage() {
+  const { user } = useAuthStore();
   const [selectedOptions, setSelectedOptions] = React.useState<{
     professor: { withBank: boolean };
     principal: { withBank: boolean };
@@ -9,6 +15,8 @@ export function BuyTokensPage() {
     professor: { withBank: true },
     principal: { withBank: true }
   });
+
+  const [loading, setLoading] = React.useState<string | null>(null);
 
   const baseFeatures = [
     'Génération d\'appréciations personnalisées',
@@ -35,7 +43,6 @@ export function BuyTokensPage() {
       tokens: '200 000',
       basePrice: 3.50,
       description: 'Parfait pour un usage régulier',
-      // Basé sur 200k tokens : ~133 appréciations OU ~111 synthèses OU ~200 communications OU ~57 séances
       examples: {
         withBank: [
           '🎯 133 appréciations détaillées',
@@ -62,7 +69,6 @@ export function BuyTokensPage() {
       tokens: '400 000',
       basePrice: 6.00,
       description: 'Usage intensif avec plus de flexibilité',
-      // Basé sur 400k tokens : ~267 appréciations OU ~222 synthèses OU ~400 communications OU ~114 séances
       examples: {
         withBank: [
           '🎯 267 appréciations détaillées',
@@ -90,14 +96,89 @@ export function BuyTokensPage() {
     }));
   };
 
-  const handlePlanSelect = (planId: 'professor' | 'principal') => {
+  const handlePlanSelect = async (planId: 'professor' | 'principal') => {
+    if (!user) {
+      alert('Vous devez être connecté pour acheter des tokens');
+      return;
+    }
+
     const withBank = selectedOptions[planId].withBank;
     const plan = plans.find(p => p.id === planId);
     const totalPrice = plan!.basePrice + (withBank ? 1.00 : 0);
     
-    // TODO: Intégration Stripe avec produit spécifique
-    const stripeProductId = `${planId}_${withBank ? 'with' : 'without'}_bank`;
-    console.log(`Plan sélectionné: ${planId}, Banque: ${withBank}, Prix: ${totalPrice}€, Produit Stripe: ${stripeProductId}`);
+    // ✅ MAPPING VERS LES PRICE ID STRIPE - UTILISATION DIRECTE DES VARIABLES D'ENVIRONNEMENT
+    const priceIdMapping = {
+      professor_false: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K,
+      professor_true: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK,
+      principal_false: import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K,
+      principal_true: import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K_BANK,
+    };
+
+    const priceId = priceIdMapping[`${planId}_${withBank}` as keyof typeof priceIdMapping];
+
+    // ✅ DÉBOGAGE : Affichage de toutes les variables d'environnement
+    console.log('🔍 DÉBOGAGE VARIABLES ENV:');
+    console.log('PROFESSOR_200K:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K);
+    console.log('PROFESSOR_200K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK);
+    console.log('PRINCIPAL_400K:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K);
+    console.log('PRINCIPAL_400K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K_BANK);
+    console.log('🎯 MAPPING COMPLET:', priceIdMapping);
+    console.log('🎯 CLÉ RECHERCHÉE:', `${planId}_${withBank}`);
+    console.log('🎯 PRICE ID TROUVÉ:', priceId);
+    console.log('🔍 REAL USER ID:', user.id);
+
+    if (!priceId) {
+      console.error('❌ Price ID not found for:', planId, withBank);
+      console.error('❌ Mapping disponible:', Object.keys(priceIdMapping));
+      alert('Erreur de configuration du produit');
+      return;
+    }
+
+    console.log('✅ Price ID sélectionné:', priceId, 'pour', planId, withBank ? 'avec banque' : 'sans banque');
+
+    setLoading(`${planId}_${withBank}`);
+
+    try {
+      // Appel à votre Edge Function
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          priceId,
+          userId: user.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la création de la session');
+      }
+
+      const { sessionId, url } = await response.json();
+
+      // Redirection vers Stripe Checkout
+      if (url) {
+        window.location.href = url;
+      } else {
+        // Fallback avec Stripe.js
+        const stripe = await stripePromise;
+        if (stripe) {
+          const { error } = await stripe.redirectToCheckout({ sessionId });
+          if (error) {
+            console.error('Erreur Stripe:', error);
+            alert('Erreur lors de la redirection vers le paiement');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'achat:', error);
+      alert('Erreur lors de la création de la session de paiement. Veuillez réessayer.');
+    } finally {
+      setLoading(null);
+    }
   };
 
   return (
@@ -164,6 +245,7 @@ export function BuyTokensPage() {
           {plans.map((plan) => {
             const withBank = selectedOptions[plan.id as keyof typeof selectedOptions].withBank;
             const totalPrice = plan.basePrice + (withBank ? 1.00 : 0);
+            const isLoading = loading === `${plan.id}_${withBank}`;
             
             const colorClasses = {
               blue: {
@@ -231,6 +313,7 @@ export function BuyTokensPage() {
                             checked={withBank}
                             onChange={() => toggleBankOption(plan.id as 'professor' | 'principal')}
                             className="sr-only"
+                            disabled={isLoading}
                           />
                           <div className={`relative w-10 h-6 rounded-full transition-colors ${
                             withBank ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
@@ -316,9 +399,19 @@ export function BuyTokensPage() {
                   {/* CTA Button */}
                   <button
                     onClick={() => handlePlanSelect(plan.id as 'professor' | 'principal')}
-                    className={`w-full py-4 px-6 rounded-2xl text-white font-semibold ${colors.button} transition-all duration-300 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-blue-500/50`}
+                    disabled={isLoading || !user}
+                    className={`w-full py-4 px-6 rounded-2xl text-white font-semibold ${colors.button} transition-all duration-300 hover:shadow-lg hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
                   >
-                    {withBank ? 'Choisir avec Banque' : 'Choisir sans Banque'} - {totalPrice.toFixed(2)}€
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                        Redirection en cours...
+                      </div>
+                    ) : !user ? (
+                      'Connectez-vous pour acheter'
+                    ) : (
+                      `${withBank ? 'Choisir avec Banque' : 'Choisir sans Banque'} - ${totalPrice.toFixed(2)}€`
+                    )}
                   </button>
                 </div>
               </div>

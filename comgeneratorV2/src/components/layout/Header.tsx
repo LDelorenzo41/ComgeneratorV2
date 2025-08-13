@@ -15,6 +15,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import useTokenBalance from '../../hooks/useTokenBalance';
 
 // Event pour notifier les changements de tokens
 export const tokenUpdateEvent = new EventTarget();
@@ -24,54 +25,28 @@ export function Header() {
   const { user } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [tokenCount, setTokenCount] = React.useState<number | null>(null);
+  const tokenCount = useTokenBalance();
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isBankDropdownOpen, setIsBankDropdownOpen] = React.useState(false);
   const location = useLocation();
 
-  const fetchTokens = React.useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .insert({ user_id: user.id, tokens: 100000 })
-            .select('tokens')
-            .single();
-          setTokenCount(newProfile?.tokens ?? 100000);
-          return;
-        }
-        console.error('Erreur lors de la récupération des tokens:', error);
-        return;
-      }
-
-      setTokenCount(data?.tokens ?? 0);
-    } catch (err) {
-      console.error('Erreur:', err);
-    }
-  }, [user]);
-
+  // AJOUT: Écouter les mises à jour de paiement
   React.useEffect(() => {
-    fetchTokens();
-  }, [fetchTokens]);
-
-  React.useEffect(() => {
-    const handleTokenUpdate = () => {
-      fetchTokens();
+    const handlePaymentUpdate = () => {
+      console.log('💰 Payment completed, refreshing tokens...');
+      // Force refresh de la page après un petit délai
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     };
 
-    tokenUpdateEvent.addEventListener(TOKEN_UPDATED, handleTokenUpdate);
+    // Écouter les événements de paiement
+    window.addEventListener('tokensUpdated', handlePaymentUpdate);
+
     return () => {
-      tokenUpdateEvent.removeEventListener(TOKEN_UPDATED, handleTokenUpdate);
+      window.removeEventListener('tokensUpdated', handlePaymentUpdate);
     };
-  }, [fetchTokens]);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -122,8 +97,11 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
           <div className="flex items-center space-x-4">
-            <Link to="/" className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">ProfAssist</span>
+            {/* Lien vers la landing page au clic sur ProfAssist */}
+            <Link to="/landing" className="flex-shrink-0 flex items-center">
+              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                ProfAssist
+              </span>
             </Link>
             <img 
               src="https://res.cloudinary.com/dhva6v5n8/image/upload/v1728059847/LOGO_T_T_zcdp8s.jpg"
@@ -363,4 +341,3 @@ export function Header() {
     </header>
   );
 }
-

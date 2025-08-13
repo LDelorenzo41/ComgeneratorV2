@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { BuyTokensPage } from './pages/BuyTokensPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage'; // 🆕 NOUVEL IMPORT
 import { AppreciationBankPage } from './pages/AppreciationBankPage';
 import { LandingPage } from './pages/LandingPage';
 import { SynthesePage } from './pages/SynthesePage'; // ✅ NOUVEL IMPORT
@@ -104,11 +105,13 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/landing" element={<LandingPage />} /> {/* ✅ NOUVELLE ROUTE pour landing page accessible à tous */}
             <Route element={<AuthLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/communication" element={<CommunicationPage />} />
               <Route path="/resources" element={<ResourcesPage />} />
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
+              <Route path="/buy-tokens/success" element={<PaymentSuccessPage />} /> {/* 🆕 NOUVELLE ROUTE */}
               <Route path="/my-appreciations" element={<AppreciationBankPage />} />
               <Route path="/appreciation-bank" element={<AppreciationBankPage />} /> {/* ✅ pour la cohérence avec le header */}
               <Route path="/lessons-bank" element={<LessonsBankPage />} /> {/* ✅ nouvelle page */}
