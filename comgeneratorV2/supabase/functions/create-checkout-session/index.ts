@@ -24,6 +24,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 === NOUVEAU DEPLOIEMENT AVEC DEBUG ===')
+    
     // Configuration Stripe
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeKey) {
@@ -49,6 +51,10 @@ serve(async (req) => {
     const priceId = body.priceId
     const userId = body.userId
 
+    console.log('📋 DONNÉES REÇUES:')
+    console.log('   priceId:', priceId)
+    console.log('   userId:', userId)
+
     if (!priceId || !userId) {
       return new Response(
         JSON.stringify({ error: 'Missing priceId or userId' }),
@@ -71,7 +77,7 @@ serve(async (req) => {
       )
     }
 
-    // ✅ MAPPING HARDCODÉ DES PRICE IDS - SOLUTION AU PROBLÈME
+    // ✅ MAPPING HARDCODÉ AVEC LE NOUVEAU PRICE ID
     const productMapping = new Map()
     
     // Ajout forcé des Price IDs exacts
@@ -93,26 +99,32 @@ serve(async (req) => {
       productType: 'principal_400k'
     })
 
-    productMapping.set('price_1RvD90J3he5yh4f3FZ8XYDLX', {
+    // ✅ NOUVEAU PRICE ID AJOUTÉ
+    productMapping.set('price_1RvZD0J3he5yh4f3dP4OwHIe', {
       tokens: 400000,
       bankAccess: true,
       productType: 'principal_400k_bank'
     })
 
-    console.log('🗺️ ProductMapping size:', productMapping.size)
-    console.log('🎯 Looking for priceId:', priceId)
-    console.log('🔍 Has priceId in map:', productMapping.has(priceId))
-    console.log('📋 All Price IDs in map:', Array.from(productMapping.keys()))
+    console.log('🗺️ MAPPING COMPLET:')
+    console.log('   Taille du mapping:', productMapping.size)
+    console.log('   Price IDs disponibles:', Array.from(productMapping.keys()))
+    console.log('   Price ID recherché:', priceId)
+    console.log('   Price ID trouvé?', productMapping.has(priceId))
 
     const productInfo = productMapping.get(priceId)
     if (!productInfo) {
-      console.error('❌ Price ID not found in mapping:', priceId)
+      console.error('❌ PRICE ID INTROUVABLE!')
+      console.error('   Price ID reçu:', priceId)
+      console.error('   Price IDs dans le mapping:', Array.from(productMapping.keys()))
+      
       return new Response(
         JSON.stringify({ 
           error: 'Invalid price ID',
           debug: {
             receivedPriceId: priceId,
-            availablePriceIds: Array.from(productMapping.keys())
+            availablePriceIds: Array.from(productMapping.keys()),
+            mappingSize: productMapping.size
           }
         }),
         { 
@@ -122,9 +134,10 @@ serve(async (req) => {
       )
     }
 
-    console.log('✅ Product info found:', productInfo)
+    console.log('✅ PRODUCT INFO TROUVÉ:', productInfo)
 
     // Création de la session Stripe Checkout
+    console.log('🎫 Création de la session Stripe...')
     const session = await stripe.checkout.sessions.create({
       customer_email: user.email,
       payment_method_types: ['card'],
@@ -145,7 +158,7 @@ serve(async (req) => {
       },
     })
 
-    console.log('✅ Stripe session created:', session.id)
+    console.log('✅ SESSION STRIPE CRÉÉE:', session.id)
 
     // Enregistrement de la transaction en base
     const { error: transactionError } = await supabase
@@ -161,9 +174,9 @@ serve(async (req) => {
       })
 
     if (transactionError) {
-      console.error('❌ Error saving transaction:', transactionError)
+      console.error('❌ Erreur sauvegarde transaction:', transactionError)
     } else {
-      console.log('✅ Transaction saved to database')
+      console.log('✅ Transaction sauvegardée')
     }
 
     return new Response(
@@ -178,7 +191,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Error creating checkout session:', error)
+    console.error('❌ ERREUR GLOBALE:', error)
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',

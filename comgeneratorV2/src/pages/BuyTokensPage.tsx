@@ -43,7 +43,6 @@ export function BuyTokensPage() {
       tokens: '200 000',
       basePrice: 3.50,
       description: 'Parfait pour un usage régulier',
-      // Basé sur 200k tokens : ~133 appréciations OU ~111 synthèses OU ~200 communications OU ~57 séances
       examples: {
         withBank: [
           '🎯 133 appréciations détaillées',
@@ -70,7 +69,6 @@ export function BuyTokensPage() {
       tokens: '400 000',
       basePrice: 6.00,
       description: 'Usage intensif avec plus de flexibilité',
-      // Basé sur 400k tokens : ~267 appréciations OU ~222 synthèses OU ~400 communications OU ~114 séances
       examples: {
         withBank: [
           '🎯 267 appréciations détaillées',
@@ -108,7 +106,7 @@ export function BuyTokensPage() {
     const plan = plans.find(p => p.id === planId);
     const totalPrice = plan!.basePrice + (withBank ? 1.00 : 0);
     
-    // Mapping vers les Price ID Stripe
+    // ✅ MAPPING VERS LES PRICE ID STRIPE - UTILISATION DIRECTE DES VARIABLES D'ENVIRONNEMENT
     const priceIdMapping = {
       professor_false: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K,
       professor_true: import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK,
@@ -118,11 +116,25 @@ export function BuyTokensPage() {
 
     const priceId = priceIdMapping[`${planId}_${withBank}` as keyof typeof priceIdMapping];
 
+    // ✅ DÉBOGAGE : Affichage de toutes les variables d'environnement
+    console.log('🔍 DÉBOGAGE VARIABLES ENV:');
+    console.log('PROFESSOR_200K:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K);
+    console.log('PROFESSOR_200K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK);
+    console.log('PRINCIPAL_400K:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K);
+    console.log('PRINCIPAL_400K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K_BANK);
+    console.log('🎯 MAPPING COMPLET:', priceIdMapping);
+    console.log('🎯 CLÉ RECHERCHÉE:', `${planId}_${withBank}`);
+    console.log('🎯 PRICE ID TROUVÉ:', priceId);
+    console.log('🔍 REAL USER ID:', user.id);
+
     if (!priceId) {
-      console.error('Price ID not found for:', planId, withBank);
+      console.error('❌ Price ID not found for:', planId, withBank);
+      console.error('❌ Mapping disponible:', Object.keys(priceIdMapping));
       alert('Erreur de configuration du produit');
       return;
     }
+
+    console.log('✅ Price ID sélectionné:', priceId, 'pour', planId, withBank ? 'avec banque' : 'sans banque');
 
     setLoading(`${planId}_${withBank}`);
 
