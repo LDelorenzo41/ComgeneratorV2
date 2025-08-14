@@ -13,20 +13,22 @@ import { supabase } from '../lib/supabase';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { Link } from 'react-router-dom';
-import { 
-  BookOpen, 
-  Copy, 
-  FileDown, 
-  Save, 
-  Edit, 
-  Check, 
-  X, 
+import {
+  BookOpen,
+  Copy,
+  FileDown,
+  Save,
+  Edit,
+  Check,
+  X,
   Sparkles,
   Clock,
   Users,
   Target,
   AlertCircle,
-  CreditCard
+  CreditCard,
+  Lock,
+  ShoppingCart
 } from 'lucide-react';
 
 const pedagogies = [
@@ -106,6 +108,44 @@ const MarkdownEditor: React.FC<{
   const [editContent, setEditContent] = React.useState(content);
   const [isExporting, setIsExporting] = React.useState(false);
 
+  // ✅ AJOUT : États pour vérifier l'accès banque
+  const [hasBankAccess, setHasBankAccess] = React.useState<boolean | null>(null);
+  const [bankAccessLoading, setBankAccessLoading] = React.useState(true);
+  const { user } = useAuthStore();
+
+  // ✅ AJOUT : Vérification de l'accès banque au chargement
+  React.useEffect(() => {
+    const checkBankAccess = async () => {
+      if (!user) {
+        setHasBankAccess(null);
+        setBankAccessLoading(false);
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('has_bank_access')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Erreur lors de la vérification de l\'accès banque:', error);
+          setHasBankAccess(false);
+        } else {
+          setHasBankAccess(profile?.has_bank_access || false);
+        }
+      } catch (err) {
+        console.error('Erreur dans checkBankAccess:', err);
+        setHasBankAccess(false);
+      } finally {
+        setBankAccessLoading(false);
+      }
+    };
+
+    checkBankAccess();
+  }, [user]);
+
   React.useEffect(() => {
     setEditContent(content);
   }, [content]);
@@ -118,6 +158,24 @@ const MarkdownEditor: React.FC<{
   const handleCancel = () => {
     setEditContent(content);
     setIsEditing(false);
+  };
+
+  // ✅ MODIFICATION : Fonction de sauvegarde avec vérification d'accès
+  const handleSaveToBank = () => {
+    if (!hasBankAccess) {
+      const userConfirmed = confirm(
+        '⚠️ Accès banque requis\n\n' +
+        'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\n' +
+        'Souhaitez-vous consulter nos plans ?'
+      );
+
+      if (userConfirmed) {
+        window.location.href = '/buy-tokens';
+      }
+      return;
+    }
+
+    onSaveToBank(content);
   };
 
   const handleExportPDF = async () => {
@@ -135,15 +193,15 @@ const MarkdownEditor: React.FC<{
           pdf.addPage();
           yPosition = margin;
         }
-        
+
         let fontStyle = 'normal';
         if (isBold && isItalic) fontStyle = 'bolditalic';
         else if (isBold) fontStyle = 'bold';
         else if (isItalic) fontStyle = 'italic';
-        
+
         pdf.setFont('helvetica', fontStyle);
         pdf.setFontSize(fontSize);
-        
+
         const lines = pdf.splitTextToSize(text, maxWidth);
         lines.forEach((line: string) => {
           if (yPosition > pageHeight - 20) {
@@ -158,15 +216,15 @@ const MarkdownEditor: React.FC<{
 
       const parseMarkdownToPDF = (markdownContent: string) => {
         const lines = markdownContent.split('\n');
-        
+
         lines.forEach((line, _index) => {
           const trimmedLine = line.trim();
-          
+
           if (trimmedLine === '') {
             yPosition += 3;
             return;
           }
-          
+
           if (trimmedLine.startsWith('# ')) {
             const title = trimmedLine.substring(2);
             addText(title, 16, true);
@@ -195,11 +253,11 @@ const MarkdownEditor: React.FC<{
           }
           else {
             let processedText = trimmedLine;
-            
+
             if (processedText.includes('**')) {
               const parts = processedText.split(/\*\*(.*?)\*\*/g);
               let currentText = '';
-              
+
               for (let i = 0; i < parts.length; i++) {
                 if (i % 2 === 0) {
                   currentText += parts[i];
@@ -219,12 +277,12 @@ const MarkdownEditor: React.FC<{
       pdf.setFontSize(18);
       pdf.text('Séance Pédagogique', margin, yPosition);
       yPosition += 10;
-      
+
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
       pdf.text(`Générée le ${new Date().toLocaleDateString('fr-FR')}`, margin, yPosition);
       yPosition += 10;
-      
+
       pdf.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 10;
 
@@ -245,13 +303,62 @@ const MarkdownEditor: React.FC<{
 
       const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
       pdf.save(`seance-pedagogique-${date}.pdf`);
-      
+
     } catch (error) {
       console.error('Erreur lors de l\'export PDF:', error);
       alert('Erreur lors de l\'export PDF. Veuillez réessayer.');
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // ✅ AJOUT : Fonction pour rendre le bouton de sauvegarde conditionnel
+  const renderSaveToBankButton = () => {
+    if (bankAccessLoading) {
+      return (
+        <button
+          disabled
+          className="inline-flex items-center px-6 py-2 bg-gray-400 text-gray-600 rounded-xl font-semibold cursor-not-allowed opacity-60"
+        >
+          <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+          Vérification...
+        </button>
+      );
+    }
+
+    if (!hasBankAccess) {
+      return (
+        <div className="relative group">
+          <button
+            disabled
+            className="inline-flex items-center px-6 py-2 bg-gray-400 text-gray-600 rounded-xl font-semibold cursor-not-allowed opacity-60"
+            title="Accès banque requis"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Ajouter à ma banque (accès requis)
+          </button>
+
+          {/* ✅ TOOLTIP EXPLICATIF */}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+            <div className="bg-gray-900 text-white text-sm rounded-lg px-3 py-2 whitespace-nowrap">
+              Achetez un plan avec banque pour sauvegarder
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        onClick={handleSaveToBank}
+        disabled={isSaving}
+        className="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50"
+      >
+        <Save className="w-4 h-4 mr-2" />
+        {isSaving ? 'Sauvegarde...' : 'Ajouter à ma banque'}
+      </button>
+    );
   };
 
   if (isEditing) {
@@ -327,14 +434,10 @@ const MarkdownEditor: React.FC<{
             <FileDown className="w-4 h-4 mr-2" />
             {isExporting ? 'Export...' : 'PDF'}
           </button>
-          <button
-            onClick={() => onSaveToBank(content)}
-            disabled={isSaving}
-            className="inline-flex items-center px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Sauvegarde...' : 'Ajouter à ma banque'}
-          </button>
+
+          {/* ✅ BOUTON DE SAUVEGARDE CONDITIONNEL */}
+          {renderSaveToBankButton()}
+
           <button
             onClick={() => setIsEditing(true)}
             className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200"
@@ -344,6 +447,30 @@ const MarkdownEditor: React.FC<{
           </button>
         </div>
       </div>
+
+      {/* ✅ ALERTE POUR UTILISATEURS SANS ACCÈS BANQUE */}
+      {!bankAccessLoading && !hasBankAccess && (
+        <div className="bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <Lock className="w-6 h-6 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">
+                Sauvegarde non disponible
+              </h5>
+              <p className="text-orange-700 dark:text-orange-300 text-sm">
+                Votre plan actuel ne permet pas de sauvegarder les séances.
+                <button
+                  onClick={() => window.location.href = '/buy-tokens'}
+                  className="underline hover:no-underline font-medium ml-1"
+                >
+                  Upgrader vers un plan avec banque
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
         <div className="prose prose-sm max-w-none dark:prose-invert p-8 overflow-auto max-h-96">
           <ReactMarkdown
@@ -429,6 +556,39 @@ export function LessonGeneratorPage() {
   const [selectedDuration, setSelectedDuration] = React.useState<string>('60');
   const [lastFormData, setLastFormData] = React.useState<LessonFormData | null>(null);
 
+  // ✅ AJOUT : États pour vérifier l'accès banque
+  const [hasBankAccess, setHasBankAccess] = React.useState<boolean | null>(null);
+
+  // ✅ AJOUT : Vérification de l'accès banque au chargement
+  React.useEffect(() => {
+    const checkBankAccess = async () => {
+      if (!user) {
+        setHasBankAccess(null);
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('has_bank_access')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Erreur lors de la vérification de l\'accès banque:', error);
+          setHasBankAccess(false);
+        } else {
+          setHasBankAccess(profile?.has_bank_access || false);
+        }
+      } catch (err) {
+        console.error('Erreur dans checkBankAccess:', err);
+        setHasBankAccess(false);
+      }
+    };
+
+    checkBankAccess();
+  }, [user]);
+
   const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<LessonFormData>({
     resolver: zodResolver(lessonSchema),
     defaultValues: {
@@ -442,7 +602,7 @@ export function LessonGeneratorPage() {
 
   const onSubmit = async (data: LessonFormData) => {
     if (!user) return;
-    
+
     if (tokenCount === 0) {
       setError('INSUFFICIENT_TOKENS');
       return;
@@ -454,15 +614,7 @@ export function LessonGeneratorPage() {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
 
-// Remplacement de la section "Déroulé détaillé" dans le prompt :
-
-// ❌ ANCIEN (problématique) :
-// ## ⏰ Déroulé détaillé de la séance
-// | Phase | Durée | Activité | Modalité | Rôle enseignant | Rôle élèves |
-// |-------|-------|----------|----------|-----------------|-------------|
-
-// ✅ NOUVEAU (plus lisible) :
-const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
+    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
 
 **CONTEXTE DE LA SÉANCE :**
 - Matière : ${data.subject}
@@ -491,7 +643,7 @@ Génère une séance pédagogique complète et directement exploitable en respec
 ### Pour les élèves
 - [Liste détaillée]
 
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ?
 `### Espace et terrain
 - [Configuration spatiale nécessaire]
 - [Matériel sportif requis]` : ''}
@@ -595,6 +747,7 @@ ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().inclu
 6. Intégrer des éléments de différenciation naturelle
 
 Génère maintenant cette séance en respectant scrupuleusement cette structure et en étant très concret dans toutes les descriptions.`;
+
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -627,8 +780,8 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
         if (!profileError && profile) {
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            .update({
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens)
             })
             .eq('user_id', user.id);
 
@@ -657,7 +810,7 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
       reset();
     } catch (err: any) {
       console.error('Erreur lors de la génération:', err);
-      
+
       if (err.message === 'INSUFFICIENT_TOKENS') {
         setError('INSUFFICIENT_TOKENS');
       } else {
@@ -672,9 +825,24 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
     setGeneratedContent(newContent);
   };
 
+  // ✅ MODIFICATION : Fonction handleSaveToBank avec vérification d'accès
   const handleSaveToBank = async (contentToSave: string) => {
     if (!user || !lastFormData) {
       alert('Impossible de sauvegarder : données du formulaire manquantes');
+      return;
+    }
+
+    // ✅ VÉRIFICATION ACCÈS BANQUE
+    if (!hasBankAccess) {
+      const userConfirmed = confirm(
+        '⚠️ Accès banque requis\n\n' +
+        'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\n' +
+        'Souhaitez-vous consulter nos plans ?'
+      );
+
+      if (userConfirmed) {
+        window.location.href = '/buy-tokens';
+      }
       return;
     }
 
@@ -699,7 +867,7 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
       successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
       successDiv.innerHTML = '✅ Séance ajoutée à votre banque !';
       document.body.appendChild(successDiv);
-      
+
       setTimeout(() => {
         successDiv.style.transform = 'translateX(100%)';
         successDiv.style.opacity = '0';
@@ -733,7 +901,7 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
-          
+
           {tokenCount !== null && (
             <div className={tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}>
               {tokenCount === 0 ? (
@@ -813,7 +981,7 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
                   placeholder="Ex: Mathématiques, Français, Histoire..."
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <BookOpen className="w-4 h-4 inline mr-2" />
