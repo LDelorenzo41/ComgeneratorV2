@@ -9,13 +9,14 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CommunicationPage } from './pages/CommunicationPage';
 import { ResourcesPage } from './pages/ResourcesPage';
 import { BuyTokensPage } from './pages/BuyTokensPage';
-import { PaymentSuccessPage } from './pages/PaymentSuccessPage'; // 🆕 NOUVEL IMPORT
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
 import { AppreciationBankPage } from './pages/AppreciationBankPage';
 import { LandingPage } from './pages/LandingPage';
-import { SynthesePage } from './pages/SynthesePage'; // ✅ NOUVEL IMPORT
+import { SynthesePage } from './pages/SynthesePage';
 import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
+import { AuthHandler } from './pages/AuthHandler';
 
-// 👉 Import de la nouvelle page banque de séances
+// Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
 
 import { useAuthStore, useThemeStore } from './lib/store';
@@ -103,22 +104,27 @@ function App() {
         <Header />
         <main className="flex-1">
           <Routes>
+            {/* Route pour traiter l'authentification et confirmation d'email */}
+            <Route path="/" element={<AuthHandler />} />
+            
+            {/* Routes publiques */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/landing" element={<LandingPage />} /> {/* ✅ NOUVELLE ROUTE pour landing page accessible à tous */}
+            <Route path="/landing" element={<LandingPage />} />
+            
+            {/* Routes protégées */}
             <Route element={<AuthLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/communication" element={<CommunicationPage />} />
               <Route path="/resources" element={<ResourcesPage />} />
               <Route path="/buy-tokens" element={<BuyTokensPage />} />
-              <Route path="/buy-tokens/success" element={<PaymentSuccessPage />} /> {/* 🆕 NOUVELLE ROUTE */}
+              <Route path="/buy-tokens/success" element={<PaymentSuccessPage />} />
               <Route path="/my-appreciations" element={<AppreciationBankPage />} />
-              <Route path="/appreciation-bank" element={<AppreciationBankPage />} /> {/* ✅ pour la cohérence avec le header */}
-              <Route path="/lessons-bank" element={<LessonsBankPage />} /> {/* ✅ nouvelle page */}
+              <Route path="/appreciation-bank" element={<AppreciationBankPage />} />
+              <Route path="/lessons-bank" element={<LessonsBankPage />} />
               <Route path="/synthese" element={<SynthesePage />} />
               <Route path="/generate-lesson" element={<LessonGeneratorPage />} />
             </Route>
-            <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
           </Routes>
         </main>
         <Footer />
