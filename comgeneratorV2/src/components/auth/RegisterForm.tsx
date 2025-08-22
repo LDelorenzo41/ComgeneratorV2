@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, CheckCircle } from 'lucide-react';
+import { UserPlus, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -20,21 +20,34 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export function RegisterForm() {
   const navigate = useNavigate();
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState<string | null>(null);
+  const [emailSent, setEmailSent] = React.useState(false);
+  const [userEmail, setUserEmail] = React.useState<string>('');
+  
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema)
   });
 
+  // Fonction pour obtenir l'URL de redirection dynamique
+  const getRedirectURL = () => {
+    // En production ou sur des domaines fixes
+    if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('app.github.dev')) {
+      return `${window.location.origin}/auth/callback`;
+    }
+    
+    // Pour Codespaces et développement local
+    return `${window.location.origin}/auth/callback`;
+  };
+
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setError(null);
-      setSuccess(null);
 
-      // 1. Créer le compte utilisateur
+      // ✅ NOUVELLE LOGIQUE : Inscription avec confirmation d'email OBLIGATOIRE
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
+          emailRedirectTo: getRedirectURL(),
           data: {
             created_at: new Date().toISOString()
           }
@@ -43,7 +56,7 @@ export function RegisterForm() {
 
       if (signUpError) {
         if (signUpError.message.includes('User already registered')) {
-          throw new Error('Un compte existe déjà avec cet email.');
+          throw new Error('Un compte existe déjà avec cet email. Vérifiez votre boîte de réception pour confirmer votre email, ou connectez-vous.');
         }
         if (signUpError.name === 'AuthRetryableFetchError') {
           throw new Error('Problème de connexion au serveur. Veuillez réessayer.');
@@ -54,45 +67,9 @@ export function RegisterForm() {
         throw signUpError;
       }
 
-      // 2. Se connecter immédiatement (pas de confirmation d'email)
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      // 3. Vérifier que le profil existe (créé automatiquement par le trigger)
-      if (signInData.user) {
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('tokens, has_bank_access')
-            .eq('user_id', signInData.user.id)
-            .single();
-
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Profile check error:', profileError);
-          } else if (profile) {
-            console.log('Profile created successfully:', { 
-              tokens: profile.tokens, 
-              has_bank_access: profile.has_bank_access 
-            });
-          }
-        } catch (profileCheckError) {
-          console.error('Profile verification error:', profileCheckError);
-          // Ne pas faire échouer l'inscription pour ça
-        }
-      }
-
-      // 4. Succès - affichage du message et redirection
-      setSuccess('Inscription réussie ! Redirection vers votre tableau de bord...');
-      
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+      // ✅ Succès : Email de confirmation envoyé
+      setUserEmail(data.email);
+      setEmailSent(true);
 
     } catch (error: any) {
       console.error('Erreur d\'inscription:', error);
@@ -100,6 +77,79 @@ export function RegisterForm() {
     }
   };
 
+  // ✅ Interface après envoi de l'email de confirmation
+  if (emailSent) {
+    return (
+      <div className="w-full max-w-md mx-auto">
+        <div className="text-center mb-6">
+          <Mail className="mx-auto h-16 w-16 text-blue-600 dark:text-blue-400 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Vérifiez votre email
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Nous avons envoyé un lien de confirmation à :
+          </p>
+          <p className="font-semibold text-blue-600 dark:text-blue-400 mt-1">
+            {userEmail}
+          </p>
+        </div>
+
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Prochaines étapes :
+              </h3>
+              <ol className="mt-2 text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
+                <li>Ouvrez votre boîte de réception email</li>
+                <li>Trouvez l'email de ProfAssist</li>
+                <li>Cliquez sur "Confirmer mon email"</li>
+                <li>Vous serez automatiquement connecté</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Email non reçu ?
+              </h3>
+              <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                <li>• Vérifiez votre dossier spam/courrier indésirable</li>
+                <li>• Le lien expire dans 24 heures</li>
+                <li>• Contactez-nous si le problème persiste</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Aller à la page de connexion
+          </button>
+          
+          <button
+            onClick={() => {
+              setEmailSent(false);
+              setError(null);
+            }}
+            className="w-full text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            ← Modifier l'adresse email
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Formulaire d'inscription standard
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 w-full max-w-sm">
       <div>
@@ -151,15 +201,6 @@ export function RegisterForm() {
         </div>
       )}
 
-      {success && (
-        <div className="rounded-md bg-green-50 dark:bg-green-900/20 p-4 border border-green-200 dark:border-green-800">
-          <div className="flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-            <p className="ml-2 text-sm text-green-700 dark:text-green-300">{success}</p>
-          </div>
-        </div>
-      )}
-
       <button
         type="submit"
         disabled={isSubmitting}
@@ -171,9 +212,13 @@ export function RegisterForm() {
             Création du compte...
           </span>
         ) : (
-          'S\'inscrire'
+          'Créer mon compte'
         )}
       </button>
+
+      <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+        Un email de confirmation sera envoyé à votre adresse
+      </p>
     </form>
   );
 }
