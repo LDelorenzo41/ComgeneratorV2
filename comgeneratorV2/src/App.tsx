@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AuthLayout } from './components/auth/AuthLayout';
-import { EmailConfirmationGuard } from './components/auth/EmailConfirmationGuard'; // NOUVEAU
+import { EmailConfirmationGuard } from './components/auth/EmailConfirmationGuard';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -105,10 +105,10 @@ function App() {
         <Header />
         <main className="flex-1">
           <Routes>
-            {/* Route racine redirige vers landing - CHANGÉ */}
+            {/* Route racine redirige vers landing */}
             <Route path="/" element={<Navigate to="/landing" replace />} />
             
-            {/* Route pour traiter l'authentification et confirmation d'email - NOUVEAU */}
+            {/* Route pour traiter l'authentification et confirmation d'email */}
             <Route path="/auth/callback" element={<AuthHandler />} />
             
             {/* Routes publiques */}
@@ -116,7 +116,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/landing" element={<LandingPage />} />
             
-            {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE - MODIFIÉ */}
+            {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
             <Route element={<AuthLayout />}>
               <Route path="/dashboard" element={
                 <EmailConfirmationGuard>

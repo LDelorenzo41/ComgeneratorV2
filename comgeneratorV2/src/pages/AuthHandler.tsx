@@ -14,6 +14,7 @@ export function AuthHandler() {
       try {
         console.log('🔐 Traitement du callback d\'authentification...');
         console.log('URL actuelle:', window.location.href);
+        console.log('📍 Pathname:', location.pathname);
 
         // Vérifier si on est sur la route /auth/callback
         if (location.pathname !== '/auth/callback') {
@@ -103,10 +104,16 @@ export function AuthHandler() {
         // Nettoyer l'URL
         window.history.replaceState({}, document.title, '/dashboard');
 
-        // Rediriger vers le dashboard après 2 secondes
+        // Redirection robuste avec fallback
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
+          try {
+            console.log('🔄 Tentative de redirection...');
+            navigate('/dashboard');
+          } catch (navError) {
+            console.log('❌ Navigate échoué, utilisation de window.location');
+            window.location.href = '/dashboard';
+          }
+        }, 3000);
 
       } catch (error) {
         console.error('💥 Erreur inattendue:', error);
@@ -115,7 +122,14 @@ export function AuthHandler() {
       }
     };
 
-    handleAuthCallback();
+    // Vérifier si nous sommes sur une page avec des tokens
+    if (window.location.hash.includes('access_token') || location.pathname === '/auth/callback') {
+      handleAuthCallback();
+    } else {
+      // Pas de tokens, rediriger vers landing
+      console.log('❌ Pas de tokens, redirection vers landing');
+      navigate('/landing');
+    }
   }, [navigate, location.pathname]);
 
   // États d'affichage
@@ -153,7 +167,13 @@ export function AuthHandler() {
             </p>
           </div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              try {
+                navigate('/dashboard');
+              } catch (error) {
+                window.location.href = '/dashboard';
+              }
+            }}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
           >
             Accéder maintenant au tableau de bord

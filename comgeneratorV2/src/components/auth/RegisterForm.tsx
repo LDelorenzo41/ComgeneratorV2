@@ -47,7 +47,7 @@ export function RegisterForm() {
       setError(null);
       console.log('📧 Valeur newsletter lors de la soumission:', data.newsletter);
 
-      // ✅ Inscription avec confirmation d'email + newsletter
+      // ✅ Inscription avec confirmation d'email OBLIGATOIRE + newsletter
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -55,7 +55,7 @@ export function RegisterForm() {
           emailRedirectTo: getRedirectURL(),
           data: {
             created_at: new Date().toISOString(),
-            newsletter_subscription: data.newsletter === true // Conversion explicite
+            newsletter_subscription: data.newsletter === true
           }
         }
       });
@@ -224,7 +224,7 @@ export function RegisterForm() {
           )}
         </div>
 
-        {/* ✅ Option newsletter améliorée */}
+        {/* ✅ Option newsletter */}
         <div className="flex items-start space-x-3 py-2">
           <input
             {...register('newsletter')}
