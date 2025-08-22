@@ -30,6 +30,11 @@ export function Header() {
   const [isBankDropdownOpen, setIsBankDropdownOpen] = React.useState(false);
   const location = useLocation();
 
+  // 🎯 NOUVELLE LOGIQUE: Détecter si on est sur la landing page
+  const isLandingPage = location.pathname === '/landing' || 
+                        location.pathname === '/' ||
+                        (!user && location.pathname !== '/login' && location.pathname !== '/register');
+
   // AJOUT: Écouter les mises à jour de paiement
   React.useEffect(() => {
     const handlePaymentUpdate = () => {
@@ -110,7 +115,8 @@ export function Header() {
             />
           </div>
 
-          {user && (
+          {/* 🎯 NAVIGATION: Seulement si utilisateur connecté ET pas sur landing page */}
+          {user && !isLandingPage && (
             <nav className="hidden md:flex items-center space-x-4">
               {navigationItems.map((item) => (
                 <Link
@@ -193,60 +199,102 @@ export function Header() {
             </nav>
           )}
 
+          {/* 🎯 ZONE DROITE: Différente selon le contexte */}
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
-            {/* Affichage du compteur de tokens */}
-            {user && tokenCount !== null && (
-              <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {tokenCount.toLocaleString()} tokens
-                </span>
-              </div>
+            {/* MODE LANDING PAGE: Seulement toggle theme + boutons auth */}
+            {isLandingPage && (
+              <>
+                {!user && (
+                  <>
+                    <Link
+                      to="/login"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      Se connecter
+                    </Link>
+                    <Link
+                      to="/register"
+                      className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    >
+                      S'inscrire
+                    </Link>
+                  </>
+                )}
+                {user && (
+                  <Link
+                    to="/dashboard"
+                    className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Accéder à l'app
+                  </Link>
+                )}
+                <button
+                  onClick={toggleTheme}
+                  className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-md transition-colors"
+                >
+                  {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </button>
+              </>
             )}
 
-            {/* Bouton Acheter des tokens */}
-            {user && (
-              <Link
-                to="/buy-tokens"
-                className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-              >
-                Acheter des tokens
-              </Link>
-            )}
+            {/* MODE APPLICATION: Tokens + boutons app */}
+            {user && !isLandingPage && (
+              <>
+                {/* Affichage du compteur de tokens */}
+                {tokenCount !== null && (
+                  <div className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                    <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {tokenCount.toLocaleString()} tokens
+                    </span>
+                  </div>
+                )}
 
-            {user && (
+                {/* Bouton Acheter des tokens */}
+                <Link
+                  to="/buy-tokens"
+                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  Acheter des tokens
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+
+                <button
+                  onClick={toggleTheme}
+                  className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-md transition-colors"
+                >
+                  {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* 🎯 MENU MOBILE: Seulement si pas sur landing page */}
+          {!isLandingPage && (
+            <div className="md:hidden flex items-center">
               <button
-                onClick={handleLogout}
-                className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2"
               >
-                <LogOut className="h-5 w-5" />
+                <Menu className="h-6 w-6" />
               </button>
-            )}
-            <button
-              onClick={toggleTheme}
-              className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-md transition-colors"
-            >
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-          </div>
-
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 p-2"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Menu mobile simplifié */}
-      {isMenuOpen && (
+      {/* Menu mobile simplifié - seulement si connecté et pas sur landing */}
+      {isMenuOpen && user && !isLandingPage && (
         <div className="md:hidden border-t border-gray-200 dark:border-gray-700">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Compteur de tokens mobile */}
-            {user && tokenCount !== null && (
+            {tokenCount !== null && (
               <div className="flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg mx-3 mb-3">
                 <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -313,28 +361,24 @@ export function Header() {
             </Link>
 
             {/* Bouton Acheter des tokens mobile */}
-            {user && (
-              <Link
-                to="/buy-tokens"
-                className="block px-3 py-2 mx-3 mt-3 rounded-md text-center text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Acheter des tokens
-              </Link>
-            )}
+            <Link
+              to="/buy-tokens"
+              className="block px-3 py-2 mx-3 mt-3 rounded-md text-center text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Acheter des tokens
+            </Link>
 
-            {user && (
-              <button
-                onClick={() => {
-                  handleLogout();
-                  setIsMenuOpen(false);
-                }}
-                className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-              >
-                <LogOut className="h-5 w-5 mr-2" />
-                <span>Déconnexion</span>
-              </button>
-            )}
+            <button
+              onClick={() => {
+                handleLogout();
+                setIsMenuOpen(false);
+              }}
+              className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+            >
+              <LogOut className="h-5 w-5 mr-2" />
+              <span>Déconnexion</span>
+            </button>
           </div>
         </div>
       )}
