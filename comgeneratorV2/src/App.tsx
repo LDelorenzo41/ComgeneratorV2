@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { AuthLayout } from './components/auth/AuthLayout';
+import { EmailConfirmationGuard } from './components/auth/EmailConfirmationGuard';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -104,26 +105,69 @@ function App() {
         <Header />
         <main className="flex-1">
           <Routes>
+            {/* Route racine redirige vers landing */}
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+            
             {/* Route pour traiter l'authentification et confirmation d'email */}
-            <Route path="/" element={<AuthHandler />} />
+            <Route path="/auth/callback" element={<AuthHandler />} />
             
             {/* Routes publiques */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/landing" element={<LandingPage />} />
             
-            {/* Routes protégées */}
+            {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
             <Route element={<AuthLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/communication" element={<CommunicationPage />} />
-              <Route path="/resources" element={<ResourcesPage />} />
-              <Route path="/buy-tokens" element={<BuyTokensPage />} />
-              <Route path="/buy-tokens/success" element={<PaymentSuccessPage />} />
-              <Route path="/my-appreciations" element={<AppreciationBankPage />} />
-              <Route path="/appreciation-bank" element={<AppreciationBankPage />} />
-              <Route path="/lessons-bank" element={<LessonsBankPage />} />
-              <Route path="/synthese" element={<SynthesePage />} />
-              <Route path="/generate-lesson" element={<LessonGeneratorPage />} />
+              <Route path="/dashboard" element={
+                <EmailConfirmationGuard>
+                  <DashboardPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/communication" element={
+                <EmailConfirmationGuard>
+                  <CommunicationPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/resources" element={
+                <EmailConfirmationGuard>
+                  <ResourcesPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/buy-tokens" element={
+                <EmailConfirmationGuard>
+                  <BuyTokensPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/buy-tokens/success" element={
+                <EmailConfirmationGuard>
+                  <PaymentSuccessPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/my-appreciations" element={
+                <EmailConfirmationGuard>
+                  <AppreciationBankPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/appreciation-bank" element={
+                <EmailConfirmationGuard>
+                  <AppreciationBankPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/lessons-bank" element={
+                <EmailConfirmationGuard>
+                  <LessonsBankPage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/synthese" element={
+                <EmailConfirmationGuard>
+                  <SynthesePage />
+                </EmailConfirmationGuard>
+              } />
+              <Route path="/generate-lesson" element={
+                <EmailConfirmationGuard>
+                  <LessonGeneratorPage />
+                </EmailConfirmationGuard>
+              } />
             </Route>
           </Routes>
         </main>
