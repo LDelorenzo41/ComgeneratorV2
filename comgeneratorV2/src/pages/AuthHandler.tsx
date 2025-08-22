@@ -15,7 +15,6 @@ export function AuthHandler() {
         console.log('🔐 Traitement du callback d\'authentification...');
         console.log('URL actuelle:', window.location.href);
         console.log('📍 Pathname:', location.pathname);
-        console.log('📍 Hash:', window.location.hash);
 
         // Vérifier si on est sur la route /auth/callback
         if (location.pathname !== '/auth/callback') {
@@ -40,33 +39,6 @@ export function AuthHandler() {
           errorDescription 
         });
 
-        // ✅ NOUVELLE LOGIQUE : Si pas de tokens, vérifier si l'utilisateur est déjà connecté
-        if (!accessToken && !refreshToken) {
-          console.log('🔍 Pas de tokens dans l\'URL, vérification de la session existante...');
-          
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session?.user) {
-            console.log('✅ Utilisateur déjà connecté:', session.user.email);
-            
-            // Vérifier si l'email est confirmé
-            if (session.user.email_confirmed_at) {
-              console.log('✅ Email déjà confirmé, redirection vers dashboard');
-              navigate('/dashboard');
-              return;
-            } else {
-              console.log('❌ Email non confirmé');
-              setStatus('error');
-              setMessage('Votre email n\'est pas encore confirmé. Veuillez vérifier votre boîte de réception.');
-              return;
-            }
-          } else {
-            console.log('❌ Aucune session active, redirection vers landing');
-            navigate('/landing');
-            return;
-          }
-        }
-
         // Gérer les erreurs dans l'URL
         if (error) {
           console.error('❌ Erreur dans l\'URL:', error, errorDescription);
@@ -88,56 +60,60 @@ export function AuthHandler() {
           return;
         }
 
-        // Traitement avec tokens présents
-        if (accessToken && refreshToken) {
-          // Définir la session avec les tokens
-          const { data, error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-
-          if (sessionError) {
-            console.error('❌ Erreur lors de la définition de la session:', sessionError);
-            
-            if (sessionError.message.includes('expired')) {
-              setStatus('expired');
-              setMessage('Le lien de confirmation a expiré. Veuillez vous inscrire à nouveau.');
-              return;
-            }
-            
-            setStatus('error');
-            setMessage('Erreur lors de la confirmation de l\'email. Veuillez réessayer.');
-            return;
-          }
-
-          // Vérifier que l'utilisateur est bien confirmé
-          if (!data.user?.email_confirmed_at) {
-            console.error('❌ Email non confirmé malgré la session');
-            setStatus('error');
-            setMessage('Votre email n\'a pas pu être confirmé. Veuillez réessayer.');
-            return;
-          }
-
-          console.log('✅ Session définie avec succès:', data.user?.email);
-          console.log('✅ Email confirmé le:', data.user?.email_confirmed_at);
-          
-          setStatus('success');
-          setMessage(`Email confirmé avec succès pour ${data.user?.email} !`);
-
-          // Nettoyer l'URL
-          window.history.replaceState({}, document.title, '/dashboard');
-
-          // Redirection robuste avec fallback
-          setTimeout(() => {
-            try {
-              console.log('🔄 Tentative de redirection...');
-              navigate('/dashboard');
-            } catch (navError) {
-              console.log('❌ Navigate échoué, utilisation de window.location');
-              window.location.href = '/dashboard';
-            }
-          }, 2000);
+        // Vérifier la présence des tokens
+        if (!accessToken || !refreshToken) {
+          console.log('❌ Tokens manquants, redirection vers landing');
+          navigate('/landing');
+          return;
         }
+
+        // Définir la session avec les tokens
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+
+        if (sessionError) {
+          console.error('❌ Erreur lors de la définition de la session:', sessionError);
+          
+          if (sessionError.message.includes('expired')) {
+            setStatus('expired');
+            setMessage('Le lien de confirmation a expiré. Veuillez vous inscrire à nouveau.');
+            return;
+          }
+          
+          setStatus('error');
+          setMessage('Erreur lors de la confirmation de l\'email. Veuillez réessayer.');
+          return;
+        }
+
+        // Vérifier que l'utilisateur est bien confirmé
+        if (!data.user?.email_confirmed_at) {
+          console.error('❌ Email non confirmé malgré la session');
+          setStatus('error');
+          setMessage('Votre email n\'a pas pu être confirmé. Veuillez réessayer.');
+          return;
+        }
+
+        console.log('✅ Session définie avec succès:', data.user?.email);
+        console.log('✅ Email confirmé le:', data.user?.email_confirmed_at);
+        
+        setStatus('success');
+        setMessage(`Email confirmé avec succès pour ${data.user?.email} !`);
+
+        // Nettoyer l'URL
+        window.history.replaceState({}, document.title, '/dashboard');
+
+        // Redirection robuste avec fallback
+        setTimeout(() => {
+          try {
+            console.log('🔄 Tentative de redirection...');
+            navigate('/dashboard');
+          } catch (navError) {
+            console.log('❌ Navigate échoué, utilisation de window.location');
+            window.location.href = '/dashboard';
+          }
+        }, 3000);
 
       } catch (error) {
         console.error('💥 Erreur inattendue:', error);
@@ -146,7 +122,14 @@ export function AuthHandler() {
       }
     };
 
-    handleAuthCallback();
+    // Vérifier si nous sommes sur une page avec des tokens
+    if (window.location.hash.includes('access_token') || location.pathname === '/auth/callback') {
+      handleAuthCallback();
+    } else {
+      // Pas de tokens, rediriger vers landing
+      console.log('❌ Pas de tokens, redirection vers landing');
+      navigate('/landing');
+    }
   }, [navigate, location.pathname]);
 
   // États d'affichage
@@ -156,10 +139,10 @@ export function AuthHandler() {
         <div className="text-center">
           <Loader className="mx-auto h-12 w-12 text-blue-600 animate-spin mb-4" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            Vérification de votre session...
+            Confirmation de votre email...
           </h1>
           <p className="text-gray-600">
-            Veuillez patienter pendant que nous vous redirigeons.
+            Veuillez patienter pendant que nous confirmons votre adresse email.
           </p>
         </div>
       </div>
