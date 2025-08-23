@@ -1,3 +1,4 @@
+// ✅ Modification du 23/08/2025 : adresse email corrigée dans le footer
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Sparkles, Heart, ExternalLink, ArrowRight } from 'lucide-react';
