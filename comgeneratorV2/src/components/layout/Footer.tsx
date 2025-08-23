@@ -75,15 +75,15 @@ export function Footer() {
             <ul className="space-y-4">
               <li>
                 <a 
-                  href="mailto:support-profassist@teachtech.fr" 
+                  href="mailto:contact-profassist@teachtech.fr" 
                   className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
                 >
                   <div className="w-8 h-8 bg-blue-800/50 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-700/50 transition-colors">
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">Email support</div>
-                    <div className="text-xs text-blue-300">support-profassist@teachtech.fr</div>
+                    <div className="text-sm font-medium">Email contact</div>
+                    <div className="text-xs text-blue-300">contact-profassist@teachtech.fr</div>
                   </div>
                 </a>
               </li>
