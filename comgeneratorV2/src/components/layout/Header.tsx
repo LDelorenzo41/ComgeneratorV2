@@ -18,7 +18,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
 
-// Event pour notifier les changements de tokens
+// Event pour notifier les changements de tokens ajout commentaire
 export const tokenUpdateEvent = new EventTarget();
 export const TOKEN_UPDATED = 'tokenUpdated';
 
