@@ -1,37 +1,15 @@
 import React from 'react';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
+import { rssService, type RSSArticle } from '../lib/rssService';
 import { ExternalLink, RefreshCw, AlertCircle, Newspaper, Check, ChevronDown, X, Sparkles, Rss, Filter, Calendar, Globe, TrendingUp } from 'lucide-react';
-import type { Article, RssFeed, UserRssPreference } from '../lib/types';
+import type { RssFeed, UserRssPreference } from '../lib/types';
 
-// ---------- Utils ----------
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-const callEdgeFunction = async () => {
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-rss`,
-    {
-      method: 'POST',
-      mode: 'cors',
-      credentials: 'omit',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-      }
-    }
-  );
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
-  }
-  return response;
-};
-
-// ---------- Composant principal ----------
 export function ResourcesPage() {
   const { user } = useAuthStore();
-  const [articles, setArticles] = React.useState<Article[]>([]);
+  const [articles, setArticles] = React.useState<RSSArticle[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -39,26 +17,32 @@ export function ResourcesPage() {
   const [refreshStatus, setRefreshStatus] = React.useState<string | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = React.useState<Date | null>(null);
 
-  // Catalogue + préférences
   const [catalog, setCatalog] = React.useState<RssFeed[]>([]);
   const [prefs, setPrefs] = React.useState<UserRssPreference[]>([]);
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const [selection, setSelection] = React.useState<string[]>([]);
 
-  // ----- Chargement du catalogue -----
+  // Chargement du catalogue
   const fetchCatalog = React.useCallback(async () => {
-    const { data, error } = await supabase
-      .from('rss_feeds')
-      .select('id, name, category, url, source_domain, is_active')
-      .eq('is_active', true)
-      .order('category', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    setCatalog(data as RssFeed[]);
+    try {
+      const feeds = rssService.getAllFeeds();
+      const catalogFeeds: RssFeed[] = feeds.map(feed => ({
+        id: feed.id,
+        name: feed.name,
+        url: feed.url,
+        category: feed.name.includes('Éduscol') ? 'Éduscol' : 
+                  feed.name.includes('Café') ? 'Actualités pédagogiques' : 'Presse spécialisée',
+        source_domain: new URL(feed.url).hostname,
+        is_active: true
+      }));
+      setCatalog(catalogFeeds);
+    } catch (err) {
+      console.error('Erreur chargement catalogue:', err);
+      throw err;
+    }
   }, []);
 
-  // ----- Chargement des préférences user -----
+  // Chargement des préférences
   const fetchPrefs = React.useCallback(async () => {
     if (!user) return;
     
@@ -71,123 +55,96 @@ export function ResourcesPage() {
     if (error) throw error;
 
     const rows = (data || []) as UserRssPreference[];
-    // Hydrate feeds
     const feedsMap = new Map(catalog.map(f => [f.id, f]));
     const enriched = rows.map(r => ({ ...r, feed: feedsMap.get(r.feed_id) }));
     setPrefs(enriched);
-
-    // Initialise la sélection dans le picker
     setSelection(enriched.map(p => p.feed_id));
   }, [user, catalog]);
 
-  // ----- Chargement des articles -----
+  // Chargement des articles
   const fetchArticles = React.useCallback(async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
       setError(null);
 
       if (forceRefresh) {
-        setRefreshStatus('Actualisation des articles...');
-        try {
-          const response = await callEdgeFunction();
-          const result = await response.json();
-          if (!result.success) {
-            throw new Error(result.message || 'Erreur lors de l\'actualisation');
-          }
-          setRefreshStatus(result.message || 'Articles mis à jour avec succès');
-          setLastRefreshTime(new Date());
-          await delay(3000);
-        } catch (edgeError: any) {
-          console.error('Edge Function error:', edgeError);
-          throw edgeError;
-        }
+        setIsRefreshing(true);
+        setRefreshStatus('Récupération des derniers articles...');
       }
 
-      const { data: articlesData, error: fetchError } = await supabase
-        .from('articles')
-        .select('*')
-        .not('feed_id', 'is', null)
-        .order('pub_date', { ascending: false });
+      const rssArticles = forceRefresh 
+        ? await rssService.fetchAllFeeds() 
+        : await rssService.fetchWithCache();
 
-      if (fetchError) throw fetchError;
-
-      const list = (articlesData || []) as Article[];
-      console.log('Articles récupérés depuis Supabase:', list.length);
-      console.log('Exemple d\'articles:', list.slice(0, 3).map(a => ({ title: a.title, feed_id: a.feed_id, source: a.source })));
+      console.log('Articles RSS récupérés:', rssArticles.length);
       
-      const sorted = [...list].sort((a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime());
-      setArticles(sorted);
+      setArticles(rssArticles);
+      setLastRefreshTime(new Date());
 
-      if (sorted.length === 0) {
+      if (rssArticles.length === 0) {
         setRefreshStatus('Aucun article disponible');
       } else {
-        setRefreshStatus(`${sorted.length} articles disponibles`);
-        if (!lastRefreshTime) setLastRefreshTime(new Date());
+        setRefreshStatus(`${rssArticles.length} articles récupérés`);
       }
+
+      await delay(2000);
+      
     } catch (err: any) {
-      console.error('Erreur:', err);
-      setError(
-        err.message === 'JWT expired'
-          ? 'Votre session a expiré. Veuillez vous reconnecter.'
-          : err.message || 'Une erreur est survenue lors de la récupération des articles'
-      );
+      console.error('Erreur RSS:', err);
+      setError(err.message || 'Erreur lors de la récupération des articles');
       setRefreshStatus(null);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
-      setTimeout(() => setRefreshStatus(null), 3000);
+      setTimeout(() => setRefreshStatus(null), 5000);
     }
-  }, [lastRefreshTime]);
+  }, []);
 
-  // ----- Sauvegarde des préférences -----
+  // Sauvegarde des préférences
   const savePrefs = async () => {
-  if (!user) return;
-  
-  try {
-    const selected = selection.slice(0, 3);
+    if (!user) return;
     
-    // Supprimer d'abord TOUTES les préférences existantes de l'utilisateur
-    const { error: deleteAllError } = await supabase
-      .from('user_rss_preferences')
-      .delete()
-      .eq('user_id', user.id);
-
-    if (deleteAllError) {
-      console.error('Erreur lors de la suppression des anciennes préférences:', deleteAllError);
-      alert('Erreur lors de la suppression des anciennes préférences.');
-      return;
-    }
-
-    // Ensuite, insérer les nouvelles préférences seulement si il y en a
-    if (selected.length > 0) {
-      const rows = selected.map((feedId, idx) => ({
-        user_id: user.id,
-        position: idx + 1,
-        feed_id: feedId
-      }));
-
-      const { error: insertError } = await supabase
+    try {
+      const selected = selection.slice(0, 3);
+      
+      const { error: deleteAllError } = await supabase
         .from('user_rss_preferences')
-        .insert(rows);
+        .delete()
+        .eq('user_id', user.id);
 
-      if (insertError) {
-        console.error('Erreur lors de l\'insertion des nouvelles préférences:', insertError);
-        alert('Erreur lors de la sauvegarde des nouvelles préférences.');
+      if (deleteAllError) {
+        console.error('Erreur suppression préférences:', deleteAllError);
+        alert('Erreur lors de la suppression des anciennes préférences.');
         return;
       }
+
+      if (selected.length > 0) {
+        const rows = selected.map((feedId, idx) => ({
+          user_id: user.id,
+          position: idx + 1,
+          feed_id: feedId
+        }));
+
+        const { error: insertError } = await supabase
+          .from('user_rss_preferences')
+          .insert(rows);
+
+        if (insertError) {
+          console.error('Erreur insertion préférences:', insertError);
+          alert('Erreur lors de la sauvegarde des nouvelles préférences.');
+          return;
+        }
+      }
+
+      await fetchPrefs();
+      setPickerOpen(false);
+      
+    } catch (error) {
+      console.error('Erreur générale sauvegarde:', error);
+      alert('Une erreur inattendue est survenue lors de la sauvegarde.');
     }
+  };
 
-    // Recharger les préférences et fermer le picker
-    await fetchPrefs();
-    setPickerOpen(false);
-    
-  } catch (error) {
-    console.error('Erreur générale lors de la sauvegarde:', error);
-    alert('Une erreur inattendue est survenue lors de la sauvegarde.');
-  }
-};
-
-  // ----- Handlers UI -----
   const toggleSelection = (id: string) => {
     setSelection(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
@@ -198,20 +155,18 @@ export function ResourcesPage() {
 
   const clearSelection = () => setSelection([]);
 
-  const handleRefresh = () => {
+  const handleRefresh = React.useCallback(() => {
     if (!isRefreshing) {
-      setIsRefreshing(true);
       fetchArticles(true);
     }
-  };
+  }, [isRefreshing, fetchArticles]);
 
-  // ----- Effects -----
   React.useEffect(() => {
     fetchCatalog().catch(err => {
       console.error(err);
       setError('Impossible de charger le catalogue des flux.');
     });
-  }, [fetchCatalog]);
+  }, []);
 
   React.useEffect(() => {
     if (catalog.length > 0) {
@@ -220,26 +175,24 @@ export function ResourcesPage() {
         setError('Impossible de charger vos préférences de flux.');
       });
     }
-  }, [catalog, fetchPrefs]);
+  }, [catalog.length, user]);
 
   React.useEffect(() => {
-    fetchArticles();
-  }, [fetchArticles]);
+    if (catalog.length > 0) {
+      fetchArticles();
+    }
+  }, [catalog.length]);
 
-  // Feeds à afficher (3 colonnes)
   const feedsToShow: (RssFeed | null)[] = [1, 2, 3].map(pos => {
     const pref = prefs.find(p => p.position === pos);
     return pref?.feed || null;
   });
 
-  // ✅ FONCTION SIMPLIFIÉE : Articles filtrés par feed_id
-  const getArticlesForFeed = (feed: RssFeed | null) => {
+  const getArticlesForFeed = React.useCallback((feed: RssFeed | null) => {
     if (!feed) return [];
     const filtered = articles.filter(a => a.feed_id === feed.id);
-    console.log(`Feed "${feed.name}" (${feed.id}): ${filtered.length} articles trouvés`);
-    console.log('Articles pour ce flux:', filtered.map(a => ({ title: a.title, feed_id: a.feed_id })));
     return filtered.slice(0, 20);
-  };
+  }, [articles]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -253,12 +206,10 @@ export function ResourcesPage() {
         minute: '2-digit'
       }).format(date);
     } catch (e) {
-      console.error('Erreur de formatage de date:', e);
       return 'Date non disponible';
     }
   };
 
-  // Grouper les flux par catégorie pour le picker
   const catalogByCategory = catalog.reduce((acc, feed) => {
     const category = feed.category || 'Autres';
     if (!acc[category]) acc[category] = [];
@@ -280,7 +231,7 @@ export function ResourcesPage() {
                 </div>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 text-white">
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Actualités éducatives
+                  Actualités éducatives en temps réel
                 </span>
               </div>
               <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
@@ -293,10 +244,9 @@ export function ResourcesPage() {
             </div>
           </div>
 
-          {/* Barre d'actions modernisée */}
+          {/* Barre d'actions */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              {/* Sélecteur multi amélioré */}
               <div className="relative">
                 <button
                   onClick={() => setPickerOpen(v => !v)}
@@ -376,7 +326,7 @@ export function ResourcesPage() {
                                           {feed.name}
                                         </div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                          {feed.source_domain || new URL(feed.url).hostname}
+                                          {feed.source_domain}
                                         </div>
                                       </div>
                                     </div>
@@ -415,12 +365,29 @@ export function ResourcesPage() {
                     {refreshStatus}
                   </div>
                 )}
-                {/* Bouton Actualiser supprimé - mise à jour automatique au chargement */}
+                {lastRefreshTime && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Dernière mise à jour : {new Intl.DateTimeFormat('fr-FR', {
+                      day: '2-digit',
+                      month: '2-digit', 
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }).format(lastRefreshTime)}
+                  </div>
+                )}
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="inline-flex items-center px-4 py-2 rounded-xl border-2 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 font-medium transition-all duration-300 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Actualisation...' : 'Actualiser'}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Erreurs modernisées */}
+          {/* Erreurs */}
           {error && (
             <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 border-l-4 border-red-500 p-6 rounded-xl">
               <div className="flex items-center">
@@ -430,7 +397,7 @@ export function ResourcesPage() {
             </div>
           )}
 
-          {/* Contenu - Grille d'articles */}
+          {/* Contenu */}
           {loading ? (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               {[0, 1, 2].map(i => (
@@ -454,8 +421,7 @@ export function ResourcesPage() {
                   'from-purple-500 to-pink-500'
                 ];
                 return (
-                  <section key={idx} className="space-y-6">
-                    {/* Header de colonne modernisé */}
+                  <section key={`${feed?.id || idx}-${idx}`} className="space-y-6">
                     <div className={`bg-gradient-to-r ${feedColors[idx]} p-6 rounded-2xl text-white`}>
                       <div className="flex items-center justify-between">
                         <div>
@@ -491,22 +457,10 @@ export function ResourcesPage() {
                       </div>
                     ) : (
                       <div className="space-y-6">
-                        {list.map(article => (
-                          <article key={article.id} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                        {list.map((article, articleIdx) => (
+                          <article key={`${article.link}-${articleIdx}`} className="group bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                             <div className="p-6">
                               <div className="flex items-start gap-4">
-                                {article.image_url && (
-                                  <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700">
-                                    <img
-                                      src={article.image_url}
-                                      alt={article.title}
-                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = 'none';
-                                      }}
-                                    />
-                                  </div>
-                                )}
                                 <div className="flex-1 min-w-0">
                                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                     {article.title}
@@ -520,7 +474,7 @@ export function ResourcesPage() {
                                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 space-x-4">
                                       <div className="flex items-center">
                                         <Calendar className="h-3 w-3 mr-1" />
-                                        {formatDate(article.pub_date)}
+                                        {formatDate(article.pubDate)}
                                       </div>
                                       <div className="flex items-center">
                                         <Globe className="h-3 w-3 mr-1" />
