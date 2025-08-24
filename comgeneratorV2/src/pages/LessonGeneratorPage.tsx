@@ -1,4 +1,7 @@
 import React from 'react';
+// AJOUTEZ CES DEUX LIGNES EN HAUT DU FICHIER
+import { ResizableBox } from 'react-resizable';
+import 'react-resizable/css/styles.css'; 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -178,139 +181,192 @@ const MarkdownEditor: React.FC<{
     onSaveToBank(content);
   };
 
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const maxWidth = pageWidth - 2 * margin;
-      let yPosition = margin;
+  // ✅ REMPLACER COMPLÈTEMENT la fonction handleExportPDF par cette version améliorée :
 
-      const addText = (text: string, fontSize: number, isBold: boolean = false, isItalic: boolean = false) => {
-        if (yPosition > pageHeight - 20) {
+const handleExportPDF = async () => {
+  setIsExporting(true);
+  try {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+    const maxWidth = pageWidth - 2 * margin;
+    let yPosition = margin;
+
+    // ✅ FONCTION AMÉLIORÉE pour ajouter du texte avec meilleur formatage
+    const addText = (text: string, fontSize: number, isBold: boolean = false, isItalic: boolean = false, marginLeft: number = 0) => {
+      // Vérifier si on a besoin d'une nouvelle page
+      if (yPosition > pageHeight - 30) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+
+      // Nettoyer le texte des emojis et caractères spéciaux
+      const cleanText = text
+        .replace(/[📚🎯🛠️🏫⏰🚀🔍🏗️📝🎨🟢🔵♿📊💡⚠️🗣️🔄📈💻🔥💪🎯🧘]/g, '') // Supprimer emojis
+        .replace(/[""]/g, '"') // Normaliser guillemets
+        .replace(/['']/g, "'") // Normaliser apostrophes
+        .replace(/…/g, '...') // Remplacer points de suspension
+        .replace(/–/g, '-') // Remplacer tirets longs
+        .replace(/—/g, '-') // Remplacer tirets cadratin
+        .trim();
+
+      if (!cleanText) return;
+
+      // Définir le style de police
+      let fontStyle = 'normal';
+      if (isBold && isItalic) fontStyle = 'bolditalic';
+      else if (isBold) fontStyle = 'bold';
+      else if (isItalic) fontStyle = 'italic';
+
+      pdf.setFont('helvetica', fontStyle);
+      pdf.setFontSize(fontSize);
+
+      // Diviser le texte en lignes
+      const availableWidth = maxWidth - marginLeft;
+      const lines = pdf.splitTextToSize(cleanText, availableWidth);
+      
+      lines.forEach((line: string) => {
+        if (yPosition > pageHeight - 30) {
           pdf.addPage();
           yPosition = margin;
         }
+        pdf.text(line.trim(), margin + marginLeft, yPosition);
+        yPosition += fontSize * 0.35 + 1; // ✅ INTERLIGNE RÉDUIT
+      });
 
-        let fontStyle = 'normal';
-        if (isBold && isItalic) fontStyle = 'bolditalic';
-        else if (isBold) fontStyle = 'bold';
-        else if (isItalic) fontStyle = 'italic';
+      // ✅ ESPACEMENT RÉDUIT après le paragraphe
+      yPosition += Math.max(2, fontSize * 0.1);
+    };
 
-        pdf.setFont('helvetica', fontStyle);
-        pdf.setFontSize(fontSize);
+    // ✅ PARSING MARKDOWN AMÉLIORÉ
+    const parseMarkdownToPDF = (markdownContent: string) => {
+      const lines = markdownContent.split('\n');
+      let inList = false;
+      let listLevel = 0;
 
-        const lines = pdf.splitTextToSize(text, maxWidth);
-        lines.forEach((line: string) => {
-          if (yPosition > pageHeight - 20) {
-            pdf.addPage();
-            yPosition = margin;
+      lines.forEach((line) => {
+        const trimmedLine = line.trim();
+
+        // Gérer les lignes vides
+        if (trimmedLine === '') {
+          if (inList) {
+            yPosition += 2; // Espacement minimal dans les listes
+          } else {
+            yPosition += 4; // Espacement entre les sections
           }
-          pdf.text(line, margin, yPosition);
-          yPosition += fontSize * 0.5 + 2;
-        });
-        yPosition += 3;
-      };
+          return;
+        }
 
-      const parseMarkdownToPDF = (markdownContent: string) => {
-        const lines = markdownContent.split('\n');
+        // Reset list state si pas dans une liste
+        if (!trimmedLine.match(/^[\s]*[-*•]\s/) && !trimmedLine.match(/^[\s]*\d+\.\s/)) {
+          inList = false;
+          listLevel = 0;
+        }
 
-        lines.forEach((line, _index) => {
-          const trimmedLine = line.trim();
+        // ✅ TITRES avec espacement adapté
+        if (trimmedLine.startsWith('# ')) {
+          const title = trimmedLine.substring(2);
+          yPosition += 8; // Espace avant titre principal
+          addText(title, 16, true);
+          yPosition += 4; // Espace après titre principal
+        }
+        else if (trimmedLine.startsWith('## ')) {
+          const title = trimmedLine.substring(3);
+          yPosition += 6; // Espace avant sous-titre
+          addText(title, 14, true);
+          yPosition += 3; // Espace après sous-titre
+        }
+        else if (trimmedLine.startsWith('### ')) {
+          const title = trimmedLine.substring(4);
+          yPosition += 4; // Espace avant sous-sous-titre
+          addText(title, 12, true);
+          yPosition += 2; // Espace après sous-sous-titre
+        }
+        // ✅ LISTES avec indentation
+        else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+          inList = true;
+          const listItem = '• ' + trimmedLine.substring(2);
+          addText(listItem, 10, false, false, 5); // Indentation de 5mm
+        }
+        else if (/^\d+\.\s/.test(trimmedLine)) {
+          inList = true;
+          addText(trimmedLine, 10, false, false, 5); // Indentation de 5mm
+        }
+        // ✅ CITATIONS
+        else if (trimmedLine.startsWith('> ')) {
+          const quote = trimmedLine.substring(2);
+          addText('"' + quote + '"', 10, false, true, 10); // Indentation de 10mm
+        }
+        // ✅ LIGNES AVEC FORMATAGE GRAS
+        else if (trimmedLine.includes('**')) {
+          // Traitement simple du gras : tout le paragraphe en gras si contient **
+          const cleanedText = trimmedLine.replace(/\*\*/g, '');
+          addText(cleanedText, 10, true);
+        }
+        // ✅ MÉTADONNÉES (Niveau, Durée, etc.)
+        else if (trimmedLine.includes('**Niveau :**') || trimmedLine.includes('Niveau :')) {
+          addText(trimmedLine.replace(/\*/g, ''), 11, true);
+          yPosition += 2;
+        }
+        // ✅ PARAGRAPHES NORMAUX
+        else {
+          addText(trimmedLine, 10);
+        }
+      });
+    };
 
-          if (trimmedLine === '') {
-            yPosition += 3;
-            return;
-          }
+    // ✅ EN-TÊTE PDF AMÉLIORÉ
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.text('Séance Pédagogique', margin, yPosition);
+    yPosition += 12;
 
-          if (trimmedLine.startsWith('# ')) {
-            const title = trimmedLine.substring(2);
-            addText(title, 16, true);
-            yPosition += 3;
-          }
-          else if (trimmedLine.startsWith('## ')) {
-            const title = trimmedLine.substring(3);
-            addText(title, 14, true);
-            yPosition += 2;
-          }
-          else if (trimmedLine.startsWith('### ')) {
-            const title = trimmedLine.substring(4);
-            addText(title, 12, true);
-            yPosition += 1;
-          }
-          else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-            const listItem = '• ' + trimmedLine.substring(2);
-            addText(listItem, 10);
-          }
-          else if (/^\d+\.\s/.test(trimmedLine)) {
-            addText(trimmedLine, 10);
-          }
-          else if (trimmedLine.startsWith('> ')) {
-            const quote = trimmedLine.substring(2);
-            addText('"' + quote + '"', 10, false, true);
-          }
-          else {
-            let processedText = trimmedLine;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text(`Générée le ${new Date().toLocaleDateString('fr-FR')} avec ProfAssist`, margin, yPosition);
+    yPosition += 8;
 
-            if (processedText.includes('**')) {
-              const parts = processedText.split(/\*\*(.*?)\*\*/g);
-              let currentText = '';
+    // Ligne de séparation
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 10;
 
-              for (let i = 0; i < parts.length; i++) {
-                if (i % 2 === 0) {
-                  currentText += parts[i];
-                } else {
-                  currentText += parts[i];
-                }
-              }
-              addText(currentText, 10);
-            } else {
-              addText(processedText, 10);
-            }
-          }
-        });
-      };
+    // ✅ PARSER LE CONTENU
+    parseMarkdownToPDF(content);
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(18);
-      pdf.text('Séance Pédagogique', margin, yPosition);
-      yPosition += 10;
-
+    // ✅ PAGINATION AMÉLIORÉE
+    const pdfInternal = pdf.internal as any;
+    const totalPages = pdfInternal.getNumberOfPages();
+    
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.text(`Générée le ${new Date().toLocaleDateString('fr-FR')}`, margin, yPosition);
-      yPosition += 10;
-
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 10;
-
-      parseMarkdownToPDF(content);
-
-      const pdfInternal = pdf.internal as any;
-      const totalPages = pdfInternal.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8);
-        pdf.text(
-          `Page ${i} sur ${totalPages}`,
-          pageWidth - margin - 20,
-          pageHeight - 10
-        );
-      }
-
-      const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
-      pdf.save(`seance-pedagogique-${date}.pdf`);
-
-    } catch (error) {
-      console.error('Erreur lors de l\'export PDF:', error);
-      alert('Erreur lors de l\'export PDF. Veuillez réessayer.');
-    } finally {
-      setIsExporting(false);
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 100, 100); // Couleur grise
+      
+      // Pied de page centré
+      const pageText = `Page ${i} sur ${totalPages}`;
+      const pageTextWidth = pdf.getTextWidth(pageText);
+      pdf.text(pageText, (pageWidth - pageTextWidth) / 2, pageHeight - 10);
+      
+      // Remettre couleur noire
+      pdf.setTextColor(0, 0, 0);
     }
-  };
+
+    // ✅ SAUVEGARDE avec nom plus lisible
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR').replace(/\//g, '-');
+    const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+    pdf.save(`Séance-${dateStr}-${timeStr}.pdf`);
+
+  } catch (error) {
+    console.error('Erreur lors de l\'export PDF:', error);
+    alert('Erreur lors de l\'export PDF. Veuillez réessayer.');
+  } finally {
+    setIsExporting(false);
+  }
+};
 
   // ✅ AJOUT : Fonction pour rendre le bouton de sauvegarde conditionnel
   const renderSaveToBankButton = () => {
@@ -390,19 +446,26 @@ const MarkdownEditor: React.FC<{
             </button>
           </div>
         </div>
-        <div className="relative">
+
+        {/* MODIFICATION ICI */}
+        <ResizableBox
+          className="relative"
+          height={384} // Hauteur initiale (équivalent à h-96)
+          minConstraints={[300, 200]}
+          maxConstraints={[Infinity, 1200]}
+          axis="y"
+          resizeHandles={['se']}
+        >
           <textarea
-            className="w-full h-96 p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none transition-all duration-200"
+            className="w-full h-full p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none"
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             placeholder="Éditez votre contenu markdown ici..."
           />
           <div className="absolute bottom-4 right-4 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
-            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-              💡 Syntaxe Markdown supportée
-            </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">💡 Syntaxe Markdown supportée</p>
           </div>
-        </div>
+        </ResizableBox>
       </div>
     );
   }
@@ -414,55 +477,31 @@ const MarkdownEditor: React.FC<{
           <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Aperçu de la séance
-          </h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Aperçu de la séance</h3>
         </div>
         <div className="flex space-x-3">
-          <button
-            onClick={() => navigator.clipboard.writeText(content)}
-            className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Copier
+          <button onClick={() => navigator.clipboard.writeText(content)} className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200">
+            <Copy className="w-4 h-4 mr-2" /> Copier
           </button>
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-xl hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50"
-          >
-            <FileDown className="w-4 h-4 mr-2" />
-            {isExporting ? 'Export...' : 'PDF'}
+          <button onClick={handleExportPDF} disabled={isExporting} className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-xl hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50">
+            <FileDown className="w-4 h-4 mr-2" /> {isExporting ? 'Export...' : 'PDF'}
           </button>
-
-          {/* ✅ BOUTON DE SAUVEGARDE CONDITIONNEL */}
           {renderSaveToBankButton()}
-
-          <button
-            onClick={() => setIsEditing(true)}
-            className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Modifier
+          <button onClick={() => setIsEditing(true)} className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200">
+            <Edit className="w-4 h-4 mr-2" /> Modifier
           </button>
         </div>
       </div>
 
-      {/* ✅ ALERTE POUR UTILISATEURS SANS ACCÈS BANQUE */}
       {!bankAccessLoading && !hasBankAccess && (
         <div className="bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <Lock className="w-6 h-6 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <div>
-              <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">
-                Sauvegarde non disponible
-              </h5>
+              <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">Sauvegarde non disponible</h5>
               <p className="text-orange-700 dark:text-orange-300 text-sm">
                 Votre plan actuel ne permet pas de sauvegarder les séances.
-                <button
-                  onClick={() => window.location.href = '/buy-tokens'}
-                  className="underline hover:no-underline font-medium ml-1"
-                >
+                <button onClick={() => window.location.href = '/buy-tokens'} className="underline hover:no-underline font-medium ml-1">
                   Upgrader vers un plan avec banque
                 </button>
               </p>
@@ -471,76 +510,36 @@ const MarkdownEditor: React.FC<{
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
-        <div className="prose prose-sm max-w-none dark:prose-invert p-8 overflow-auto max-h-96">
+      {/* MODIFICATION ICI */}
+      <ResizableBox
+        className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-auto relative"
+        height={384} // Hauteur initiale
+        minConstraints={[300, 200]}
+        maxConstraints={[Infinity, 1200]}
+        axis="y" // Redimensionnement vertical uniquement
+        resizeHandles={['se']} // Poignée en bas à droite
+      >
+        <div className="prose prose-sm max-w-none dark:prose-invert p-8 h-full">
           <ReactMarkdown
             components={{
-              h1: ({ children }) => (
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">
-                  {children}
-                </h1>
-              ),
-              h2: ({ children }) => (
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">
-                  {children}
-                </h2>
-              ),
-              h3: ({ children }) => (
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
-                  {children}
-                </h3>
-              ),
-              p: ({ children }) => (
-                <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
-                  {children}
-                </p>
-              ),
-              ul: ({ children }) => (
-                <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                  {children}
-                </ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                  {children}
-                </ol>
-              ),
-              li: ({ children }) => (
-                <li className="mb-1">
-                  {children}
-                </li>
-              ),
-              strong: ({ children }) => (
-                <strong className="font-semibold text-gray-900 dark:text-gray-100">
-                  {children}
-                </strong>
-              ),
-              em: ({ children }) => (
-                <em className="italic text-gray-800 dark:text-gray-200">
-                  {children}
-                </em>
-              ),
-              blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">
-                  {children}
-                </blockquote>
-              ),
-              code: ({ children }) => (
-                <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">
-                  {children}
-                </code>
-              ),
-              pre: ({ children }) => (
-                <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">
-                  {children}
-                </pre>
-              )
+              h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
+              p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
+              em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
+              blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">{children}</blockquote>,
+              code: ({ children }) => <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">{children}</code>,
+              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>
             }}
           >
             {content}
           </ReactMarkdown>
         </div>
-      </div>
+      </ResizableBox>
     </div>
   );
 };
@@ -552,7 +551,7 @@ export function LessonGeneratorPage() {
   const [loading, setLoading] = React.useState(false);
   const [savingToBank, setSavingToBank] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [selectedPedagogy, setSelectedPedagogy] = React.useState<string>('');
+  const [selectedPedagogy, setSelectedPedagogy] = React.useState<string>('traditionnelle'); // ✅ Au lieu de ''
   const [selectedDuration, setSelectedDuration] = React.useState<string>('60');
   const [lastFormData, setLastFormData] = React.useState<LessonFormData | null>(null);
 
@@ -590,15 +589,15 @@ export function LessonGeneratorPage() {
   }, [user]);
 
   const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<LessonFormData>({
-    resolver: zodResolver(lessonSchema),
-    defaultValues: {
-      subject: '',
-      topic: '',
-      level: '',
-      pedagogy_type: '',
-      duration: '60'
-    }
-  });
+  resolver: zodResolver(lessonSchema),
+  defaultValues: {
+    subject: '',
+    topic: '',
+    level: '',
+    pedagogy_type: 'traditionnelle', // ✅ Mettre une valeur par défaut au lieu de chaîne vide
+    duration: '60'
+  }
+});
 
   const onSubmit = async (data: LessonFormData) => {
     if (!user) return;
@@ -614,7 +613,9 @@ export function LessonGeneratorPage() {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
 
-    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
+    // ✅ REMPLACEMENT COMPLET - Remplacer tout le prompt existant par ceci :
+
+const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
 
 **CONTEXTE DE LA SÉANCE :**
 - Matière : ${data.subject}
@@ -622,6 +623,58 @@ export function LessonGeneratorPage() {
 - Niveau : ${data.level}
 - Durée : ${data.duration} minutes
 - Approche pédagogique : ${pedagogyDescription}
+
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 
+`**🏃 SPÉCIFICITÉS EPS - INSTRUCTIONS PRIORITAIRES :**
+
+**IMPÉRATIFS PÉDAGOGIQUES EPS :**
+- **75% minimum d'activité motrice** : La séance doit être majoritairement composée d'exercices pratiques et de situations motrices
+- **Progressivité des apprentissages** : Du simple au complexe, du global au spécifique
+- **Sécurité active et passive** : Intégrer systématiquement les consignes de sécurité et l'échauffement
+- **Différenciation motrice** : Adapter les exercices selon les niveaux d'habileté des élèves
+- **Évaluation par l'action** : Privilégier l'observation des comportements moteurs et les critères de réalisation
+
+**STRUCTURE SPÉCIFIQUE EPS (à respecter absolument) :**
+
+### 🔥 **Phase 1 : Échauffement/Mise en activité** - [12-15 minutes sur ${data.duration} min]
+**Activité motrice obligatoire :** [Exercices d'échauffement spécifiques à l'APSA, mobilisation articulaire, activation cardio-vasculaire]
+**Exercices concrets :** [Détailler 3-4 exercices progressifs avec consignes de sécurité]
+**Modalité :** [Collectif puis individuel/binômes]
+
+### 💪 **Phase 2 : Apprentissage moteur principal** - [${Math.floor((parseInt(data.duration) * 0.6))} minutes]
+**Situation d'apprentissage 1 :** [Exercice technique spécifique avec critères de réalisation]
+**Situation d'apprentissage 2 :** [Situation d'opposition/coopération ou perfectionnement technique]
+**Situation d'apprentissage 3 :** [Mise en application complexe ou situation de jeu]
+**Variables didactiques :** [Espace, temps, matériel, nombre de joueurs, règles...]
+
+### 🎯 **Phase 3 : Mise en situation complexe/Jeu** - [${Math.floor((parseInt(data.duration) * 0.2))} minutes]
+**Application pratique :** [Situation de match, parcours, ou évaluation pratique]
+**Rôles des élèves :** [Joueurs, arbitres, observateurs, coaches...]
+
+### 🧘 **Phase 4 : Retour au calme/Bilan** - [5-8 minutes]
+**Récupération active :** [Étirements, relaxation, exercices respiratoires]
+**Bilan moteur :** [Analyse des sensations, verbalisation des apprentissages]
+
+**MATÉRIEL EPS SPÉCIFIQUE :**
+- [Lister précisément tout le matériel sportif nécessaire]
+- [Préciser l'aménagement des espaces et la sécurité]
+- [Indiquer les alternatives en cas de manque de matériel]
+
+**CRITÈRES DE RÉALISATION MOTRICE :**
+- [Définir 3-4 critères observables pour évaluer la réussite technique]
+- [Préciser les observables comportementaux et moteurs]
+- [Adapter selon les niveaux d'habileté]
+
+**SÉCURITÉ ET GESTION DE CLASSE :**
+- [Consignes de sécurité spécifiques à l'APSA]
+- [Gestion des groupes et rotations]
+- [Signaux et codes de communication]
+
+**DIFFÉRENCIATION MOTRICE :**
+- **Élèves en difficulté motrice :** [Adaptations techniques, matériel adapté, simplifications]
+- **Élèves experts :** [Complexifications, rôles de tuteur, défis supplémentaires]
+- **Élèves en situation de handicap :** [Adaptations inclusives spécifiques]` 
+: ''}
 
 **CONSIGNES DE STRUCTURATION :**
 Génère une séance pédagogique complète et directement exploitable en respectant OBLIGATOIREMENT cette structure Markdown :
@@ -646,7 +699,8 @@ Génère une séance pédagogique complète et directement exploitable en respec
 ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ?
 `### Espace et terrain
 - [Configuration spatiale nécessaire]
-- [Matériel sportif requis]` : ''}
+- [Matériel sportif requis]
+- [Consignes de sécurité]` : ''}
 
 ## 🏫 Organisation spatiale de la classe
 > **💡 Configuration adaptée à la pédagogie ${data.pedagogy_type}**
@@ -655,10 +709,36 @@ ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().inclu
 
 ## ⏰ Déroulé détaillé de la séance
 
-### 🚀 **Phase 1 : Accroche/Situation déclenchante** - [X minutes]
+### 🚀 **Phase 1 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Échauffement/Mise en activité' : 'Accroche/Situation déclenchante'}** - [X minutes]
 > **Modalité :** [Individuel/Groupe/Collectif]
 
-**Activité :** [Description précise de l'activité]
+**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - OBLIGATOIREMENT MOTRICE avec exercices concrets' : ''}]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '**Consignes de sécurité :** [Précisions sécuritaires spécifiques]' : ''}
+
+---
+
+### 🔍 **Phase 2 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Apprentissage moteur principal' : '[Nom de la phase]'}** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - SITUATIONS MOTRICES DÉTAILLÉES avec critères de réalisation' : ''}]
+
+**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+
+**Rôle des élèves :** [Actions attendues des élèves]
+
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '**Variables didactiques :** [Adaptations possibles : espace, temps, règles...]' : ''}
+
+---
+
+### 🏗️ **Phase 3 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Mise en situation complexe/Application' : '[Nom de la phase]'}** - [X minutes]
+> **Modalité :** [Individuel/Groupe/Collectif]
+
+**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - SITUATION DE JEU OU APPLICATION COMPLEXE' : ''}]
 
 **Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
 
@@ -666,32 +746,10 @@ ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().inclu
 
 ---
 
-### 🔍 **Phase 2 : [Nom de la phase]** - [X minutes]
+### 📝 **Phase 4 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Retour au calme/Bilan moteur' : 'Synthèse/Institutionnalisation'}** - [X minutes]
 > **Modalité :** [Individuel/Groupe/Collectif]
 
-**Activité :** [Description précise de l'activité]
-
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
-
-**Rôle des élèves :** [Actions attendues des élèves]
-
----
-
-### 🏗️ **Phase 3 : [Nom de la phase]** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
-
-**Activité :** [Description précise de l'activité]
-
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
-
-**Rôle des élèves :** [Actions attendues des élèves]
-
----
-
-### 📝 **Phase 4 : Synthèse/Institutionnalisation** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
-
-**Activité :** [Description précise de l'activité]
+**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - RETOUR AU CALME + VERBALISATION' : ''}]
 
 **Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
 
@@ -699,40 +757,40 @@ ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().inclu
 
 ## 🎨 Différenciation et adaptations
 
-### 🟢 Pour les élèves en difficulté
-- [3-4 adaptations concrètes]
+### 🟢 Pour les élèves en difficulté${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' motrice' : ''}
+- [3-4 adaptations concrètes${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' : matériel adapté, simplifications techniques, aides visuelles' : ''}]
 
-### 🔵 Pour les élèves à l'aise
-- [3-4 enrichissements possibles]
+### 🔵 Pour les élèves à l'aise${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '/experts moteurs' : ''}
+- [3-4 enrichissements possibles${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' : complexifications, rôles de tuteur, défis supplémentaires' : ''}]
 
 ### ♿ Adaptations inclusives
-- [Adaptations pour élèves à besoins particuliers]
+- [Adaptations pour élèves à besoins particuliers${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' et situations de handicap moteur' : ''}]
 
 ## 📊 Évaluation et critères de réussite
 
 ### Critères de réussite observables
-- **Critère 1 :** [Comportement/production attendue]
-- **Critère 2 :** [Comportement/production attendue]
-- **Critère 3 :** [Comportement/production attendue]
+- **Critère 1 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE MOTEUR OBSERVABLE' : ''}]
+- **Critère 2 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE TECHNIQUE MESURABLE' : ''}]
+- **Critère 3 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE COMPORTEMENTAL EN SITUATION' : ''}]
 
 ### Modalités d'évaluation
-- [Formative/Sommative/Auto-évaluation/Etc.]
+- [${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Observation directe des comportements moteurs/Auto-évaluation des sensations/Évaluation par les pairs' : 'Formative/Sommative/Auto-évaluation/Etc.'}]
 
 ## 💡 Conseils pratiques et anticipation
 
 ### ⚠️ Points de vigilance
-- [Difficultés prévisibles et solutions]
+- [Difficultés prévisibles et solutions${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Focus sur la sécurité et la gestion des groupes' : ''}]
 
 ### 🗣️ Questions types à poser
-- [5-6 questions pour guider les élèves]
+- [5-6 questions pour guider les élèves${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Verbalisation des sensations et analyse technique' : ''}]
 
 ### 🔄 Variantes possibles
-- [Adaptations selon le contexte]
+- [Adaptations selon le contexte${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ', météo, matériel disponible' : ''}]
 
 ## 📈 Prolongements possibles
-- **Séance suivante :** [Piste pour la continuité]
+- **Séance suivante :** [Piste pour la continuité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Évolution des situations motrices' : ''}]
 - **Interdisciplinarité :** [Liens avec d'autres matières]
-- **À la maison :** [Travail personnel éventuel]
+- **À la maison :** [Travail personnel éventuel${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Pratique autonome, recherches' : ''}]
 
 ---
 > **💻 Ressources numériques :** [Sites, apps, outils TICE recommandés]
@@ -745,6 +803,7 @@ ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().inclu
 4. Les consignes aux élèves doivent être formulées simplement
 5. Prévoir des transitions fluides entre les phases
 6. Intégrer des éléments de différenciation naturelle
+${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '7. **PRIORITÉ EPS :** Au moins 75% d\'exercices pratiques et situations motrices avec critères techniques précis' : ''}
 
 Génère maintenant cette séance en respectant scrupuleusement cette structure et en étant très concret dans toutes les descriptions.`;
 
@@ -900,6 +959,11 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
+          </p>
+
+          {/* === AJOUT ICI === */}
+          <p className="text-sm italic text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
+            La séance générée est une aide proposée par l’IA : elle peut contenir des approximations. Elle ne remplace pas votre expertise professionnelle, mais constitue une orientation à adapter avec votre jugement.
           </p>
 
           {tokenCount !== null && (

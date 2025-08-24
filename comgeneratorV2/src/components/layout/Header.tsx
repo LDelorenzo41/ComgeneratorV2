@@ -256,6 +256,20 @@ export function Header() {
                     {isSettingsDropdownOpen && (
                       <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
                         <div className="flex flex-col py-2">
+                          {/* 🆕 NOUVEAU : Lien vers la page de paramètres */}
+                          <Link
+                            to="/settings"
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={() => setIsSettingsDropdownOpen(false)}
+                          >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Paramètres du compte
+                          </Link>
+                          
+                          {/* Séparateur */}
+                          <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                          
+                          {/* Boutons existants */}
                           <button
                             onClick={() => { toggleTheme(); setIsSettingsDropdownOpen(false); }}
                             className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -377,6 +391,15 @@ export function Header() {
               Acheter des tokens
             </Link>
             <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
+              {/* 🆕 AJOUT : Lien Paramètres dans le menu mobile */}
+              <Link
+                to="/settings"
+                className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Settings className="h-5 w-5 mr-2" />
+                <span>Paramètres du compte</span>
+              </Link>
               <button
                 onClick={() => {
                   toggleTheme();

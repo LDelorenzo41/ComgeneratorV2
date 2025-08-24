@@ -158,6 +158,13 @@ const RSS_FEEDS: RSSFeed[] = [
   name: 'Édubase – Technologie',
   url: 'https://edubase.eduscol.education.fr/rss/rss.xml?discipline[0]=Technologie',
   proxyUrl: 'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fedubase.eduscol.education.fr%2Frss%2Frss.xml%3Fdiscipline%5B0%5D%3DTechnologie'
+},
+// ... (vos autres flux)
+{
+  id: 'a0b1c2d3-e4f5-4a6b-8c7d-9e8f0a1b2c3d',
+  name: 'Édubase – Scénarios pédagogiques nationaux',
+  url: 'https://edubase.eduscol.education.fr/rss/rss.xml?academie[0]=Minist%C3%A8re%20de%20l%27%C3%89ducation%20nationale',
+  proxyUrl: 'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fedubase.eduscol.education.fr%2Frss%2Frss.xml%3Facademie%5B0%5D%3DMinist%25C3%25A8re%2520de%2520l%2527%25C3%2589ducation%2520nationale'
 }
 ];
 

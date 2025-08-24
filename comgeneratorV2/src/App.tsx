@@ -16,9 +16,16 @@ import { LandingPage } from './pages/LandingPage';
 import { SynthesePage } from './pages/SynthesePage';
 import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
 import { AuthHandler } from './pages/AuthHandler';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
+
+// 🆕 Import des routes légales
+import { LegalRoutes } from './routes/LegalRoutes';
+
+// 🆕 Import de la page de paramètres
+import { SettingsPage } from './pages/SettingsPage';
 
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -114,7 +121,12 @@ function App() {
             {/* Routes publiques */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            {/* 🆕 Nouvelle route pour reset password */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/landing" element={<LandingPage />} />
+            
+            {/* 🆕 Routes légales (publiques - accessibles sans connexion) */}
+            <Route path="/legal/*" element={<LegalRoutes />} />
             
             {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
             <Route element={<AuthLayout />}>
@@ -166,6 +178,12 @@ function App() {
               <Route path="/generate-lesson" element={
                 <EmailConfirmationGuard>
                   <LessonGeneratorPage />
+                </EmailConfirmationGuard>
+              } />
+              {/* 🆕 Route pour la page de paramètres avec suppression de compte */}
+              <Route path="/settings" element={
+                <EmailConfirmationGuard>
+                  <SettingsPage />
                 </EmailConfirmationGuard>
               } />
             </Route>
