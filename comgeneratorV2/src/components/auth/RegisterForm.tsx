@@ -3,14 +3,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
-import { useNavigate } from 'react-router-dom';
-import { UserPlus, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { UserPlus, Mail, CheckCircle, AlertCircle, Scale, Shield } from 'lucide-react';
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
   confirmPassword: z.string(),
-  newsletter: z.boolean().optional()
+  newsletter: z.boolean().optional(),
+  // 🆕 Ajout de l'acceptation des conditions légales
+  legalAccepted: z.boolean().refine(val => val === true, {
+    message: 'Vous devez accepter les conditions générales pour créer votre compte'
+  })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Les mots de passe ne correspondent pas",
   path: ["confirmPassword"]
@@ -27,12 +31,14 @@ export function RegisterForm() {
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      newsletter: false
+      newsletter: false,
+      legalAccepted: false // 🆕 Valeur par défaut
     }
   });
 
-  // Surveiller la valeur de newsletter
+  // Surveiller les valeurs
   const newsletterValue = watch('newsletter');
+  const legalAcceptedValue = watch('legalAccepted'); // 🆕 Surveillance
 
   // Fonction pour obtenir l'URL de redirection dynamique
   const getRedirectURL = () => {
@@ -46,8 +52,15 @@ export function RegisterForm() {
     try {
       setError(null);
       console.log('📧 Valeur newsletter lors de la soumission:', data.newsletter);
+      console.log('⚖️ Acceptation légale lors de la soumission:', data.legalAccepted);
 
-      // ✅ Inscription avec confirmation d'email OBLIGATOIRE + newsletter
+      // ✅ Vérification supplémentaire côté client
+      if (!data.legalAccepted) {
+        setError('Vous devez accepter les conditions générales pour créer votre compte');
+        return;
+      }
+
+      // ✅ Inscription avec confirmation d'email OBLIGATOIRE + newsletter + acceptation légale
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
@@ -55,7 +68,9 @@ export function RegisterForm() {
           emailRedirectTo: getRedirectURL(),
           data: {
             created_at: new Date().toISOString(),
-            newsletter_subscription: data.newsletter === true
+            newsletter_subscription: data.newsletter === true,
+            legal_accepted_at: new Date().toISOString(), // 🆕 Horodatage acceptation
+            legal_accepted: true // 🆕 Confirmation acceptation
           }
         }
       });
@@ -70,87 +85,53 @@ export function RegisterForm() {
         if (signUpError.message === 'Failed to fetch') {
           throw new Error('Impossible de se connecter au serveur. Veuillez vérifier votre connexion internet.');
         }
-        throw signUpError;
+        throw new Error(signUpError.message || 'Erreur lors de la création du compte');
       }
 
-      // ✅ AJOUT : Mise à jour explicite du profil avec la newsletter
       if (signUpData.user) {
-        console.log('🔄 Mise à jour du profil avec newsletter:', data.newsletter);
-        
-        // Attendre un peu que le trigger crée le profil
-        setTimeout(async () => {
-          try {
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ newsletter_subscription: data.newsletter === true })
-              .eq('user_id', signUpData.user.id);
-
-            if (updateError) {
-              console.error('Erreur mise à jour newsletter:', updateError);
-            } else {
-              console.log('✅ Newsletter mise à jour avec succès');
-            }
-          } catch (updateError) {
-            console.error('Erreur lors de la mise à jour:', updateError);
-          }
-        }, 2000);
+        console.log('✅ Compte créé avec succès ! ID utilisateur:', signUpData.user.id);
+        setUserEmail(data.email);
+        setEmailSent(true);
+      } else {
+        throw new Error('Erreur lors de la création du compte');
       }
-
-      setUserEmail(data.email);
-      setEmailSent(true);
 
     } catch (error: any) {
-      console.error('Erreur d\'inscription:', error);
-      setError(error.message || 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+      console.error('❌ Erreur inscription:', error);
+      setError(error.message);
     }
   };
 
-  // Interface après envoi de l'email de confirmation
+  // ✅ Si l'email a été envoyé, afficher le message de confirmation
   if (emailSent) {
     return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="text-center mb-6">
-          <Mail className="mx-auto h-16 w-16 text-blue-600 dark:text-blue-400 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Vérifiez votre email
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Nous avons envoyé un lien de confirmation à :
-          </p>
-          <p className="font-semibold text-blue-600 dark:text-blue-400 mt-1">
-            {userEmail}
-          </p>
-        </div>
-
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6">
-          <div className="flex items-start">
-            <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Prochaines étapes :
-              </h3>
-              <ol className="mt-2 text-sm text-blue-700 dark:text-blue-300 list-decimal list-inside space-y-1">
-                <li>Ouvrez votre boîte de réception email</li>
-                <li>Trouvez l'email de ProfAssist</li>
-                <li>Cliquez sur "Confirmer mon email"</li>
-                <li>Vous serez automatiquement connecté</li>
-              </ol>
-            </div>
+      <div className="text-center space-y-6">
+        <div className="flex justify-center">
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
         </div>
 
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 mb-6">
-          <div className="flex items-start">
-            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Email non reçu ?
-              </h3>
-              <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                <li>• Vérifiez votre dossier spam/courrier indésirable</li>
-                <li>• Le lien expire dans 24 heures</li>
-                <li>• Contactez-nous si le problème persiste</li>
-              </ul>
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Compte créé avec succès !
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Un email de confirmation a été envoyé à <strong>{userEmail}</strong>
+          </p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mr-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-amber-800 dark:text-amber-400 mb-1">
+                  Prochaine étape importante
+                </h4>
+                <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                  <li>• Vérifiez votre dossier spam/courrier indésirable</li>
+                  <li>• Le lien expire dans 24 heures</li>
+                  <li>• Contactez-nous si le problème persiste</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -177,60 +158,140 @@ export function RegisterForm() {
     );
   }
 
-  // ✅ Formulaire d'inscription CENTRÉ avec option newsletter
+  // ✅ Formulaire d'inscription avec acceptation des CGU
   return (
     <div className="flex justify-center items-center min-h-full py-8">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 w-full max-w-sm">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 w-full max-w-md">
+        
+        {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Email
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Adresse email <span className="text-red-500">*</span>
           </label>
           <input
             {...register('email')}
             type="email"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
             placeholder="votre.email@exemple.com"
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
           )}
         </div>
 
+        {/* Mot de passe */}
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Mot de passe
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Mot de passe <span className="text-red-500">*</span>
           </label>
           <input
             {...register('password')}
             type="password"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            placeholder="Minimum 6 caractères"
           />
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
           )}
         </div>
 
+        {/* Confirmation mot de passe */}
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Confirmer le mot de passe
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Confirmer le mot de passe <span className="text-red-500">*</span>
           </label>
           <input
             {...register('confirmPassword')}
             type="password"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+            placeholder="Répétez votre mot de passe"
           />
           {errors.confirmPassword && (
-            <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword.message}</p>
           )}
         </div>
 
-        {/* ✅ Option newsletter */}
-        <div className="flex items-start space-x-3 py-2">
+        {/* 🆕 SECTION LÉGALE - Acceptation des CGU/CGV (OBLIGATOIRE) */}
+        <div className="space-y-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+          <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
+            <Scale className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
+            Acceptation des conditions (obligatoire)
+          </h4>
+          
+          {/* Checkbox principal CGU + CGV */}
+          <div className="flex items-start">
+            <input
+              {...register('legalAccepted')}
+              id="accept-legal"
+              type="checkbox"
+              className="h-5 w-5 text-blue-600 border-2 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 mt-1"
+            />
+            <label htmlFor="accept-legal" className="ml-3 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              <span className="font-medium text-gray-900 dark:text-white">
+                J'accepte les conditions d'utilisation <span className="text-red-500">*</span>
+              </span>
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
+                  <Scale className="w-3 h-3 mr-1" />
+                  <Link 
+                    to="/legal/cgu" 
+                    target="_blank"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline mr-2 font-medium"
+                  >
+                    Conditions générales d'utilisation (CGU)
+                  </Link>
+                  <span>et</span>
+                  <Link 
+                    to="/legal/cgv" 
+                    target="_blank"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-2 font-medium"
+                  >
+                    Conditions générales de vente (CGV)
+                  </Link>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {/* Information sur la politique de confidentialité */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+            <div className="flex items-start">
+              <Shield className="w-4 h-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Protection de vos données personnelles</p>
+                <p>
+                  En créant votre compte, vous acceptez notre{' '}
+                  <Link 
+                    to="/legal/politique-confidentialite" 
+                    target="_blank"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
+                  >
+                    politique de confidentialité
+                  </Link>
+                  {' '}conforme au RGPD. Vos données sont protégées et ne seront jamais vendues.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Erreur de validation légale */}
+          {errors.legalAccepted && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <div className="flex items-center">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mr-2" />
+                <span className="text-red-700 dark:text-red-300 text-sm font-medium">{errors.legalAccepted.message}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Option newsletter */}
+        <div className="flex items-start space-x-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
           <input
             {...register('newsletter')}
             type="checkbox"
             id="newsletter"
-            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
           />
           <div className="flex-1">
             <label htmlFor="newsletter" className="text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
@@ -242,37 +303,78 @@ export function RegisterForm() {
           </div>
         </div>
 
+        {/* Note importante */}
+        <div className="text-xs text-gray-500 dark:text-gray-400 italic bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+          <p>
+            💡 <strong>Obligatoire :</strong> L'acceptation des conditions est requise pour créer votre compte ProfAssist 
+            et utiliser nos services d'intelligence artificielle.
+          </p>
+        </div>
+
         {/* Debug en développement */}
         {process.env.NODE_ENV === 'development' && (
-          <p className="text-xs text-gray-400">
-            Debug: Newsletter = {newsletterValue ? 'true' : 'false'}
-          </p>
-        )}
-
-        {error && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <div className="text-xs text-gray-400 space-y-1 bg-gray-100 dark:bg-gray-800 p-2 rounded">
+            <p>Debug Newsletter: {newsletterValue ? 'true' : 'false'}</p>
+            <p>Debug CGU acceptées: {legalAcceptedValue ? 'true' : 'false'}</p>
           </div>
         )}
 
+        {/* Erreur générale */}
+        {error && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-4 border-2 border-red-200 dark:border-red-800">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-3" />
+              <p className="text-sm text-red-700 dark:text-red-300 font-medium">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Bouton de soumission */}
         <button
           type="submit"
-          disabled={isSubmitting}
-          className="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          disabled={isSubmitting || !legalAcceptedValue} // 🆕 Désactivé si CGU non acceptées
+          className="w-full flex items-center justify-center py-4 px-6 border border-transparent rounded-xl shadow-sm text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
         >
           {isSubmitting ? (
             <span className="flex items-center">
-              <UserPlus className="animate-spin -ml-1 mr-2 h-4 w-4" />
+              <UserPlus className="animate-spin -ml-1 mr-3 h-5 w-5" />
               Création du compte...
             </span>
           ) : (
-            'Créer mon compte'
+            <span className="flex items-center">
+              <UserPlus className="mr-3 h-5 w-5" />
+              Créer mon compte ProfAssist
+            </span>
           )}
         </button>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          Un email de confirmation sera envoyé à votre adresse
-        </p>
+        {/* Information de confirmation email */}
+        <div className="text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Un email de confirmation sera envoyé à votre adresse
+          </p>
+        </div>
+
+        {/* Liens vers les mentions légales en bas */}
+        <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+            <Link 
+              to="/legal/mentions-legales" 
+              target="_blank"
+              className="hover:text-blue-600 dark:hover:text-blue-400 underline"
+            >
+              Mentions légales
+            </Link>
+            <span>•</span>
+            <Link 
+              to="/legal/politique-confidentialite" 
+              target="_blank"
+              className="hover:text-blue-600 dark:hover:text-blue-400 underline"
+            >
+              Confidentialité
+            </Link>
+          </div>
+        </div>
       </form>
     </div>
   );

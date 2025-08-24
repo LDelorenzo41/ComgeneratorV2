@@ -20,6 +20,12 @@ import { AuthHandler } from './pages/AuthHandler';
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
 
+// 🆕 Import des routes légales
+import { LegalRoutes } from './routes/LegalRoutes';
+
+// 🆕 Import de la page de paramètres
+import { SettingsPage } from './pages/SettingsPage';
+
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
 
@@ -116,6 +122,9 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/landing" element={<LandingPage />} />
             
+            {/* 🆕 Routes légales (publiques - accessibles sans connexion) */}
+            <Route path="/legal/*" element={<LegalRoutes />} />
+            
             {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
             <Route element={<AuthLayout />}>
               <Route path="/dashboard" element={
@@ -166,6 +175,12 @@ function App() {
               <Route path="/generate-lesson" element={
                 <EmailConfirmationGuard>
                   <LessonGeneratorPage />
+                </EmailConfirmationGuard>
+              } />
+              {/* 🆕 Route pour la page de paramètres avec suppression de compte */}
+              <Route path="/settings" element={
+                <EmailConfirmationGuard>
+                  <SettingsPage />
                 </EmailConfirmationGuard>
               } />
             </Route>
