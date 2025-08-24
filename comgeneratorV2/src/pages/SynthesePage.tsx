@@ -120,7 +120,6 @@ export function SynthesePage() {
   };
 
   const generateSynthese = async () => {
-    // ✅ BLOCAGE : Seulement si exactement 0 tokens
     if (tokenCount === 0) {
       setError('INSUFFICIENT_TOKENS');
       return;
@@ -141,23 +140,7 @@ export function SynthesePage() {
       return;
     }
 
-    // ❌ ANCIEN PROMPT (version simple) dans SynthesePage.tsx :
-/*
-const prompt = `
-Voici plusieurs commentaires de professeurs extraits d'un bulletin scolaire.
-
-Tu dois générer une appréciation globale en identifiant les grandes tendances : points forts, difficultés éventuelles, éléments positifs. Ne cite pas les professeurs mais tu peux mentionner les matières. Utilise un ton fluide, synthétique et pertinent.
-
-La synthèse doit respecter la limite maximale de ${maxChars} caractères.
-
-Commentaires :
-${extracted}
-`;
-*/
-
-// ✅ NOUVEAU PROMPT AMÉLIORÉ (à remplacer ligne ~118 dans SynthesePage.tsx) :
-
-const prompt = `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
+    const prompt = `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**
 Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et rédiger une appréciation générale cohérente et professionnelle qui sera placée en pied de bulletin.
@@ -234,21 +217,6 @@ ${extracted}
 
 Rédige maintenant cette appréciation générale en respectant scrupuleusement ces instructions et en t'adaptant intelligemment au profil de l'élève qui se dégage des commentaires analysés.`;
 
-// ESTIMATION DU COÛT :
-// Ancien prompt : ~50 tokens
-// Nouveau prompt : ~850 tokens  
-// Augmentation : +1600% mais qualité professionnelle drastiquement améliorée
-// Coût supplémentaire : ~$0.0001 par synthèse (négligeable)
-
-// AVANTAGES DU NOUVEAU PROMPT :
-// ✅ Analyse pédagogique approfondie
-// ✅ Structure professionnelle claire  
-// ✅ Ton bienveillant et constructif
-// ✅ Vocabulaire spécialisé adapté
-// ✅ Gestion des cas complexes (commentaires contradictoires)
-// ✅ Respect des principes éducatifs
-// ✅ Formulations exemplaires fournies
-
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -267,7 +235,6 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
       const data = await response.json();
       setSummary(data.choices?.[0]?.message?.content || '');
 
-      // ✅ MISE À JOUR : Jamais en dessous de 0
       const usedTokens = data.usage?.total_tokens ?? 0;
 
       if (usedTokens > 0 && user) {
@@ -286,7 +253,6 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
             .eq('user_id', user.id);
 
           if (!updateError) {
-            // ✅ DÉCLENCHER la mise à jour des tokens dans toute l'app
             tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
           }
         }
@@ -416,6 +382,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
 
         <div className={`space-y-8 ${!tokensAvailable ? 'opacity-60' : ''}`}>
           
+          {/* Étape 1: Upload PDF */}
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
             <div className="mb-6">
               <div className="flex items-center space-x-3 mb-4">
@@ -448,30 +415,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
             </div>
           </div>
 
-          {pdfDoc && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-              <div className="mb-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                    <Eye className="w-5 h-5 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Votre bulletin
-                  </h2>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Aperçu de votre document PDF
-                </p>
-              </div>
-              
-              <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6 border-2 border-gray-200 dark:border-gray-600">
-                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden max-w-full bg-white">
-                  <canvas ref={canvasRef} className="w-full" />
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Étape 2: Capture d'écran */}
           {pdfDoc && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
@@ -498,7 +442,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
                   <div className="flex items-center space-x-3 mb-4">
                     <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                     <h3 className="text-lg font-bold text-blue-800 dark:text-blue-200">
-                      Instructions pour la capture
+                      Utilisez votre outil de capture habituel, sinon voici les raccourcis clavier
                     </h3>
                   </div>
                   
@@ -536,7 +480,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
                   
                   <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      💡 <strong>Conseil :</strong> Sélectionnez uniquement la partie contenant les commentaires des professeurs pour une analyse plus précise
+                      ⚠️ <strong>Recommandation :</strong> Sélectionnez uniquement les commentaires des professeurs, jamais les données personnelles de l’élève.
                     </p>
                   </div>
                 </div>
@@ -561,6 +505,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
             </div>
           )}
 
+          {/* Capture sélectionnée */}
           {capturedImage && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
@@ -595,100 +540,104 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
-            <div className="mb-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Configuration et génération
-                  {!tokensAvailable && (
-                    <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
-                      Indisponible
-                    </span>
-                  )}
-                </h2>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400">
-                Définissez la longueur souhaitée et lancez l'analyse
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  <Target className="w-4 h-4 inline mr-2" />
-                  Limite maximale de caractères
-                </label>
-                <Input
-                  type="number"
-                  value={maxChars}
-                  onChange={e => setMaxChars(Number(e.target.value))}
-                  min={50}
-                  max={1000}
-                  disabled={!tokensAvailable}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-                  placeholder="300"
-                />
-              </div>
-
-              {error === 'INSUFFICIENT_TOKENS' && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-                  <div className="flex items-center space-x-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm text-red-800 dark:text-red-200 font-medium">
-                        Crédits insuffisants pour générer une synthèse
-                      </p>
-                      <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                        Rechargez votre compte pour continuer à utiliser cette fonctionnalité.
-                      </p>
-                    </div>
-                    <Link 
-                      to="/buy-tokens"
-                      className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" />
-                      Recharger
-                    </Link>
+          {/* Configuration et génération */}
+          {capturedImage && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+              <div className="mb-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                    <Zap className="w-5 h-5 text-white" />
                   </div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Configuration et génération
+                    {!tokensAvailable && (
+                      <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
+                        Indisponible
+                      </span>
+                    )}
+                  </h2>
                 </div>
-              )}
+                <p className="text-gray-600 dark:text-gray-400">
+                  Définissez la longueur souhaitée et lancez l'analyse
+                </p>
+              </div>
 
-              <button
-                onClick={generateSynthese} 
-                disabled={loading || !capturedImage || tokenCount === 0}
-                className="w-full group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                <span className="relative flex items-center justify-center">
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                      Analyse en cours...
-                    </>
-                  ) : tokenCount === 0 ? (
-                    <>
-                      <AlertCircle className="w-5 h-5 mr-3" />
-                      Crédits épuisés
-                    </>
-                  ) : capturedImage ? (
-                    <>
-                      <Zap className="w-5 h-5 mr-3" />
-                      Générer la synthèse
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-5 h-5 mr-3" />
-                      Uploadez d'abord un PDF puis une capture
-                    </>
-                  )}
-                </span>
-              </button>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    <Target className="w-4 h-4 inline mr-2" />
+                    Limite maximale de caractères
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxChars}
+                    onChange={e => setMaxChars(Number(e.target.value))}
+                    min={50}
+                    max={1000}
+                    disabled={!tokensAvailable}
+                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
+                    placeholder="300"
+                  />
+                </div>
+
+                {error === 'INSUFFICIENT_TOKENS' && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                    <div className="flex items-center space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm text-red-800 dark:text-red-200 font-medium">
+                          Crédits insuffisants pour générer une synthèse
+                        </p>
+                        <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                          Rechargez votre compte pour continuer à utiliser cette fonctionnalité.
+                        </p>
+                      </div>
+                      <Link 
+                        to="/buy-tokens"
+                        className="inline-flex items-center bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors"
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        Recharger
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={generateSynthese} 
+                  disabled={loading || !capturedImage || tokenCount === 0}
+                  className="w-full group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  <span className="relative flex items-center justify-center">
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                        Analyse en cours...
+                      </>
+                    ) : tokenCount === 0 ? (
+                      <>
+                        <AlertCircle className="w-5 h-5 mr-3" />
+                        Crédits épuisés
+                      </>
+                    ) : capturedImage ? (
+                      <>
+                        <Zap className="w-5 h-5 mr-3" />
+                        Générer la synthèse
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 mr-3" />
+                        Uploadez d'abord un PDF puis une capture
+                      </>
+                    )}
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* Synthèse générée */}
           {summary && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
@@ -739,6 +688,32 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
               </div>
             </div>
           )}
+
+          {/* Aperçu du bulletin */}
+          {pdfDoc && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+              <div className="mb-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                    <Eye className="w-5 h-5 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    Votre bulletin
+                  </h2>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Aperçu de votre document PDF
+                </p>
+              </div>
+              
+              <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6 border-2 border-gray-200 dark:border-gray-600">
+                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden max-w-full bg-white">
+                  <canvas ref={canvasRef} className="w-full" />
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
