@@ -1,7 +1,7 @@
-// ✅ Modification du 23/08/2025 : adresse email corrigée dans le footer
+// ✅ Modification du 24/08/2025 : ajout des liens légaux obligatoires
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MapPin, Sparkles, Heart, ExternalLink, ArrowRight } from 'lucide-react';
+import { Mail, MapPin, Sparkles, Heart, ExternalLink, ArrowRight, FileText, Shield, Scale } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -32,20 +32,19 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           
           {/* À propos */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center">
               <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center mr-3">
                 <Sparkles className="w-3 h-3 text-white" />
               </div>
-              À propos de ProfAssist
+              À propos
             </h3>
             <p className="text-blue-100 leading-relaxed mb-6">
-              ProfAssist révolutionne la création d'appréciations scolaires avec une suite complète d'outils alimentés par l'IA. 
-              Gagnez du temps tout en maintenant la qualité et la personnalisation de vos évaluations.
+              ProfAssist révolutionne la création d'appréciations scolaires avec une suite complète d'outils alimentés par l'IA.
             </p>
             
             {/* Features highlights */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
               <div className="flex items-center text-sm text-blue-200">
                 <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                 Appréciations personnalisées
@@ -58,13 +57,9 @@ export function Footer() {
                 <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
                 Communications professionnelles
               </div>
-              <div className="flex items-center text-sm text-blue-200">
-                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                Séances pédagogiques
-              </div>
             </div>
           </div>
-          
+
           {/* Contact */}
           <div>
             <h3 className="text-lg font-bold text-white mb-4 flex items-center">
@@ -83,7 +78,7 @@ export function Footer() {
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium">Email contact</div>
+                    <div className="text-sm font-medium">Email</div>
                     <div className="text-xs text-blue-300">contact-profassist@teachtech.fr</div>
                   </div>
                 </a>
@@ -102,7 +97,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Liens utiles */}
+          {/* Accès rapide */}
           <div>
             <h3 className="text-lg font-bold text-white mb-4 flex items-center">
               <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mr-3">
@@ -140,11 +135,59 @@ export function Footer() {
               </li>
               <li>
                 <Link 
-                  to="/communication" 
+                  to="/buy-tokens" 
                   className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
                 >
                   <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
-                  Communication
+                  Acheter des tokens
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* 🆕 Section Légal */}
+          <div>
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+              <div className="w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center mr-3">
+                <Scale className="w-3 h-3 text-white" />
+              </div>
+              Informations légales
+            </h3>
+            <ul className="space-y-3">
+              <li>
+                <Link 
+                  to="/legal/mentions-legales" 
+                  className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  <span className="text-sm">Mentions légales</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/legal/politique-confidentialite" 
+                  className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  <span className="text-sm">Politique de confidentialité</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/legal/cgu" 
+                  className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  <span className="text-sm">CGU</span>
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/legal/cgv" 
+                  className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
+                >
+                  <Scale className="w-4 h-4 mr-2" />
+                  <span className="text-sm">CGV</span>
                 </Link>
               </li>
             </ul>
@@ -163,12 +206,25 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Footer bottom */}
+        {/* Footer bottom avec mentions légales condensées */}
         <div className="flex flex-col md:flex-row justify-between items-center">
-          <div className="flex items-center mb-4 md:mb-0">
-            <p className="text-blue-200 text-sm">
+          <div className="flex flex-col md:flex-row items-center mb-4 md:mb-0">
+            <p className="text-blue-200 text-sm mb-2 md:mb-0 md:mr-4">
               © {new Date().getFullYear()} ProfAssist. Tous droits réservés.
             </p>
+            <div className="flex items-center space-x-4 text-xs text-blue-300">
+              <Link to="/legal/mentions-legales" className="hover:text-white transition-colors">
+                Mentions légales
+              </Link>
+              <span>•</span>
+              <Link to="/legal/politique-confidentialite" className="hover:text-white transition-colors">
+                Confidentialité
+              </Link>
+              <span>•</span>
+              <Link to="/legal/cgv" className="hover:text-white transition-colors">
+                CGV
+              </Link>
+            </div>
           </div>
           
           <div className="flex items-center text-blue-200 text-sm">
