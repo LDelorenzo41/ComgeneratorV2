@@ -1,381 +1,356 @@
-import React from 'react';
+// src/pages/ResetPasswordPage.tsx
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '../../lib/supabase';
-import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, Mail, CheckCircle, AlertCircle, Scale, Shield } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Key, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-const registerSchema = z.object({
-  email: z.string().email('Email invalide'),
+const resetPasswordSchema = z.object({
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
   confirmPassword: z.string(),
-  newsletter: z.boolean().optional(),
-  // 🆕 Ajout de l'acceptation des conditions légales
-  legalAccepted: z.boolean().refine(val => val === true, {
-    message: 'Vous devez accepter les conditions générales pour créer votre compte'
-  })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Les mots de passe ne correspondent pas",
   path: ["confirmPassword"]
 });
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
-export function RegisterForm() {
+export function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [error, setError] = React.useState<string | null>(null);
-  const [emailSent, setEmailSent] = React.useState(false);
-  const [userEmail, setUserEmail] = React.useState<string>('');
+  const [searchParams] = useSearchParams();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
   
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      newsletter: false,
-      legalAccepted: false // 🆕 Valeur par défaut
-    }
+  // 🔐 SÉCURITÉ: Stocker les tokens SANS les utiliser pour la session
+  const [storedTokens, setStoredTokens] = useState<{accessToken: string, refreshToken: string} | null>(null);
+
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema)
   });
 
-  // Surveiller les valeurs
-  const newsletterValue = watch('newsletter');
-  const legalAcceptedValue = watch('legalAccepted'); // 🆕 Surveillance
+  // 🔒 SÉCURITÉ: NE PAS forcer la déconnexion au début car cela invalide les tokens
+  // La déconnexion se fera après le changement de mot de passe réussi
+  /* 
+  useEffect(() => {
+    const forceSignOut = async () => {
+      await supabase.auth.signOut();
+      console.log('🔒 Déconnexion sécurisée forcée sur la page reset password');
+    };
+    
+    forceSignOut();
+  }, []);
+  */
 
-  // Fonction pour obtenir l'URL de redirection dynamique
-  const getRedirectURL = () => {
-    if (window.location.hostname !== 'localhost' && !window.location.hostname.includes('app.github.dev')) {
-      return `${window.location.origin}/auth/callback`;
-    }
-    return `${window.location.origin}/auth/callback`;
-  };
+  // Vérifier la validité du token au chargement SANS créer de session
+  useEffect(() => {
+    const checkTokenValidity = async () => {
+      // 🔧 FIX: Lire les tokens depuis le fragment (#) au lieu des query params (?)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      let accessToken = hashParams.get('access_token');
+      let refreshToken = hashParams.get('refresh_token');
 
-  const onSubmit = async (data: RegisterFormData) => {
-    try {
-      setError(null);
-      console.log('📧 Valeur newsletter lors de la soumission:', data.newsletter);
-      console.log('⚖️ Acceptation légale lors de la soumission:', data.legalAccepted);
+      // Fallback: essayer aussi les query parameters au cas où
+      if (!accessToken || !refreshToken) {
+        accessToken = searchParams.get('access_token');
+        refreshToken = searchParams.get('refresh_token');
+      }
 
-      // ✅ Vérification supplémentaire côté client
-      if (!data.legalAccepted) {
-        setError('Vous devez accepter les conditions générales pour créer votre compte');
+      console.log('🔍 Recherche de tokens...', {
+        fromHash: { 
+          accessToken: !!hashParams.get('access_token'), 
+          refreshToken: !!hashParams.get('refresh_token') 
+        },
+        fromQuery: { 
+          accessToken: !!searchParams.get('access_token'), 
+          refreshToken: !!searchParams.get('refresh_token') 
+        },
+        finalResult: { accessToken: !!accessToken, refreshToken: !!refreshToken }
+      });
+
+      if (!accessToken || !refreshToken) {
+        console.log('❌ Tokens manquants dans l\'URL');
+        console.log('URL complète:', window.location.href);
+        console.log('Hash:', window.location.hash);
+        console.log('Search:', window.location.search);
+        setIsValidToken(false);
+        setError('Lien invalide ou expiré. Veuillez demander un nouveau lien de réinitialisation.');
         return;
       }
 
-      // ✅ Inscription avec confirmation d'email OBLIGATOIRE + newsletter + acceptation légale
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo: getRedirectURL(),
-          data: {
-            created_at: new Date().toISOString(),
-            newsletter_subscription: data.newsletter === true,
-            legal_accepted_at: new Date().toISOString(), // 🆕 Horodatage acceptation
-            legal_accepted: true // 🆕 Confirmation acceptation
-          }
-        }
-      });
+      // 🔒 SÉCURITÉ: Stocker les tokens SANS créer de session
+      // L'utilisateur ne sera authentifié qu'APRÈS avoir changé son mot de passe
+      console.log('🔑 Tokens valides trouvés, stockage sécurisé sans authentification');
+      setStoredTokens({ accessToken, refreshToken });
+      setIsValidToken(true);
+    };
 
-      if (signUpError) {
-        if (signUpError.message.includes('User already registered')) {
-          throw new Error('Un compte existe déjà avec cet email. Vérifiez votre boîte de réception pour confirmer votre email, ou connectez-vous.');
-        }
-        if (signUpError.name === 'AuthRetryableFetchError') {
-          throw new Error('Problème de connexion au serveur. Veuillez réessayer.');
-        }
-        if (signUpError.message === 'Failed to fetch') {
-          throw new Error('Impossible de se connecter au serveur. Veuillez vérifier votre connexion internet.');
-        }
-        throw new Error(signUpError.message || 'Erreur lors de la création du compte');
+    checkTokenValidity();
+  }, [searchParams]);
+
+  // 🧹 Nettoyer l'URL après avoir lu les tokens (sécurité)
+  useEffect(() => {
+    if (storedTokens) {
+      // Supprimer les tokens de l'URL pour éviter qu'ils restent visibles
+      window.history.replaceState({}, document.title, '/reset-password');
+    }
+  }, [storedTokens]);
+
+  const onSubmit = async (data: ResetPasswordFormData) => {
+    try {
+      setError(null);
+
+      if (!storedTokens) {
+        throw new Error('Tokens manquants. Veuillez utiliser un nouveau lien.');
       }
 
-      if (signUpData.user) {
-        console.log('✅ Compte créé avec succès ! ID utilisateur:', signUpData.user.id);
-        setUserEmail(data.email);
-        setEmailSent(true);
-      } else {
-        throw new Error('Erreur lors de la création du compte');
+      console.log('🔄 Tentative de changement de mot de passe...');
+
+      // 🔐 OPTION 1: Utiliser directement updateUser sans setSession
+      // Car les tokens sont peut-être déjà actifs dans la session courante
+      let updateError = null;
+      
+      try {
+        const { error } = await supabase.auth.updateUser({
+          password: data.password
+        });
+        updateError = error;
+      } catch (err: any) {
+        updateError = err;
       }
+
+      // Si ça ne marche pas, essayer avec setSession d'abord
+      if (updateError) {
+        console.log('🔄 Première tentative échouée, essai avec setSession...');
+        
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: storedTokens.accessToken,
+          refresh_token: storedTokens.refreshToken
+        });
+
+        if (sessionError) {
+          console.error('❌ Erreur setSession:', sessionError);
+          throw new Error('Lien expiré ou invalide. Veuillez demander un nouveau lien.');
+        }
+
+        // Réessayer updateUser après setSession
+        const { error: updateError2 } = await supabase.auth.updateUser({
+          password: data.password
+        });
+
+        if (updateError2) {
+          console.error('❌ Erreur updateUser après setSession:', updateError2);
+          throw updateError2;
+        }
+      }
+
+      console.log('✅ Mot de passe mis à jour avec succès');
+
+      // 🔒 SÉCURITÉ: Déconnecter après le changement réussi
+      await supabase.auth.signOut();
+      console.log('✅ Déconnexion sécurisée après changement de mot de passe');
+
+      setSuccess(true);
+
+      // Redirection après 3 secondes
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
 
     } catch (error: any) {
-      console.error('❌ Erreur inscription:', error);
-      setError(error.message);
+      console.error('❌ Erreur lors du reset:', error);
+      setError(error.message || 'Une erreur est survenue lors de la mise à jour du mot de passe.');
+      
+      // En cas d'erreur, s'assurer qu'on est déconnecté
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('Erreur lors de la déconnexion:', signOutError);
+      }
     }
   };
 
-  // ✅ Si l'email a été envoyé, afficher le message de confirmation
-  if (emailSent) {
+  // Lien invalide
+  if (isValidToken === false) {
     return (
-      <div className="text-center space-y-6">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            Compte créé avec succès !
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Un email de confirmation de <strong>Supabase Auth</strong> a été envoyé à <strong>{userEmail}</strong>
-          </p>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-            <div className="flex items-start">
-              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mr-3 mt-0.5 flex-shrink-0" />
-              <div>
-                <h4 className="font-medium text-amber-800 dark:text-amber-400 mb-1">
-                  Prochaine étape importante
-                </h4>
-                <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                  <li>• Vérifiez votre dossier spam/courrier indésirable</li>
-                  <li>• Le lien expire dans 24 heures</li>
-                  <li>• Contactez-nous si le problème persiste</li>
-                </ul>
-              </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-red-600" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Lien invalide
+            </h1>
+            <p className="text-gray-600 mb-6">
+              {error || 'Ce lien de réinitialisation est invalide ou a expiré.'}
+            </p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+            >
+              Retour à la connexion
+            </button>
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <button
-            onClick={() => navigate('/login')}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Aller à la page de connexion
-          </button>
-          
-          <button
-            onClick={() => {
-              setEmailSent(false);
-              setError(null);
-            }}
-            className="w-full text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            ← Modifier l'adresse email
-          </button>
         </div>
       </div>
     );
   }
 
-  // ✅ Formulaire d'inscription avec acceptation des CGU
-  return (
-    <div className="flex justify-center items-center min-h-full py-8">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 w-full max-w-md">
-        
-        {/* Email */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-            Adresse email <span className="text-red-500">*</span>
-          </label>
-          <input
-            {...register('email')}
-            type="email"
-            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            placeholder="votre.email@exemple.com"
-          />
-          {errors.email && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
-          )}
-        </div>
-
-        {/* Mot de passe */}
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-            Mot de passe <span className="text-red-500">*</span>
-          </label>
-          <input
-            {...register('password')}
-            type="password"
-            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            placeholder="Minimum 6 caractères"
-          />
-          {errors.password && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>
-          )}
-        </div>
-
-        {/* Confirmation mot de passe */}
-        <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
-            Confirmer le mot de passe <span className="text-red-500">*</span>
-          </label>
-          <input
-            {...register('confirmPassword')}
-            type="password"
-            className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-            placeholder="Répétez votre mot de passe"
-          />
-          {errors.confirmPassword && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword.message}</p>
-          )}
-        </div>
-
-        {/* 🆕 SECTION LÉGALE - Acceptation des CGU/CGV (OBLIGATOIRE) */}
-        <div className="space-y-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-            <Scale className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
-            Acceptation des conditions (obligatoire)
-          </h4>
-          
-          {/* Checkbox principal CGU + CGV */}
-          <div className="flex items-start">
-            <input
-              {...register('legalAccepted')}
-              id="accept-legal"
-              type="checkbox"
-              className="h-5 w-5 text-blue-600 border-2 border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 mt-1"
-            />
-            <label htmlFor="accept-legal" className="ml-3 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-              <span className="font-medium text-gray-900 dark:text-white">
-                J'accepte les conditions d'utilisation <span className="text-red-500">*</span>
-              </span>
-              <div className="mt-2 space-y-2">
-                <div className="flex items-center text-xs text-gray-600 dark:text-gray-400">
-                  <Scale className="w-3 h-3 mr-1" />
-                  <Link 
-                    to="/legal/cgu" 
-                    target="_blank"
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline mr-2 font-medium"
-                  >
-                    Conditions générales d'utilisation (CGU)
-                  </Link>
-                  <span>et</span>
-                  <Link 
-                    to="/legal/cgv" 
-                    target="_blank"
-                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline ml-2 font-medium"
-                  >
-                    Conditions générales de vente (CGV)
-                  </Link>
-                </div>
-              </div>
-            </label>
-          </div>
-
-          {/* Information sur la politique de confidentialité */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
-            <div className="flex items-start">
-              <Shield className="w-4 h-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-gray-600 dark:text-gray-400">
-                <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Protection de vos données personnelles</p>
-                <p>
-                  En créant votre compte, vous acceptez notre{' '}
-                  <Link 
-                    to="/legal/politique-confidentialite" 
-                    target="_blank"
-                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
-                  >
-                    politique de confidentialité
-                  </Link>
-                  {' '}conforme au RGPD. Vos données sont protégées et ne seront jamais vendues.
-                </p>
-              </div>
+  // Succès
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-          </div>
-
-          {/* Erreur de validation légale */}
-          {errors.legalAccepted && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <div className="flex items-center">
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mr-2" />
-                <span className="text-red-700 dark:text-red-300 text-sm font-medium">{errors.legalAccepted.message}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Option newsletter */}
-        <div className="flex items-start space-x-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-          <input
-            {...register('newsletter')}
-            type="checkbox"
-            id="newsletter"
-            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-          />
-          <div className="flex-1">
-            <label htmlFor="newsletter" className="text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
-              <span className="font-medium">Newsletter ProfAssist</span>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Recevez nos dernières actualités, nouveautés et conseils pédagogiques par email (optionnel)
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Mot de passe mis à jour !
+            </h1>
+            <p className="text-gray-600 mb-6">
+              Votre mot de passe a été modifié avec succès. Vous allez être redirigé vers la page de connexion.
+            </p>
+            <div className="bg-green-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-700">
+                Redirection automatique dans quelques secondes...
               </p>
-            </label>
-          </div>
-        </div>
-
-        {/* Note importante */}
-        <div className="text-xs text-gray-500 dark:text-gray-400 italic bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
-          <p>
-            💡 <strong>Obligatoire :</strong> L'acceptation des conditions est requise pour créer votre compte ProfAssist 
-            et utiliser nos services d'intelligence artificielle.
-          </p>
-        </div>
-
-        {/* Debug en développement */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="text-xs text-gray-400 space-y-1 bg-gray-100 dark:bg-gray-800 p-2 rounded">
-            <p>Debug Newsletter: {newsletterValue ? 'true' : 'false'}</p>
-            <p>Debug CGU acceptées: {legalAcceptedValue ? 'true' : 'false'}</p>
-          </div>
-        )}
-
-        {/* Erreur générale */}
-        {error && (
-          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 p-4 border-2 border-red-200 dark:border-red-800">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-3" />
-              <p className="text-sm text-red-700 dark:text-red-300 font-medium">{error}</p>
             </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+            >
+              Se connecter maintenant
+            </button>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
 
-        {/* Bouton de soumission */}
-        <button
-          type="submit"
-          disabled={isSubmitting || !legalAcceptedValue} // 🆕 Désactivé si CGU non acceptées
-          className="w-full flex items-center justify-center py-4 px-6 border border-transparent rounded-xl shadow-sm text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-        >
-          {isSubmitting ? (
-            <span className="flex items-center">
-              <UserPlus className="animate-spin -ml-1 mr-3 h-5 w-5" />
-              Création du compte...
-            </span>
-          ) : (
-            <span className="flex items-center">
-              <UserPlus className="mr-3 h-5 w-5" />
-              Créer mon compte ProfAssist
-            </span>
-          )}
-        </button>
+  // Chargement
+  if (isValidToken === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Vérification du lien...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-        {/* Information de confirmation email */}
-        <div className="text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Un email de confirmation sera envoyé à votre adresse
+  // Formulaire de réinitialisation
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Key className="w-8 h-8 text-blue-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Nouveau mot de passe
+          </h1>
+          <p className="text-gray-600">
+            Définissez un nouveau mot de passe pour votre compte ProfAssist
           </p>
         </div>
 
-        {/* Liens vers les mentions légales en bas */}
-        <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-            <Link 
-              to="/legal/mentions-legales" 
-              target="_blank"
-              className="hover:text-blue-600 dark:hover:text-blue-400 underline"
-            >
-              Mentions légales
-            </Link>
-            <span>•</span>
-            <Link 
-              to="/legal/politique-confidentialite" 
-              target="_blank"
-              className="hover:text-blue-600 dark:hover:text-blue-400 underline"
-            >
-              Confidentialité
-            </Link>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Nouveau mot de passe */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              Nouveau mot de passe
+            </label>
+            <div className="relative">
+              <input
+                {...register('password')}
+                type={showPassword ? 'text' : 'password'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Minimum 6 caractères"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+            )}
           </div>
+
+          {/* Confirmer mot de passe */}
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              Confirmer le nouveau mot de passe
+            </label>
+            <div className="relative">
+              <input
+                {...register('confirmPassword')}
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Répétez le mot de passe"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            {errors.confirmPassword && (
+              <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+
+          {/* Erreur */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Bouton */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center">
+                <Key className="animate-spin w-5 h-5 mr-2" />
+                Mise à jour...
+              </span>
+            ) : (
+              'Mettre à jour le mot de passe'
+            )}
+          </button>
+        </form>
+
+        {/* Lien retour */}
+        <div className="text-center mt-6">
+          <button
+            onClick={() => navigate('/login')}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            ← Retour à la connexion
+          </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
