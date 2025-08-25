@@ -19,6 +19,10 @@ export function DashboardPage() {
     return name.charAt(0).toUpperCase() + name.slice(1);
   };
 
+  // ✅ AJOUT : Variable pour simplifier les vérifications de tokens
+  const hasTokens = (tokenCount ?? 0) > 0;
+  const isOutOfTokens = (tokenCount ?? 0) === 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -45,37 +49,44 @@ export function DashboardPage() {
           
           {/* Compteur de tokens stylisé avec alerte si 0 tokens */}
           {tokenCount !== null && (
-            <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
-              tokenCount === 0 
-                ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-            }`}>
-              {tokenCount === 0 ? (
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
-              ) : (
-                <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
-              )}
-              <span className={`text-sm font-medium ${
-                tokenCount === 0 
-                  ? 'text-red-700 dark:text-red-300'
-                  : 'text-gray-700 dark:text-gray-300'
+            <div className="space-y-2">
+              <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
+                isOutOfTokens 
+                  ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
               }`}>
-                {tokenCount === 0 ? (
-                  <>
-                    <span className="font-bold">Crédits épuisés !</span>
-                    <Link 
-                      to="/buy-tokens" 
-                      className="ml-2 underline hover:no-underline"
-                    >
-                      Recharger →
-                    </Link>
-                  </>
+                {isOutOfTokens ? (
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
                 ) : (
-                  <>
-                    Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
-                  </>
+                  <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
                 )}
-              </span>
+                <span className={`text-sm font-medium ${
+                  isOutOfTokens 
+                    ? 'text-red-700 dark:text-red-300'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}>
+                  {isOutOfTokens ? (
+                    <>
+                      <span className="font-bold">Crédits épuisés !</span>
+                      <Link 
+                        to="/buy-tokens" 
+                        className="ml-2 underline hover:no-underline"
+                      >
+                        Recharger →
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{(tokenCount ?? 0).toLocaleString()}</span> tokens
+                    </>
+                  )}
+                </span>
+              </div>
+              
+              {/* AJOUT : Explication discrète des tokens */}
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                Les tokens sont des crédits qui permettent d'utiliser l'IA. Un token correspond à environ 4 caractères générés.
+              </p>
             </div>
           )}
         </div>
@@ -83,7 +94,7 @@ export function DashboardPage() {
         <div className="space-y-12">
           
           {/* AJOUT : Alerte tokens épuisés */}
-          {tokenCount === 0 && (
+          {isOutOfTokens && (
             <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8">
               <div className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -129,7 +140,7 @@ export function DashboardPage() {
 
           {/* Section Génération d'appréciations */}
           <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 ${
-            tokenCount === 0 ? 'opacity-50' : ''
+            isOutOfTokens ? 'opacity-50' : ''
           }`}>
             <div className="mb-8">
               <div className="flex items-center space-x-3 mb-4">
@@ -140,14 +151,14 @@ export function DashboardPage() {
                   Générer une appréciation
                 </h2>
                 {/* AJOUT : Badge "Indisponible" si 0 tokens */}
-                {tokenCount === 0 && (
+                {isOutOfTokens && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
                     Indisponible
                   </span>
                 )}
               </div>
               <p className="text-gray-600 dark:text-gray-400">
-                {tokenCount === 0 
+                {isOutOfTokens 
                   ? 'Rechargez vos crédits pour créer des appréciations personnalisées'
                   : 'Créez des appréciations personnalisées basées sur vos critères d\'évaluation'
                 }
@@ -156,7 +167,7 @@ export function DashboardPage() {
             
             <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6">
               {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
-              {tokenCount > 0 && <AIDisclaimer />}
+              {hasTokens && <AIDisclaimer />}
               
               <AppreciationForm 
                 onTokensUpdated={() => {}} // MODIFICATION : Suppression car useTokenBalance gère automatiquement

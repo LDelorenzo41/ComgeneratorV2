@@ -1,4 +1,7 @@
 import React from 'react';
+// AJOUTEZ CES DEUX LIGNES EN HAUT DU FICHIER
+import { ResizableBox } from 'react-resizable';
+import 'react-resizable/css/styles.css'; 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -443,19 +446,26 @@ const handleExportPDF = async () => {
             </button>
           </div>
         </div>
-        <div className="relative">
+
+        {/* MODIFICATION ICI */}
+        <ResizableBox
+          className="relative"
+          height={384} // Hauteur initiale (équivalent à h-96)
+          minConstraints={[300, 200]}
+          maxConstraints={[Infinity, 1200]}
+          axis="y"
+          resizeHandles={['se']}
+        >
           <textarea
-            className="w-full h-96 p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none transition-all duration-200"
+            className="w-full h-full p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none"
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             placeholder="Éditez votre contenu markdown ici..."
           />
           <div className="absolute bottom-4 right-4 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
-            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-              💡 Syntaxe Markdown supportée
-            </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">💡 Syntaxe Markdown supportée</p>
           </div>
-        </div>
+        </ResizableBox>
       </div>
     );
   }
@@ -467,55 +477,31 @@ const handleExportPDF = async () => {
           <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Aperçu de la séance
-          </h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Aperçu de la séance</h3>
         </div>
         <div className="flex space-x-3">
-          <button
-            onClick={() => navigator.clipboard.writeText(content)}
-            className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Copier
+          <button onClick={() => navigator.clipboard.writeText(content)} className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200">
+            <Copy className="w-4 h-4 mr-2" /> Copier
           </button>
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-xl hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50"
-          >
-            <FileDown className="w-4 h-4 mr-2" />
-            {isExporting ? 'Export...' : 'PDF'}
+          <button onClick={handleExportPDF} disabled={isExporting} className="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-xl hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50">
+            <FileDown className="w-4 h-4 mr-2" /> {isExporting ? 'Export...' : 'PDF'}
           </button>
-
-          {/* ✅ BOUTON DE SAUVEGARDE CONDITIONNEL */}
           {renderSaveToBankButton()}
-
-          <button
-            onClick={() => setIsEditing(true)}
-            className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200"
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Modifier
+          <button onClick={() => setIsEditing(true)} className="inline-flex items-center px-4 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-all duration-200">
+            <Edit className="w-4 h-4 mr-2" /> Modifier
           </button>
         </div>
       </div>
 
-      {/* ✅ ALERTE POUR UTILISATEURS SANS ACCÈS BANQUE */}
       {!bankAccessLoading && !hasBankAccess && (
         <div className="bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-900/30 dark:to-red-900/30 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <Lock className="w-6 h-6 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
             <div>
-              <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">
-                Sauvegarde non disponible
-              </h5>
+              <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">Sauvegarde non disponible</h5>
               <p className="text-orange-700 dark:text-orange-300 text-sm">
                 Votre plan actuel ne permet pas de sauvegarder les séances.
-                <button
-                  onClick={() => window.location.href = '/buy-tokens'}
-                  className="underline hover:no-underline font-medium ml-1"
-                >
+                <button onClick={() => window.location.href = '/buy-tokens'} className="underline hover:no-underline font-medium ml-1">
                   Upgrader vers un plan avec banque
                 </button>
               </p>
@@ -524,76 +510,36 @@ const handleExportPDF = async () => {
         </div>
       )}
 
-      <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
-        <div className="prose prose-sm max-w-none dark:prose-invert p-8 overflow-auto max-h-96">
+      {/* MODIFICATION ICI */}
+      <ResizableBox
+        className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-auto relative"
+        height={384} // Hauteur initiale
+        minConstraints={[300, 200]}
+        maxConstraints={[Infinity, 1200]}
+        axis="y" // Redimensionnement vertical uniquement
+        resizeHandles={['se']} // Poignée en bas à droite
+      >
+        <div className="prose prose-sm max-w-none dark:prose-invert p-8 h-full">
           <ReactMarkdown
             components={{
-              h1: ({ children }) => (
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">
-                  {children}
-                </h1>
-              ),
-              h2: ({ children }) => (
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">
-                  {children}
-                </h2>
-              ),
-              h3: ({ children }) => (
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
-                  {children}
-                </h3>
-              ),
-              p: ({ children }) => (
-                <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
-                  {children}
-                </p>
-              ),
-              ul: ({ children }) => (
-                <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                  {children}
-                </ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">
-                  {children}
-                </ol>
-              ),
-              li: ({ children }) => (
-                <li className="mb-1">
-                  {children}
-                </li>
-              ),
-              strong: ({ children }) => (
-                <strong className="font-semibold text-gray-900 dark:text-gray-100">
-                  {children}
-                </strong>
-              ),
-              em: ({ children }) => (
-                <em className="italic text-gray-800 dark:text-gray-200">
-                  {children}
-                </em>
-              ),
-              blockquote: ({ children }) => (
-                <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">
-                  {children}
-                </blockquote>
-              ),
-              code: ({ children }) => (
-                <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">
-                  {children}
-                </code>
-              ),
-              pre: ({ children }) => (
-                <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">
-                  {children}
-                </pre>
-              )
+              h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
+              p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
+              em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
+              blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">{children}</blockquote>,
+              code: ({ children }) => <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">{children}</code>,
+              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>
             }}
           >
             {content}
           </ReactMarkdown>
         </div>
-      </div>
+      </ResizableBox>
     </div>
   );
 };
@@ -1013,6 +959,11 @@ Génère maintenant cette séance en respectant scrupuleusement cette structure 
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
+          </p>
+
+          {/* === AJOUT ICI === */}
+          <p className="text-sm italic text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
+            La séance générée est une aide proposée par l’IA : elle peut contenir des approximations. Elle ne remplace pas votre expertise professionnelle, mais constitue une orientation à adapter avec votre jugement.
           </p>
 
           {tokenCount !== null && (

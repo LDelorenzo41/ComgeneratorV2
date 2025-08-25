@@ -244,6 +244,11 @@ export function ResourcesPage() {
             </div>
           </div>
 
+          {/* Définition RSS */}
+          <p className="text-center text-sm italic text-gray-600 dark:text-gray-400">
+            Un flux RSS est un fil d’actualités qui permet de recevoir automatiquement les nouveaux articles d’un site.
+          </p>
+
           {/* Barre d'actions */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap items-center justify-between gap-4">

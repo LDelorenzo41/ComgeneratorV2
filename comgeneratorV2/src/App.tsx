@@ -16,6 +16,7 @@ import { LandingPage } from './pages/LandingPage';
 import { SynthesePage } from './pages/SynthesePage';
 import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
 import { AuthHandler } from './pages/AuthHandler';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
@@ -120,6 +121,8 @@ function App() {
             {/* Routes publiques */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            {/* 🆕 Nouvelle route pour reset password */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/landing" element={<LandingPage />} />
             
             {/* 🆕 Routes légales (publiques - accessibles sans connexion) */}
