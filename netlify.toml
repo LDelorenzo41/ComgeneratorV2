@@ -1,0 +1,29 @@
+# netlify.toml
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Verrouille la version de Node.js pour des builds reproductibles
+  NODE_VERSION = "20" 
+
+# Redirections pour la SPA - Source unique de vérité
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# En-têtes de sécurité et de performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  # Met en cache les assets de manière agressive
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
