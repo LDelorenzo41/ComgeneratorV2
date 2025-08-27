@@ -123,7 +123,7 @@ export function LandingPage() {
               </a>
               
               <a
-                href="https://www.youtube.com/watch?v=7Z-ldWkOF6g"
+                href="https://youtu.be/whV_svG5S3g"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group inline-flex items-center px-8 py-4 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-semibold rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
