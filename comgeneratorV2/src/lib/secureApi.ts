@@ -40,9 +40,8 @@ export interface LessonParams {
 }
 
 export interface SynthesisParams {
-  bulletinText: string;
-  studentName?: string;
-  additionalContext?: string;
+  extractedText: string;  // au lieu de bulletinText
+  maxChars: number;       // au lieu d'additionalContext
 }
 
 // Classe pour gérer les appels sécurisés aux Edge Functions
@@ -138,11 +137,11 @@ class SecureApiService {
 
   // Génération de synthèses (remplace SynthesePage.tsx)
   async generateSynthesis(params: SynthesisParams) {
-    return this.makeRequest<{
-      synthesis: string;
-      usedTokens: number;
-    }>('synthesis', params);
-  }
+  return this.makeRequest<{
+    content: string;  // au lieu de synthesis
+    usage: any;       // au lieu de usedTokens
+  }>('synthesis', params);
+}
 }
 
 // Instance singleton

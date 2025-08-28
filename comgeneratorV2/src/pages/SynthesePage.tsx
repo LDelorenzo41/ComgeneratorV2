@@ -148,19 +148,20 @@ export function SynthesePage() {
         return;
       }
 
-      // ✅ REMPLACEMENT - Appel à secureApi avec le texte extrait
+      // ✅ REMPLACEMENT - Appel à secureApi avec les paramètres corrects
       const result = await secureApi.generateSynthesis({
-        bulletinText: extracted,
-        additionalContext: `Limite maximale: ${maxChars} caractères`
+        extractedText: extracted,  // ← Nom attendu par l'Edge Function
+        maxChars: maxChars         // ← Paramètre direct au lieu d'additionalContext
       });
 
-      const content = result.synthesis;
+      // ✅ LECTURE CORRIGÉE du résultat
+      const content = result.content;  // ← L'Edge Function retourne "content", pas "synthesis"
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setSummary(content);
 
-      // ✅ MODIFICATION - Usage récupéré depuis result
-      const usedTokens: number = result.usedTokens ?? 0;
+      // ✅ MODIFICATION - Usage récupéré depuis result.usage
+      const usedTokens: number = result.usage?.total_tokens ?? 0;  // ← Depuis usage.total_tokens
 
       // Mise à jour des tokens
       if (usedTokens > 0 && user) {
