@@ -25,19 +25,18 @@ export interface CommunicationParams {
 }
 
 export interface ReplyParams {
-  originalMessage: string;
-  context: string;
-  tone: string;
+  message: string;
+  ton: string;
+  objectifs: string;
+  signature?: string | null;
 }
 
 export interface LessonParams {
   subject: string;
-  level: string;
-  duration: number;
   topic: string;
-  objectives: string[];
-  pedagogy: string;
-  specificRequests?: string;
+  level: string;
+  pedagogy_type: string;  // ← Correspond à l'Edge Function
+  duration: string;       // ← En string, pas number
 }
 
 export interface SynthesisParams {
@@ -123,19 +122,19 @@ class SecureApiService {
 
   // Génération de réponses (remplace src/lib/generateReply.ts)
   async generateReply(params: ReplyParams) {
-    return this.makeRequest<{
-      content: string;
-      usedTokens: number;
-    }>('reply', params);
-  }
+  return this.makeRequest<{
+    content: string;
+    usage: any;  // ← Correct, comme l'Edge Function le retourne
+  }>('reply', params);
+}
 
   // Génération de séances (remplace LessonGeneratorPage.tsx)
   async generateLesson(params: LessonParams) {
-    return this.makeRequest<{
-      content: string;
-      usedTokens: number;
-    }>('lessons', params);
-  }
+  return this.makeRequest<{
+    content: string;
+    usage: any;  // ← L'Edge Function retourne "usage", pas "usedTokens"
+  }>('lessons', params);
+}
 
   // Génération de synthèses (remplace SynthesePage.tsx)
   async generateSynthesis(params: SynthesisParams) {

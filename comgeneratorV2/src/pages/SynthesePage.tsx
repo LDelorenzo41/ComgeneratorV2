@@ -1,3 +1,5 @@
+// src/pages/SynthesePage.tsx - VERSION MIGRÉE VERS EDGE FUNCTION
+
 import React from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -6,6 +8,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
+// ✅ IMPORT MODIFIÉ - Utilisation de secureApi au lieu d'OpenAI direct
+import { secureApi, type SynthesisParams } from '../lib/secureApi';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import { Link } from 'react-router-dom';
@@ -119,6 +123,7 @@ export function SynthesePage() {
     }
   };
 
+  // ✅ FONCTION MODIFIÉE - Utilisation de secureApi au lieu d'OpenAI direct
   const generateSynthese = async () => {
     if (tokenCount === 0) {
       setError('INSUFFICIENT_TOKENS');
@@ -132,111 +137,32 @@ export function SynthesePage() {
     
     setLoading(true);
     setError(null);
-    const extracted = await extractTextFromCapture();
     
-    if (!extracted) {
-      setLoading(false);
-      alert('Aucun texte détecté dans votre capture d\'écran.');
-      return;
-    }
-
-    const prompt = `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
-
-**CONTEXTE ET MISSION :**
-Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et rédiger une appréciation générale cohérente et professionnelle qui sera placée en pied de bulletin.
-
-**COMMENTAIRES À ANALYSER :**
-"""
-${extracted}
-"""
-
-**INSTRUCTIONS D'ANALYSE :**
-
-1. **Identification des tendances pédagogiques :**
-   - Repère les points forts récurrents dans les différentes matières
-   - Identifie les difficultés ou axes d'amélioration mentionnés
-   - Détecte les compétences transversales (autonomie, participation, méthode, etc.)
-   - Évalue l'évolution ou la progression de l'élève si mentionnée
-
-2. **Analyse des domaines de compétences :**
-   - **Savoirs disciplinaires :** Connaissances et compétences spécifiques aux matières
-   - **Savoir-faire méthodologiques :** Organisation, rigueur, présentation des travaux
-   - **Savoir-être comportementaux :** Participation, attitude, relations avec autrui
-   - **Compétences transversales :** Raisonnement, créativité, esprit critique
-
-3. **Cohérence pédagogique :**
-   - Identifie les convergences entre les appréciations des différents professeurs
-   - Repère les spécificités selon les types de matières (littéraires, scientifiques, artistiques)
-   - Détecte les compétences qui se confirment ou s'infirment selon les disciplines
-
-**INSTRUCTIONS DE RÉDACTION :**
-
-4. **Structure de l'appréciation générale :**
-   - **Ouverture :** Bilan global du trimestre/semestre en 1-2 phrases
-   - **Points forts :** Mise en valeur des réussites et qualités de l'élève
-   - **Axes d'amélioration :** Formulation constructive des difficultés avec pistes de progrès
-   - **Conclusion :** Encouragements et objectifs pour la suite
-
-5. **Ton et registre :**
-   - Adopte un ton bienveillant mais objectif
-   - Utilise un vocabulaire pédagogique professionnel
-   - Évite les jugements de valeur et privilégie les observations factuelles
-   - Maintiens une perspective encourageante même en cas de difficultés
-
-6. **Formulation pédagogique :**
-   - Utilise des tournures positives même pour les points d'amélioration
-   - Privilégie "Il serait profitable de..." plutôt que "Il faut absolument..."
-   - Emploie le vocabulaire des compétences et de la progression
-   - Évite les répétitions avec les commentaires disciplinaires
-
-**CONTRAINTES TECHNIQUES :**
-- **Limite stricte :** ${maxChars} caractères maximum (espaces compris)
-- **Références aux matières :** Tu PEUX mentionner les disciplines sans citer nommément les professeurs
-- **Cohérence :** L'appréciation doit être en accord avec l'ensemble des commentaires analysés
-- **Lisibilité :** Phrases fluides et accessibles aux parents et à l'élève
-
-**PRINCIPES PÉDAGOGIQUES À RESPECTER :**
-- **Bienveillance éducative :** Chaque élève a des potentialités à développer
-- **Constructivisme :** Les difficultés sont des étapes vers le progrès
-- **Différenciation :** Reconnaissance des spécificités et du rythme de chaque élève
-- **Motivation :** L'appréciation doit encourager la poursuite des efforts
-
-**EXEMPLES DE FORMULATIONS PROFESSIONNELLES :**
-- "Trimestre révélateur de qualités solides en..."
-- "Des acquis qui se confirment particulièrement en..."
-- "Une progression encourageante notamment dans..."
-- "Il serait profitable de renforcer..."
-- "Les efforts consentis méritent d'être poursuivis..."
-- "Un potentiel à développer davantage en..."
-
-**ATTENTION PARTICULIÈRE :**
-- Si les commentaires sont majoritairement positifs → valorise tout en maintenant des objectifs
-- Si les commentaires révèlent des difficultés → reste constructif et propose des pistes
-- Si les commentaires sont contradictoires → trouve l'équilibre et explique les variations
-- Si certaines matières ne sont pas évaluées → concentre-toi sur celles qui le sont
-
-Rédige maintenant cette appréciation générale en respectant scrupuleusement ces instructions et en t'adaptant intelligemment au profil de l'élève qui se dégage des commentaires analysés.`;
-
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4.1-mini',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.5,
-          max_tokens: Math.floor(maxChars * 1.5),
-        })
+      // ✅ EXTRACTION OCR D'ABORD
+      const extracted = await extractTextFromCapture();
+      
+      if (!extracted) {
+        setLoading(false);
+        alert('Aucun texte détecté dans votre capture d\'écran.');
+        return;
+      }
+
+      // ✅ REMPLACEMENT - Appel à secureApi avec le texte extrait
+      const result = await secureApi.generateSynthesis({
+        bulletinText: extracted,
+        additionalContext: `Limite maximale: ${maxChars} caractères`
       });
 
-      const data = await response.json();
-      setSummary(data.choices?.[0]?.message?.content || '');
+      const content = result.synthesis;
+      if (!content) throw new Error('Réponse invalide de l\'API');
 
-      const usedTokens = data.usage?.total_tokens ?? 0;
+      setSummary(content);
 
+      // ✅ MODIFICATION - Usage récupéré depuis result
+      const usedTokens: number = result.usedTokens ?? 0;
+
+      // Mise à jour des tokens
       if (usedTokens > 0 && user) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -259,8 +185,13 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
       }
 
     } catch (error: any) {
-      console.error('Erreur lors de l\'appel à OpenAI:', error);
-      setError(error.message || 'Une erreur est survenue.');
+      console.error('Erreur lors de la génération:', error);
+
+      if (error.message === 'INSUFFICIENT_TOKENS') {
+        setError('INSUFFICIENT_TOKENS');
+      } else {
+        setError(error.message || 'Une erreur est survenue lors de la génération.');
+      }
     } finally {
       setLoading(false);
     }
@@ -480,7 +411,7 @@ Rédige maintenant cette appréciation générale en respectant scrupuleusement 
                   
                   <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      ⚠️ <strong>Recommandation :</strong> Sélectionnez uniquement les commentaires des professeurs, jamais les données personnelles de l’élève.
+                      ⚠️ <strong>Recommandation :</strong> Sélectionnez uniquement les commentaires des professeurs, jamais les données personnelles de l'élève.
                     </p>
                   </div>
                 </div>
