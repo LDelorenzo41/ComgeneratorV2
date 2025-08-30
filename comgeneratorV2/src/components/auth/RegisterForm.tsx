@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, Mail, CheckCircle, AlertCircle, Scale, Shield } from 'lucide-react';
+import { UserPlus, Mail, CheckCircle, AlertCircle, Scale, Shield, AlertTriangle } from 'lucide-react';
 
 const registerSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -39,6 +39,16 @@ export function RegisterForm() {
   // Surveiller les valeurs
   const newsletterValue = watch('newsletter');
   const legalAcceptedValue = watch('legalAccepted'); // 🆕 Surveillance
+
+  // 🆕 Détection des adresses académiques
+  const emailValue = watch('email', '');
+  const isAcademicEmail = React.useMemo(() => {
+    if (!emailValue) return false;
+    const academicDomains = [
+      '@ac-', '@education.gouv.fr', '@univ-', '@cned.fr', '@reseau-canope.fr'
+    ];
+    return academicDomains.some(domain => emailValue.toLowerCase().includes(domain));
+  }, [emailValue]);
 
   // Fonction pour obtenir l'URL de redirection dynamique
   const getRedirectURL = () => {
@@ -176,6 +186,27 @@ export function RegisterForm() {
           />
           {errors.email && (
             <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.email.message}</p>
+          )}
+
+          {/* 🆕 Avertissement académique */}
+          {isAcademicEmail && (
+            <div className="mt-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+              <div className="flex items-start">
+                <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mr-2 mt-0.5 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-medium text-orange-800 dark:text-orange-400">
+                    ⚠️ Adresse académique détectée
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                    Les serveurs de messagerie académiques bloquent actuellement nos emails de confirmation. 
+                    <strong> Nous travaillons à une solution technique.</strong>
+                  </p>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    💡 <strong>Conseil :</strong> Utilisez temporairement une adresse personnelle (Gmail, Outlook, Orange, etc.) pour tester ProfAssist.
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
