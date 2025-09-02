@@ -190,6 +190,15 @@ export function Footer() {
                   <span className="text-sm">CGV</span>
                 </Link>
               </li>
+              <li>
+                <Link 
+                  to="/legal/cookies" 
+                className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                <span className="text-sm">Gestion des cookies</span>
+              </Link>
+            </li>
             </ul>
           </div>
         </div>
