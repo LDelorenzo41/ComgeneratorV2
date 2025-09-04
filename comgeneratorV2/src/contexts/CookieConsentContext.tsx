@@ -170,7 +170,7 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
 
   // Chargement Google Ads
   const loadGoogleAds = () => {
-    const ADS_ID = 'AW-7580889075'; // Remplacez par votre ID Google Ads
+    const ADS_ID = 'AW-17524425260'; // Remplacez par votre ID Google Ads
     
     if (window.gtag) {
       // Si gtag existe déjà (via Analytics), ajouter juste la config Ads
