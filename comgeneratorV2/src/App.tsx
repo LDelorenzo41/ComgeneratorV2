@@ -21,11 +21,15 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
 
-// 🆕 Import des routes légales
+// Import des routes légales
 import { LegalRoutes } from './routes/LegalRoutes';
 
-// 🆕 Import de la page de paramètres
+// Import de la page de paramètres
 import { SettingsPage } from './pages/SettingsPage';
+
+// Import des composants cookies
+import { CookieConsentProvider } from './contexts/CookieConsentContext';
+import { CookieBanner } from './components/CookieBanner';
 
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -107,91 +111,93 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-        <Header />
-        <main className="flex-1">
-          <Routes>
-            {/* Route racine redirige vers landing */}
-            <Route path="/" element={<Navigate to="/landing" replace />} />
-            
-            {/* Route pour traiter l'authentification et confirmation d'email */}
-            <Route path="/auth/callback" element={<AuthHandler />} />
-            
-            {/* Routes publiques */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            {/* 🆕 Nouvelle route pour reset password */}
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/landing" element={<LandingPage />} />
-            
-            {/* 🆕 Routes légales (publiques - accessibles sans connexion) */}
-            <Route path="/legal/*" element={<LegalRoutes />} />
-            
-            {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
-            <Route element={<AuthLayout />}>
-              <Route path="/dashboard" element={
-                <EmailConfirmationGuard>
-                  <DashboardPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/communication" element={
-                <EmailConfirmationGuard>
-                  <CommunicationPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/resources" element={
-                <EmailConfirmationGuard>
-                  <ResourcesPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/buy-tokens" element={
-                <EmailConfirmationGuard>
-                  <BuyTokensPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/buy-tokens/success" element={
-                <EmailConfirmationGuard>
-                  <PaymentSuccessPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/my-appreciations" element={
-                <EmailConfirmationGuard>
-                  <AppreciationBankPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/appreciation-bank" element={
-                <EmailConfirmationGuard>
-                  <AppreciationBankPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/lessons-bank" element={
-                <EmailConfirmationGuard>
-                  <LessonsBankPage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/synthese" element={
-                <EmailConfirmationGuard>
-                  <SynthesePage />
-                </EmailConfirmationGuard>
-              } />
-              <Route path="/generate-lesson" element={
-                <EmailConfirmationGuard>
-                  <LessonGeneratorPage />
-                </EmailConfirmationGuard>
-              } />
-              {/* 🆕 Route pour la page de paramètres avec suppression de compte */}
-              <Route path="/settings" element={
-                <EmailConfirmationGuard>
-                  <SettingsPage />
-                </EmailConfirmationGuard>
-              } />
-            </Route>
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </BrowserRouter>
+    <CookieConsentProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <Routes>
+              {/* Route racine redirige vers landing */}
+              <Route path="/" element={<Navigate to="/landing" replace />} />
+              
+              {/* Route pour traiter l'authentification et confirmation d'email */}
+              <Route path="/auth/callback" element={<AuthHandler />} />
+              
+              {/* Routes publiques */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/landing" element={<LandingPage />} />
+              
+              {/* Routes légales (publiques - accessibles sans connexion) */}
+              <Route path="/legal/*" element={<LegalRoutes />} />
+              
+              {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
+              <Route element={<AuthLayout />}>
+                <Route path="/dashboard" element={
+                  <EmailConfirmationGuard>
+                    <DashboardPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/communication" element={
+                  <EmailConfirmationGuard>
+                    <CommunicationPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/resources" element={
+                  <EmailConfirmationGuard>
+                    <ResourcesPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/buy-tokens" element={
+                  <EmailConfirmationGuard>
+                    <BuyTokensPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/buy-tokens/success" element={
+                  <EmailConfirmationGuard>
+                    <PaymentSuccessPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/my-appreciations" element={
+                  <EmailConfirmationGuard>
+                    <AppreciationBankPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/appreciation-bank" element={
+                  <EmailConfirmationGuard>
+                    <AppreciationBankPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/lessons-bank" element={
+                  <EmailConfirmationGuard>
+                    <LessonsBankPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/synthese" element={
+                  <EmailConfirmationGuard>
+                    <SynthesePage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/generate-lesson" element={
+                  <EmailConfirmationGuard>
+                    <LessonGeneratorPage />
+                  </EmailConfirmationGuard>
+                } />
+                <Route path="/settings" element={
+                  <EmailConfirmationGuard>
+                    <SettingsPage />
+                  </EmailConfirmationGuard>
+                } />
+              </Route>
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+        
+        <CookieBanner />
+      </BrowserRouter>
+    </CookieConsentProvider>
   );
 }
 
