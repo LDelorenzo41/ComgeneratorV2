@@ -1,7 +1,8 @@
 // ✅ Modification du 24/08/2025 : ajout des liens légaux obligatoires
+// ✅ Modification du 09/09/2025 : ajout des réseaux sociaux
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, MapPin, Sparkles, Heart, ExternalLink, ArrowRight, FileText, Shield, Scale } from 'lucide-react';
+import { Mail, MapPin, Sparkles, Heart, ExternalLink, ArrowRight, FileText, Shield, Scale, Instagram, Linkedin } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -145,7 +146,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* 🆕 Section Légal */}
+          {/* Section Légal */}
           <div>
             <h3 className="text-lg font-bold text-white mb-4 flex items-center">
               <div className="w-6 h-6 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center mr-3">
@@ -215,7 +216,7 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Footer bottom avec mentions légales condensées */}
+        {/* Footer bottom avec mentions légales condensées et réseaux sociaux */}
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="flex flex-col md:flex-row items-center mb-4 md:mb-0">
             <p className="text-blue-200 text-sm mb-2 md:mb-0 md:mr-4">
@@ -236,10 +237,43 @@ export function Footer() {
             </div>
           </div>
           
-          <div className="flex items-center text-blue-200 text-sm">
-            <span>Développé avec</span>
-            <Heart className="w-4 h-4 mx-1 text-red-400 animate-pulse" />
-            <span>pour les enseignants</span>
+          <div className="flex flex-col items-center">
+            <div className="flex items-center text-blue-200 text-sm mb-3">
+              <span>Développé avec</span>
+              <Heart className="w-4 h-4 mx-1 text-red-400 animate-pulse" />
+              <span>pour les enseignants</span>
+            </div>
+            
+            {/* Réseaux sociaux */}
+            <div className="flex items-center space-x-3">
+              <a 
+                href="https://www.instagram.com/ldteachtech/" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-500 rounded-lg flex items-center justify-center hover:scale-110 transition-transform"
+                title="Suivez-moi sur Instagram"
+              >
+                <Instagram className="w-4 h-4 text-white" />
+              </a>
+              <a 
+                href="https://www.linkedin.com/in/lionel-delorenzo-194a16330/" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center hover:scale-110 transition-transform"
+                title="Connectez-vous sur LinkedIn"
+              >
+                <Linkedin className="w-4 h-4 text-white" />
+              </a>
+              <a 
+                href="https://bsky.app/profile/ldteachtech.bsky.social" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 bg-gradient-to-br from-sky-400 to-blue-500 rounded-lg flex items-center justify-center hover:scale-110 transition-transform"
+                title="Suivez-moi sur Bluesky"
+              >
+                <span className="text-xs font-bold text-white">BS</span>
+              </a>
+            </div>
           </div>
         </div>
 
