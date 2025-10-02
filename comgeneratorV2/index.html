@@ -6,6 +6,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ProfAssist - Assistant IA pour Enseignants</title>
     <meta name="description" content="ProfAssist automatise la création d'appréciations scolaires, de séances pédagogiques et de communications professionnelles grâce à l'Intelligence Artificielle." />
+    
+    <!-- ============================================ -->
+    <!-- AJOUT : Google Consent Mode v2 -->
+    <!-- ============================================ -->
+    <script>
+      // Initialisation du dataLayer et gtag
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      
+      // Configuration par défaut : TOUT REFUSÉ
+      gtag('consent', 'default', {
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied',
+        'analytics_storage': 'denied',
+        'functionality_storage': 'denied',
+        'personalization_storage': 'denied',
+        'security_storage': 'granted',
+        'wait_for_update': 500
+      });
+
+      // Configuration région UE
+      gtag('set', 'ads_data_redaction', true);
+      gtag('set', 'url_passthrough', true);
+      
+      console.log('✅ Google Consent Mode v2 initialisé');
+    </script>
+    <!-- ============================================ -->
+    <!-- FIN AJOUT -->
+    <!-- ============================================ -->
   </head>
   <body>
     <div id="root"></div>

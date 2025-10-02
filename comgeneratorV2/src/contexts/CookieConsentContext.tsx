@@ -1,3 +1,10 @@
+// src/contexts/CookieConsentContext.tsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+// ✅ AJOUT : Import des fonctions RGPD
+import { logConsent, getOrCreateSessionId } from '../lib/api/consent';
+import { safeStorage } from '../lib/storage/safeStorage';
+import { useAuthStore } from '../lib/store';
+
 // Types pour Google Analytics/Ads
 declare global {
   interface Window {
@@ -5,9 +12,6 @@ declare global {
     gtag: (...args: any[]) => void;
   }
 }
-
-// src/contexts/CookieConsentContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type CookieConsent = {
   necessary: boolean;      // Toujours true (obligatoires)
@@ -50,12 +54,17 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const [consentStatus, setConsentStatus] = useState<ConsentStatus>('pending');
   const [showBanner, setShowBanner] = useState(false);
   const [hasConsented, setHasConsented] = useState(false);
+  
+  // ✅ AJOUT : Récupération de l'utilisateur connecté et session ID
+  const { user } = useAuthStore();
+  const sessionId = getOrCreateSessionId();
 
   // Charger le consentement sauvegardé au démarrage
   useEffect(() => {
     try {
-      const savedConsent = localStorage.getItem(CONSENT_STORAGE_KEY);
-      const savedDate = localStorage.getItem(CONSENT_DATE_KEY);
+      // ✅ MODIFIÉ : Utilisation de safeStorage au lieu de localStorage
+      const savedConsent = safeStorage.getItem(CONSENT_STORAGE_KEY);
+      const savedDate = safeStorage.getItem(CONSENT_DATE_KEY);
       
       if (savedConsent && savedDate) {
         const consentData = JSON.parse(savedConsent);
@@ -71,6 +80,9 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
           
           // Charger les scripts autorisés
           loadAuthorizedScripts(consentData.consent);
+          
+          // ✅ AJOUT : Mettre à jour Consent Mode avec les préférences sauvegardées
+          updateGoogleConsentMode(consentData.consent);
           return;
         }
       }
@@ -99,17 +111,47 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
     }
   };
 
-  // Sauvegarder le consentement
-  const saveConsent = (newConsent: CookieConsent) => {
+  // ============================================
+  // ✅ AJOUT : Fonction Google Consent Mode v2
+  // ============================================
+  /**
+   * Met à jour Google Consent Mode v2 selon les préférences utilisateur
+   */
+  const updateGoogleConsentMode = (consentData: CookieConsent) => {
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', {
+        'analytics_storage': consentData.analytics ? 'granted' : 'denied',
+        'ad_storage': consentData.advertising ? 'granted' : 'denied',
+        'ad_user_data': consentData.advertising ? 'granted' : 'denied',
+        'ad_personalization': consentData.advertising ? 'granted' : 'denied',
+        'functionality_storage': consentData.functional ? 'granted' : 'denied',
+        'personalization_storage': consentData.functional ? 'granted' : 'denied',
+      });
+
+      console.log('✅ Google Consent Mode mis à jour:', {
+        analytics: consentData.analytics ? 'granted' : 'denied',
+        advertising: consentData.advertising ? 'granted' : 'denied',
+        functional: consentData.functional ? 'granted' : 'denied',
+      });
+    }
+  };
+  // ============================================
+  // FIN AJOUT
+  // ============================================
+
+  // ✅ MODIFIÉ : Fonction saveConsent avec logging RGPD
+  const saveConsent = async (newConsent: CookieConsent) => {
     try {
+      const now = new Date().toISOString();
       const consentData = {
         consent: newConsent,
-        date: new Date().toISOString(),
+        date: now,
         version: CONSENT_VERSION
       };
       
-      localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(consentData));
-      localStorage.setItem(CONSENT_DATE_KEY, consentData.date);
+      // ✅ MODIFIÉ : Utilisation de safeStorage
+      safeStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(consentData));
+      safeStorage.setItem(CONSENT_DATE_KEY, now);
       
       setConsent(newConsent);
       setHasConsented(true);
@@ -118,6 +160,23 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
       
       // Charger ou décharger les scripts selon le consentement
       loadAuthorizedScripts(newConsent);
+      
+      // ✅ AJOUT : Mettre à jour Google Consent Mode
+      updateGoogleConsentMode(newConsent);
+      
+      // ✅ AJOUT : Logging RGPD asynchrone (ne bloque pas l'UX)
+      const action = !hasConsented ? 'grant' : 'update';
+      
+      logConsent({
+        userId: user?.id || null,
+        sessionId,
+        consentData: newConsent,
+        consentVersion: CONSENT_VERSION,
+        action,
+      }).catch(err => {
+        // Log silencieux pour ne pas perturber l'utilisateur
+        console.error('Échec du logging RGPD (non bloquant):', err);
+      });
       
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du consentement:', error);
@@ -256,12 +315,4 @@ export function useCookieConsent() {
     throw new Error('useCookieConsent doit être utilisé dans un CookieConsentProvider');
   }
   return context;
-}
-
-// Types pour window.gtag (pour TypeScript)
-declare global {
-  interface Window {
-    dataLayer: any[];
-    gtag: (...args: any[]) => void;
-  }
 }
