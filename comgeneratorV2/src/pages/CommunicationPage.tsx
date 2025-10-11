@@ -10,7 +10,7 @@ import { generateCommunication } from '../lib/generateCommunication';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
-import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer'; // AJOUT : Import du disclaimer
+import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 
 import { 
   MessageSquare, 
@@ -34,7 +34,10 @@ interface Signature {
   id: string;
   name: string;
   content: string;
-  is_default: boolean;
+  is_default: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  user_id?: string;
 }
 
 export function CommunicationPage() {
@@ -288,14 +291,18 @@ export function CommunicationPage() {
                     onChange={(e) => setDestinataire(e.target.value)}
                     className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     options={[
+                      { value: "Parent d'élève", label: "Parent d'élève" },
                       { value: "Parents d'élèves", label: "Parents d'élèves" },
                       { value: 'Élève', label: 'Élève' },
+                      { value: 'Élèves', label: 'Élèves' },
                       { value: 'Classe', label: 'Classe' },
                       { value: 'Collègue(s)', label: 'Collègue(s)' },
                       {
                         value: "Chef(fe) d'établissement / Chef(fe) adjoint",
                         label: "Chef(fe) d'établissement / Chef(fe) adjoint"
-                      }
+                      },
+                      { value: 'Commission disciplinaire', label: 'Commission disciplinaire' },
+                      { value: "Rapport d'incident", label: "Rapport d'incident" }
                     ]}
                   />
                 </div>
@@ -676,4 +683,3 @@ export function CommunicationPage() {
 }
 
 export default CommunicationPage;
-
