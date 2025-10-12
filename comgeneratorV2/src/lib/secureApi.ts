@@ -39,9 +39,12 @@ export interface LessonParams {
   duration: string;       // ← En string, pas number
 }
 
+// ✅ INTERFACE MISE À JOUR pour SynthesisParams
 export interface SynthesisParams {
-  extractedText: string;  // au lieu de bulletinText
-  maxChars: number;       // au lieu d'additionalContext
+  extractedText: string;
+  maxChars: number;
+  tone?: 'neutre' | 'encourageant' | 'analytique';
+  outputType?: 'complet' | 'essentiel';
 }
 
 // Classe pour gérer les appels sécurisés aux Edge Functions

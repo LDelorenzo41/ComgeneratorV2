@@ -208,57 +208,48 @@ ${extractedText}
 Rédige maintenant l'appréciation générale en respectant SCRUPULEUSEMENT ces instructions, notamment la limite de ${maxChars} caractères.`;
 }
 
-// ✅ PROMPT ESSENTIEL (CORRIGÉ)
+// ✅ PROMPT ESSENTIEL (NOUVEAU)
 function buildEssentialPrompt(extractedText: string, maxChars: number, toneInstructions: string): string {
   return `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**
-Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et identifier LA TENDANCE GLOBALE DOMINANTE qui caractérise le bilan de l'élève, puis rédiger une synthèse concise centrée sur cette vision d'ensemble.
+Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et identifier LA CARACTÉRISTIQUE PRINCIPALE qui ressort, puis rédiger une synthèse concise centrée sur cet élément.
 
 **COMMENTAIRES À ANALYSER :**
 """
 ${extractedText}
 """
 
-**INSTRUCTIONS D'ANALYSE CRITIQUE :**
+**INSTRUCTIONS D'ANALYSE :**
 
-1. **Identification de la tendance GLOBALE dominante :**
+1. **Identification de l'élément central :**
+   - Quel est LE point qui revient le plus souvent dans les commentaires ?
+   - Quelle est LA tendance dominante (positive ou négative) ?
+   - Quel est LE constat principal qui se dégage ?
    
-   ⚠️ **ATTENTION PRIORITAIRE :** Évalue d'abord la VISION D'ENSEMBLE :
-   - Combien de matières/commentaires sont POSITIFS vs NÉGATIFS ?
-   - Quelle est la TONALITÉ GÉNÉRALE du bulletin ?
-   - Y a-t-il des mentions explicites (félicitations, encouragements, mises en garde) ?
-   
-   **Hiérarchie d'importance :**
-   1. **Si > 70% des commentaires sont positifs** → La tendance dominante est LA RÉUSSITE GLOBALE
-   2. **Si > 70% des commentaires sont négatifs** → La tendance dominante est LES DIFFICULTÉS GÉNÉRALISÉES
-   3. **Si équilibré (40-60%)** → Identifier LE POINT TRANSVERSAL le plus significatif
-   
-   ⚠️ **NE PAS se focaliser sur 2-3 points mineurs négatifs si l'ensemble est excellent**
-   ⚠️ **NE PAS se focaliser sur 2-3 points mineurs positifs si l'ensemble est faible**
+   Exemples possibles :
+   - Un élève en difficulté généralisée
+   - Un élève excellent partout
+   - Des lacunes méthodologiques transversales
+   - Un problème comportemental récurrent
+   - Une force particulière (créativité, rigueur, participation...)
 
-2. **Exemples de tendances dominantes correctes :**
-   - **Bulletin très positif** : "Trimestre excellent avec félicitations" / "Résultats très satisfaisants"
-   - **Bulletin positif** : "Bon trimestre avec réussites marquées"
-   - **Bulletin mitigé** : "Résultats contrastés nécessitant régularité" / "Lacunes méthodologiques transversales"
-   - **Bulletin faible** : "Difficultés généralisées nécessitant soutien" / "Manque de travail et d'investissement"
+2. **Construction de la synthèse essentielle :**
+   - **Point principal :** Énonce clairement la caractéristique dominante
+   - **Constat :** Explique comment cela se manifeste concrètement
+   - **Action recommandée :** Propose UNE piste d'action prioritaire
 
-3. **Construction de la synthèse essentielle :**
-   - **Point principal :** Énonce la tendance GLOBALE dominante
-   - **Constat :** Illustre avec 1-2 éléments concrets
-   - **Perspective :** Encouragement ou conseil adapté au niveau global
-
-4. ${toneInstructions}
+3. ${toneInstructions}
 
 **CONTRAINTES IMPÉRATIVES :**
 - Longueur maximale STRICTE : ${maxChars} caractères
-- Focus sur la VISION D'ENSEMBLE, pas sur des détails isolés
-- Si le bulletin est globalement positif, la synthèse DOIT être positive
-- Si le bulletin est globalement négatif, la synthèse DOIT être constructive mais lucide
+- Focus UNIQUEMENT sur l'élément central identifié
+- Évite les listes ou énumérations multiples
+- Va droit au but avec une synthèse percutante
 - Reste professionnel et utilisable dans un bulletin officiel
 
 **STRUCTURE ATTENDUE :**
-[Bilan global en une phrase] + [Illustration concrète] + [Perspective/Conseil]
+[Point principal en une phrase] + [Constat concret] + [Action recommandée]
 
 **ACTION REQUISE :**
 Rédige maintenant cette synthèse essentielle en respectant SCRUPULEUSEMENT la limite de ${maxChars} caractères.`;

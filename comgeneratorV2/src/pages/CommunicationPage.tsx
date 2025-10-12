@@ -51,6 +51,9 @@ export function CommunicationPage() {
   const [loading, setLoading] = React.useState(false);
   const [generatedContent, setGeneratedContent] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
+  
+  // ✅ NOUVEAU: État pour le point de vue (rapport d'incident)
+  const [pointDeVue, setPointDeVue] = React.useState<'troisieme' | 'premiere'>('troisieme');
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -97,7 +100,18 @@ export function CommunicationPage() {
     fetchSignatures();
   }, [fetchSignatures]);
 
-  // ✅ MODIFICATION: Fonction handleGenerate avec signature
+  // ✅ NOUVEAU: Fonction de réinitialisation complète
+  const handleResetCommunication = () => {
+    setDestinataire("Parents d'élèves");
+    setTon('Détendu');
+    setContenu('');
+    setGeneratedContent('');
+    setError(null);
+    setSelectedSignatureOutgoing('');
+    setPointDeVue('troisieme');
+  };
+
+  // ✅ MODIFICATION: Fonction handleGenerate avec signature et point de vue
   const handleGenerate = async () => {
     if (tokenCount === 0) {
       setError('Crédits insuffisants pour générer une communication.');
@@ -114,11 +128,17 @@ export function CommunicationPage() {
         ? signatures.find(s => s.id === selectedSignatureOutgoing)
         : null;
 
+      // ✅ NOUVEAU: Ajout du point de vue pour rapport d'incident
+      let contenuAvecPointDeVue = contenu;
+      if (destinataire === "Rapport d'incident" && pointDeVue === 'premiere') {
+        contenuAvecPointDeVue = `[IMPORTANT: Rédiger ce rapport à la PREMIÈRE PERSONNE du singulier (je, j'ai constaté, j'ai observé, etc.)]\n\n${contenu}`;
+      }
+
       // ✅ MODIFICATION: Ajout de la signature dans les paramètres
       const text = await generateCommunication({ 
         destinataire, 
         ton, 
-        contenu,
+        contenu: contenuAvecPointDeVue,
         signature: selectedSignature ? selectedSignature.content : null
       });
       setGeneratedContent(text);
@@ -326,6 +346,44 @@ export function CommunicationPage() {
                 </div>
               </div>
 
+              {/* ✅ NOUVEAU: Choix du point de vue pour Rapport d'incident */}
+              {destinataire === "Rapport d'incident" && (
+                <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                    <FileText className="w-4 h-4 inline mr-2" />
+                    Point de vue de rédaction
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pointDeVue"
+                        value="troisieme"
+                        checked={pointDeVue === 'troisieme'}
+                        onChange={(e) => setPointDeVue(e.target.value as 'troisieme' | 'premiere')}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <strong>Troisième personne</strong> (objectif : "L'élève a fait...")
+                      </span>
+                    </label>
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pointDeVue"
+                        value="premiere"
+                        checked={pointDeVue === 'premiere'}
+                        onChange={(e) => setPointDeVue(e.target.value as 'troisieme' | 'premiere')}
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <strong>Première personne</strong> (témoin : "J'ai constaté que...")
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {/* ✅ AJOUT: Menu déroulant pour signature sortante avec bouton de gestion */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -431,23 +489,38 @@ export function CommunicationPage() {
               </div>
 
               <div className="space-y-6">
+                {/* ✅ MODIFICATION: Textarea redimensionnable (suppression de resize-none) */}
                 <Textarea
                   rows={8}
                   value={generatedContent}
                   onChange={(e) => setGeneratedContent(e.target.value)}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 resize-none"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                 />
 
-                <button
-                  onClick={() => handleCopy(generatedContent)}
-                  className="w-full group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <span className="relative flex items-center justify-center">
-                    <Copy className="w-5 h-5 mr-3" />
-                    Copier le message
-                  </span>
-                </button>
+                {/* ✅ NOUVEAU: Deux boutons - Copier ET Nouvelle communication */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button
+                    onClick={() => handleCopy(generatedContent)}
+                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                    <span className="relative flex items-center justify-center">
+                      <Copy className="w-5 h-5 mr-3" />
+                      Copier le message
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={handleResetCommunication}
+                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-200 font-bold py-4 px-8 rounded-xl border-2 border-gray-300 dark:border-gray-600 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                    <span className="relative flex items-center justify-center">
+                      <RefreshCw className="w-5 h-5 mr-3" />
+                      Nouvelle communication
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -610,11 +683,12 @@ export function CommunicationPage() {
               </div>
 
               <div className="space-y-6">
+                {/* ✅ MODIFICATION: Textarea redimensionnable */}
                 <Textarea
                   rows={8}
                   value={generatedReply}
                   onChange={(e) => setGeneratedReply(e.target.value)}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 resize-none"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                 />
 
                 <div className="flex flex-col sm:flex-row gap-4">

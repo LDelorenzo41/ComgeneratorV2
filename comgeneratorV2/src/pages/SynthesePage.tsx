@@ -1,4 +1,4 @@
-// src/pages/SynthesePage.tsx - VERSION MIGRÉE VERS EDGE FUNCTION
+// src/pages/SynthesePage.tsx - VERSION AMÉLIORÉE AVEC CONTRÔLES TON/LONGUEUR/TYPE
 
 import React from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -8,7 +8,6 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
-// ✅ IMPORT MODIFIÉ - Utilisation de secureApi au lieu d'OpenAI direct
 import { secureApi, type SynthesisParams } from '../lib/secureApi';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
@@ -28,7 +27,8 @@ import {
   Command,
   Printer,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Settings
 } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -43,7 +43,12 @@ export function SynthesePage() {
 
   const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
-  const [maxChars, setMaxChars] = React.useState(300);
+  
+  // ✅ NOUVEAUX ÉTATS POUR LES CONTRÔLES
+  const [tone, setTone] = React.useState<'neutre' | 'encourageant' | 'analytique'>('neutre');
+  const [maxChars, setMaxChars] = React.useState<number>(300);
+  const [outputType, setOutputType] = React.useState<'complet' | 'essentiel'>('complet');
+  
   const [summary, setSummary] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [copySuccess, setCopySuccess] = React.useState(false);
@@ -123,7 +128,6 @@ export function SynthesePage() {
     }
   };
 
-  // ✅ FONCTION MODIFIÉE - Utilisation de secureApi au lieu d'OpenAI direct
   const generateSynthese = async () => {
     if (tokenCount === 0) {
       setError('INSUFFICIENT_TOKENS');
@@ -139,7 +143,6 @@ export function SynthesePage() {
     setError(null);
     
     try {
-      // ✅ EXTRACTION OCR D'ABORD
       const extracted = await extractTextFromCapture();
       
       if (!extracted) {
@@ -148,20 +151,21 @@ export function SynthesePage() {
         return;
       }
 
-      // ✅ REMPLACEMENT - Appel à secureApi avec les paramètres corrects
+      // ✅ APPEL AVEC LES NOUVEAUX PARAMÈTRES (pour le moment, l'Edge Function les ignore)
       const result = await secureApi.generateSynthesis({
-        extractedText: extracted,  // ← Nom attendu par l'Edge Function
-        maxChars: maxChars         // ← Paramètre direct au lieu d'additionalContext
+        extractedText: extracted,
+        maxChars: maxChars,
+        // @ts-ignore - Ces paramètres seront utilisés après la mise à jour de l'Edge Function
+        tone: tone,
+        outputType: outputType
       });
 
-      // ✅ LECTURE CORRIGÉE du résultat
-      const content = result.content;  // ← L'Edge Function retourne "content", pas "synthesis"
+      const content = result.content;
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setSummary(content);
 
-      // ✅ MODIFICATION - Usage récupéré depuis result.usage
-      const usedTokens: number = result.usage?.total_tokens ?? 0;  // ← Depuis usage.total_tokens
+      const usedTokens: number = result.usage?.total_tokens ?? 0;
 
       // Mise à jour des tokens
       if (usedTokens > 0 && user) {
@@ -227,6 +231,9 @@ export function SynthesePage() {
     setCapturedImage(null);
     setPdfDoc(null);
     setError(null);
+    setTone('neutre');
+    setMaxChars(300);
+    setOutputType('complet');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -472,16 +479,16 @@ export function SynthesePage() {
             </div>
           )}
 
-          {/* Configuration et génération */}
+          {/* ✅ NOUVELLE SECTION : Configuration et génération avec contrôles */}
           {capturedImage && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-                    <Zap className="w-5 h-5 text-white" />
+                    <Settings className="w-5 h-5 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Configuration et génération
+                    Configuration de la synthèse
                     {!tokensAvailable && (
                       <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
                         Indisponible
@@ -490,26 +497,159 @@ export function SynthesePage() {
                   </h2>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Définissez la longueur souhaitée et lancez l'analyse
+                  Personnalisez le ton, la longueur et le type de synthèse avant la génération
                 </p>
               </div>
 
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                    <Target className="w-4 h-4 inline mr-2" />
-                    Limite maximale de caractères
+                
+                {/* ✅ SÉLECTEUR DE TON */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <Sparkles className="w-4 h-4 inline mr-2" />
+                    Ton de la synthèse
                   </label>
-                  <Input
-                    type="number"
-                    value={maxChars}
-                    onChange={e => setMaxChars(Number(e.target.value))}
-                    min={50}
-                    max={1000}
-                    disabled={!tokensAvailable}
-                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200"
-                    placeholder="300"
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button
+                      onClick={() => setTone('neutre')}
+                      disabled={!tokensAvailable}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                        tone === 'neutre'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center justify-center mb-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          tone === 'neutre' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Neutre</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Factuel et objectif</p>
+                    </button>
+
+                    <button
+                      onClick={() => setTone('encourageant')}
+                      disabled={!tokensAvailable}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                        tone === 'encourageant'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center justify-center mb-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          tone === 'encourageant' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                          <Sparkles className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Encourageant</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Valorise les points positifs</p>
+                    </button>
+
+                    <button
+                      onClick={() => setTone('analytique')}
+                      disabled={!tokensAvailable}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                        tone === 'analytique'
+                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center justify-center mb-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          tone === 'analytique' ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}>
+                          <Target className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Analytique</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Détaillé et approfondi</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* ✅ CURSEUR DE LONGUEUR */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <Target className="w-4 h-4 inline mr-2" />
+                    Longueur maximale : <span className="text-orange-600 dark:text-orange-400 font-bold">{maxChars}</span> caractères
+                  </label>
+                  <div className="bg-gradient-to-r from-gray-50 to-orange-50 dark:from-gray-700 dark:to-orange-900/20 rounded-xl p-6 border-2 border-gray-200 dark:border-gray-600">
+                    <input
+                      type="range"
+                      min="50"
+                      max="500"
+                      value={maxChars}
+                      onChange={(e) => setMaxChars(Number(e.target.value))}
+                      disabled={!tokensAvailable}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: `linear-gradient(to right, rgb(249, 115, 22) 0%, rgb(249, 115, 22) ${((maxChars - 50) / (500 - 50)) * 100}%, rgb(229, 231, 235) ${((maxChars - 50) / (500 - 50)) * 100}%, rgb(229, 231, 235) 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-2">
+                      <span>50</span>
+                      <span>275</span>
+                      <span>500</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ✅ TYPE D'OUTPUT - BOUTONS RADIO */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <Eye className="w-4 h-4 inline mr-2" />
+                    Type de synthèse
+                  </label>
+                  <div className="space-y-3">
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      outputType === 'complet'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="outputType"
+                        value="complet"
+                        checked={outputType === 'complet'}
+                        onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse complète</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Analyse détaillée avec points forts, axes d'amélioration et recommandations
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      outputType === 'essentiel'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="outputType"
+                        value="essentiel"
+                        checked={outputType === 'essentiel'}
+                        onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse essentielle</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Focus sur la caractéristique principale qui ressort du bulletin
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {error === 'INSUFFICIENT_TOKENS' && (
@@ -535,6 +675,7 @@ export function SynthesePage() {
                   </div>
                 )}
 
+                {/* ✅ BOUTON DE GÉNÉRATION */}
                 <button
                   onClick={generateSynthese} 
                   disabled={loading || !capturedImage || tokenCount === 0}
@@ -552,15 +693,10 @@ export function SynthesePage() {
                         <AlertCircle className="w-5 h-5 mr-3" />
                         Crédits épuisés
                       </>
-                    ) : capturedImage ? (
+                    ) : (
                       <>
                         <Zap className="w-5 h-5 mr-3" />
                         Générer la synthèse
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-5 h-5 mr-3" />
-                        Uploadez d'abord un PDF puis une capture
                       </>
                     )}
                   </span>
@@ -589,7 +725,7 @@ export function SynthesePage() {
               <div className="space-y-6">
                 <div className="relative bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6 border-2 border-gray-200 dark:border-gray-600">
                   <textarea
-                    className="w-full min-h-32 p-4 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                    className="w-full min-h-32 p-4 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-xl resize-y focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                     value={summary}
                     onChange={(e) => setSummary(e.target.value)}
                     placeholder="Votre synthèse apparaîtra ici..."
