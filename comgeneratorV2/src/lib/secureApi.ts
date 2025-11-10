@@ -15,6 +15,7 @@ export interface GenerateAppreciationParams {
   minLength: number;
   maxLength: number;
   tone: 'bienveillant' | 'normal' | 'severe';
+  addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';  // ✅ AJOUT
 }
 
 export interface CommunicationParams {

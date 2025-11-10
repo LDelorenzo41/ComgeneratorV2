@@ -21,6 +21,7 @@ interface GenerateAppreciationParams {
   minLength: number;
   maxLength: number;
   tone: 'bienveillant' | 'normal' | 'severe';
+  addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';
 }
 
 const generateHandler = async (req: Request): Promise<Response> => {
@@ -64,14 +65,24 @@ const generateHandler = async (req: Request): Promise<Response> => {
     }
 
     const criteriaText = formatCriteriaForPrompt(params.criteria);
+    
     const toneDescriptions = {
       bienveillant: "bienveillant et encourageant",
       normal: "neutre et objectif", 
       severe: "strict et exigeant"
     };
 
+    const addressModeDescriptions = {
+      tutoiement: "TUTOIEMENT (tu/te/ton/ta/tes)",
+      vouvoiement: "VOUVOIEMENT (vous/votre/vos)",
+      impersonnel: "FORMULATION IMPERSONNELLE (l'élève/il/elle)"
+    };
+
     // Reproduction exacte de votre prompt complet
     const prompt = `Tu es un enseignant expérimenté, expert en évaluation pédagogique et en rédaction d'appréciations de bulletins scolaires. Tu maîtrises parfaitement les enjeux de l'évaluation formative et les codes de communication avec les élèves et leurs familles.
+
+**⚠️ CONTRAINTE CRITIQUE #1 - MODE D'ADRESSE (PRIORITÉ ABSOLUE) :**
+${getAddressModeInstructions(params.addressMode)}
 
 **⚠️ CONTRAINTES CRITIQUES DE LONGUEUR (IMPÉRATIF ABSOLU) :**
 - Version détaillée : EXACTEMENT entre ${params.minLength} et ${params.maxLength} caractères (espaces compris)
@@ -86,6 +97,7 @@ const generateHandler = async (req: Request): Promise<Response> => {
 **MATIÈRE ENSEIGNÉE :** ${params.subject}
 **ÉLÈVE ÉVALUÉ :** ${params.studentName}
 **TON REQUIS :** ${toneDescriptions[params.tone]}
+**MODE D'ADRESSE IMPOSÉ :** ${addressModeDescriptions[params.addressMode]}
 
 **CRITÈRES D'ÉVALUATION ANALYSÉS :**
 ${criteriaText}
@@ -158,14 +170,17 @@ ${getToneInstructionsForAppreciation(params.tone)}
    - Les critères "Normal" sont **mentionnés** de manière équilibrée
 
 **PROCESSUS DE VÉRIFICATION OBLIGATOIRE :**
-1. Rédige tes deux versions selon les instructions ci-dessus
-2. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
-3. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
-4. Si une version dépasse les limites : RACCOURCIS immédiatement
-5. Si une version est trop courte : DÉVELOPPE avec plus de détails
-6. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
+1. VÉRIFIE d'abord que tu respectes le mode d'adresse : ${addressModeDescriptions[params.addressMode]}
+2. Rédige tes deux versions selon les instructions ci-dessus
+3. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
+4. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
+5. Si une version dépasse les limites : RACCOURCIS immédiatement
+6. Si une version est trop courte : DÉVELOPPE avec plus de détails
+7. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
+8. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
 
 **CONSIGNES DE FINALISATION :**
+- **Respect ABSOLU** du mode d'adresse ${addressModeDescriptions[params.addressMode]}
 - **Respect ABSOLU** des limites de caractères imposées
 - **Vocabulaire adapté** au type de compétence (disciplinaire/comportementale/méthodologique)
 - **Exclusion totale** des critères "Non évalué" (déjà filtrés)
@@ -180,7 +195,7 @@ Version détaillée :
 Version synthétique :
 [Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
 
-⚠️ RAPPEL FINAL : Les contraintes de longueur sont CRITIQUES et le vocabulaire doit être adapté au type de compétence évaluée.`;
+⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES et le vocabulaire doit être adapté au type de compétence évaluée.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -193,7 +208,14 @@ Version synthétique :
         messages: [
           {
             role: 'system',
-            content: 'Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires. Tu dois ABSOLUMENT ignorer tous les critères marqués comme "Non évalué" et ne jamais les mentionner dans l\'appréciation. Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).'
+            content: `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
+
+⚠️ RÈGLE ABSOLUE #1 - MODE D'ADRESSE :
+${getSystemAddressModeMessage(params.addressMode)}
+
+RÈGLE #2 : Tu dois ABSOLUMENT ignorer tous les critères marqués comme "Non évalué" et ne jamais les mentionner dans l'appréciation.
+
+RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).`
           },
           {
             role: 'user',
@@ -267,7 +289,8 @@ Version synthétique :
       detailed: detailed.length,
       summary: summary.length,
       limitesDetaillees: `${params.minLength}-${params.maxLength}`,
-      limitesSynthetique: `${expectedSummaryMin}-${expectedSummaryMax}`
+      limitesSynthetique: `${expectedSummaryMin}-${expectedSummaryMax}`,
+      addressMode: params.addressMode
     });
 
     return new Response(JSON.stringify({
@@ -382,6 +405,50 @@ function getToneInstructionsForAppreciation(tone: 'bienveillant' | 'normal' | 's
 
     default:
       return `   - Adapte le ton en maintenant la bienveillance éducative et le professionnalisme`;
+  }
+}
+
+function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel'): string {
+  switch (addressMode) {
+    case "tutoiement":
+      return `Tu DOIS ABSOLUMENT utiliser le TUTOIEMENT dans TOUTE l'appréciation :
+- Utilise UNIQUEMENT : "tu", "te", "t'", "ton", "ta", "tes"
+- Exemples corrects : "Tu montres", "Ton travail", "Tu dois", "Tes efforts"
+- INTERDIT : "vous", "votre", "vos", "l'élève", "il/elle"
+- Cette règle s'applique à CHAQUE phrase sans exception.`;
+
+    case "vouvoiement":
+      return `Tu DOIS ABSOLUMENT utiliser le VOUVOIEMENT dans TOUTE l'appréciation :
+- Utilise UNIQUEMENT : "vous", "votre", "vos"
+- Exemples corrects : "Vous montrez", "Votre travail", "Vous devez", "Vos efforts"
+- INTERDIT : "tu", "te", "ton", "ta", "tes", "l'élève", "il/elle"
+- Cette règle s'applique à CHAQUE phrase sans exception.`;
+
+    case "impersonnel":
+      return `Tu DOIS ABSOLUMENT utiliser une FORMULATION IMPERSONNELLE dans TOUTE l'appréciation :
+- Utilise UNIQUEMENT : "l'élève", "il", "elle", "son", "sa", "ses", le prénom de l'élève
+- Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts", "${params.studentName} démontre"
+- INTERDIT : "tu", "te", "ton", "ta", "tes", "vous", "votre", "vos"
+- Cette règle s'applique à CHAQUE phrase sans exception.`;
+
+    default:
+      return `Utilise le tutoiement par défaut.`;
+  }
+}
+
+function getSystemAddressModeMessage(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel'): string {
+  switch (addressMode) {
+    case "tutoiement":
+      return `Tu dois IMPÉRATIVEMENT utiliser le TUTOIEMENT (tu/te/ton/ta/tes) dans chaque phrase de l'appréciation. L'utilisation de "vous", "votre", "l'élève" ou "il/elle" est une ERREUR CRITIQUE.`;
+
+    case "vouvoiement":
+      return `Tu dois IMPÉRATIVEMENT utiliser le VOUVOIEMENT (vous/votre/vos) dans chaque phrase de l'appréciation. L'utilisation de "tu", "te", "l'élève" ou "il/elle" est une ERREUR CRITIQUE.`;
+
+    case "impersonnel":
+      return `Tu dois IMPÉRATIVEMENT utiliser une FORMULATION IMPERSONNELLE (l'élève/il/elle/son/sa/ses ou le prénom) dans chaque phrase de l'appréciation. L'utilisation de "tu", "te", "vous" ou "votre" est une ERREUR CRITIQUE.`;
+
+    default:
+      return `Utilise le tutoiement par défaut.`;
   }
 }
 

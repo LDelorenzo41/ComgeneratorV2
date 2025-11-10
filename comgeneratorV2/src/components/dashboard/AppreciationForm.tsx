@@ -38,6 +38,7 @@ const appreciationSchema = z.object({
   })),
   personalNotes: z.string().optional(),
   tone: z.enum(['bienveillant', 'normal', 'severe'] as const),
+  addressMode: z.enum(['tutoiement', 'vouvoiement', 'impersonnel'] as const),  // ✅ AJOUT
   minLength: z.number().min(50).max(500),
   maxLength: z.number().min(100).max(1000)
 }).refine((data) => data.maxLength > data.minLength, {
@@ -92,6 +93,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
       studentName: '',
       criteria: [],
       tone: 'normal',
+      addressMode: 'tutoiement',  // ✅ AJOUT : valeur par défaut
       personalNotes: '',
       minLength: 150,
       maxLength: 300
@@ -222,7 +224,8 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
         personalNotes: data.personalNotes || '',
         minLength: data.minLength,
         maxLength: data.maxLength,
-        tone: data.tone
+        tone: data.tone,
+        addressMode: data.addressMode  // ✅ AJOUT
       });
 
       const usedTokens = generatedResult.usedTokens;
@@ -552,7 +555,26 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                 <option value="severe">Sévère</option>
               </select>
             </div>
-
+            {/* ✅ AJOUT : Mode d'adresse */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <MessageCircle className="w-4 h-4 inline mr-2" />
+                Mode d'adresse
+              </label>
+              <select
+                {...register('addressMode')}
+                disabled={tokenCount === 0}
+                onChange={(e) => {
+                  register('addressMode').onChange(e);
+                  setIsGenerateClicked(false);
+                }}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="tutoiement">Tutoiement</option>
+                <option value="vouvoiement">Vouvoiement</option>
+                <option value="impersonnel">Formulation impersonnelle</option>
+              </select>
+            </div>
             {/* Notes personnelles */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
