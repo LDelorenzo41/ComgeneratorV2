@@ -23,6 +23,9 @@ export interface AppreciationResult {
 
 export type AppreciationTone = 'bienveillant' | 'normal' | 'severe';
 
+// ✅ AJOUT : Type pour le mode d'adresse
+export type AddressMode = 'tutoiement' | 'vouvoiement' | 'impersonnel';
+
 export type AppreciationTag = 'tres_bien' | 'bien' | 'moyen' | 'insuffisant';
 
 export interface AppreciationFormFields {
@@ -38,6 +41,7 @@ export interface AppreciationFormFields {
   minLength: number;
   maxLength: number;
   tone: AppreciationTone;
+  addressMode: AddressMode;  // ✅ AJOUT
 }
 
 export interface SavedAppreciation {
