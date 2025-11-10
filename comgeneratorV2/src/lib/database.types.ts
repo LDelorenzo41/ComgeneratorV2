@@ -269,18 +269,21 @@ export type Database = {
         Row: {
           has_bank_access: boolean | null
           newsletter_subscription: boolean | null
+          special_offer_claimed: boolean | null  // ✅ AJOUT
           tokens: number
           user_id: string
         }
         Insert: {
           has_bank_access?: boolean | null
           newsletter_subscription?: boolean | null
+          special_offer_claimed?: boolean | null  // ✅ AJOUT
           tokens?: number
           user_id: string
         }
         Update: {
           has_bank_access?: boolean | null
           newsletter_subscription?: boolean | null
+          special_offer_claimed?: boolean | null  // ✅ AJOUT
           tokens?: number
           user_id?: string
         }
@@ -577,3 +580,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
