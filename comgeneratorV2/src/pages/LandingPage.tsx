@@ -20,12 +20,14 @@ import {
   Database,
   Eye,
   ChevronDown,
-  Play
+  Play,
+  Gift  // ✅ AJOUT
 } from 'lucide-react';
 
 export function LandingPage() {
   const [activeFeature, setActiveFeature] = useState(0);
   const [isVisible, setIsVisible] = useState({});
+  const [showSpecialOffer, setShowSpecialOffer] = useState(false); // ✅ AJOUT
 
   const features = [
     {
@@ -80,8 +82,58 @@ export function LandingPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ AJOUT : Vérifier si on doit afficher l'offre spéciale
+  useEffect(() => {
+    const currentDate = new Date();
+    const deadlineDate = new Date('2025-12-10T23:59:59');
+    
+    if (currentDate <= deadlineDate) {
+      setShowSpecialOffer(true);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
+      {/* ✅ AJOUT : Post-it offre spéciale - Position fixe en bas à gauche */}
+      {showSpecialOffer && (
+        <div className="fixed bottom-6 left-6 z-50 animate-bounce-slow">
+          <div className="relative group">
+            {/* Post-it */}
+            <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 dark:from-yellow-600 dark:to-yellow-700 rounded-2xl shadow-lg p-6 max-w-xs border-2 border-yellow-300 dark:border-yellow-500 transform hover:scale-105 transition-all duration-300">
+              {/* Emoji en haut */}
+              <div className="text-4xl mb-3 text-center animate-pulse">
+                🎁
+              </div>
+              
+              {/* Texte */}
+              <div className="text-center space-y-2">
+                <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
+                  Offre spéciale bulletins
+                </h3>
+                <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">
+                  <strong>30 000 tokens</strong> offerts pour tester ProfAssist !
+                </p>
+                <p className="text-xs text-gray-700 dark:text-gray-300">
+                  (Jusqu'au 10 décembre 2025)
+                </p>
+              </div>
+
+              {/* Bouton CTA */}
+              <a
+                href="/register"
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+              >
+                <Gift className="w-4 h-4" />
+                Profitez-en maintenant
+              </a>
+            </div>
+
+            {/* Effet de collage (petit triangle en haut pour simuler un post-it) */}
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-8 h-3 bg-yellow-300 dark:bg-yellow-600 rounded-t-sm opacity-60"></div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0">
@@ -395,6 +447,21 @@ export function LandingPage() {
           </p>
         </div>
       </div>
+
+      {/* ✅ AJOUT : Animation CSS pour le post-it */}
+      <style>{`
+        @keyframes bounce-slow {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 3s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

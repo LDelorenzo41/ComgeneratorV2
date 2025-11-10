@@ -31,6 +31,9 @@ import { SettingsPage } from './pages/SettingsPage';
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
 
+// ✅ AJOUT : Import de la modale cadeau
+import { SpecialOfferModal } from './components/SpecialOfferModal';
+
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
 
@@ -196,6 +199,9 @@ function App() {
         </div>
         
         <CookieBanner />
+        
+        {/* ✅ AJOUT : Modale cadeau spécial - s'affiche uniquement si user connecté */}
+        {user && <SpecialOfferModal />}
       </BrowserRouter>
     </CookieConsentProvider>
   );
