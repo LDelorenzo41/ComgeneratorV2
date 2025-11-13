@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+  <!-- Page d'accueil / Landing -->
+  <url>
+    <loc>https://profassist.net/landing</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Page de connexion -->
+  <url>
+    <loc>https://profassist.net/login</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Page d'inscription -->
+  <url>
+    <loc>https://profassist.net/register</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Page de réinitialisation de mot de passe -->
+  <url>
+    <loc>https://profassist.net/reset-password</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Pages légales -->
+  <url>
+    <loc>https://profassist.net/legal/mentions-legales</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://profassist.net/legal/politique-confidentialite</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://profassist.net/legal/cgu</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://profassist.net/legal/cgv</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://profassist.net/legal/cookies</loc>
+    <lastmod>2025-08-24</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+</urlset>
