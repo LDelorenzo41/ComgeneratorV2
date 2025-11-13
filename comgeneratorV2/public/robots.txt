@@ -1,0 +1,36 @@
+# robots.txt - ProfAssist
+# Génère automatiquement les règles pour les moteurs de recherche
+
+User-agent: *
+
+# Pages publiques indexables
+Allow: /landing
+Allow: /login
+Allow: /register
+Allow: /reset-password
+Allow: /legal/mentions-legales
+Allow: /legal/politique-confidentialite
+Allow: /legal/cgu
+Allow: /legal/cgv
+Allow: /legal/cookies
+
+# Routes protégées (authentification requise) - NON indexables
+Disallow: /dashboard
+Disallow: /synthese
+Disallow: /communication
+Disallow: /generate-lesson
+Disallow: /buy-tokens
+Disallow: /appreciation-bank
+Disallow: /lessons-bank
+Disallow: /resources
+Disallow: /settings
+Disallow: /auth/
+
+# Assets et fichiers techniques
+Allow: /profassist.png
+Allow: /manifest.json
+Allow: /*.css$
+Allow: /*.js$
+
+# Sitemap
+Sitemap: https://profassist.net/sitemap.xml
