@@ -8,7 +8,42 @@
   # Verrouille la version de Node.js pour des builds reproductibles
   NODE_VERSION = "20" 
 
-# Redirections pour la SPA - Source unique de vérité
+# ⚠️ IMPORTANT : L'ordre des redirections compte !
+# Les exceptions doivent être AVANT la règle globale SPA
+
+# Exception : Ne pas rediriger les fichiers statiques SEO
+[[redirects]]
+  from = "/robots.txt"
+  to = "/robots.txt"
+  status = 200
+
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/sitemap.xml"
+  status = 200
+
+[[redirects]]
+  from = "/manifest.json"
+  to = "/manifest.json"
+  status = 200
+
+[[redirects]]
+  from = "/og-image.png"
+  to = "/og-image.png"
+  status = 200
+
+[[redirects]]
+  from = "/profassist.png"
+  to = "/profassist.png"
+  status = 200
+
+# Exception : Ne pas rediriger les assets
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+# Règle globale SPA - DOIT être en DERNIER
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -27,3 +62,27 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  # Cache pour les images PNG (24h)
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  # Cache pour les fichiers XML (1h)
+  for = "/*.xml"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  # Cache pour les fichiers TXT (1h)
+  for = "/*.txt"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  # Cache pour manifest.json (1h)
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
