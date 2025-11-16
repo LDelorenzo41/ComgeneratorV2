@@ -6,15 +6,52 @@
 
 [build.environment]
   # Verrouille la version de Node.js pour des builds reproductibles
-  NODE_VERSION = "20" 
+  NODE_VERSION = "20"
 
-# Redirections pour la SPA - Source unique de vérité
+# ⚠️ IMPORTANT : L'ordre des redirections compte !
+# Les exceptions doivent être AVANT la règle globale SPA
+
+# Exception : Ne pas rediriger les fichiers statiques SEO
+[[redirects]]
+  from = "/robots.txt"
+  to = "/robots.txt"
+  status = 200
+
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/sitemap.xml"
+  status = 200
+
+[[redirects]]
+  from = "/manifest.json"
+  to = "/manifest.json"
+  status = 200
+
+[[redirects]]
+  from = "/og-image.png"
+  to = "/og-image.png"
+  status = 200
+
+[[redirects]]
+  from = "/profassist.png"
+  to = "/profassist.png"
+  status = 200
+
+# Exception : Ne pas rediriger les assets buildés
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+# Règle globale SPA - DOIT être en DERNIER
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# En-têtes de sécurité et de performance
+# ============================================
+# EN-TÊTES DE SÉCURITÉ (appliqués globalement)
+# ============================================
 [[headers]]
   for = "/*"
   [headers.values]
@@ -22,8 +59,57 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
+# ============================================
+# OPTIMISATION CACHE - ASSETS BUILDÉS
+# ============================================
 [[headers]]
-  # Met en cache les assets de manière agressive
+  # Cache agressif pour les assets avec hash (immutables)
   for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ============================================
+# OPTIMISATION CACHE - IMAGES STATIQUES
+# ============================================
+[[headers]]
+  # Cache 30 jours pour PNG (og-image.png, profassist.png)
+  # Augmenté de 24h → 30j pour économiser la bande passante
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, immutable"
+
+# ============================================
+# OPTIMISATION CACHE - FICHIERS SEO
+# ============================================
+[[headers]]
+  # Cache 1 heure pour sitemap.xml
+  for = "/*.xml"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  # Cache 1 heure pour robots.txt
+  for = "/*.txt"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  # Cache 1 heure pour manifest.json
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+# ============================================
+# OPTIMISATION COMPRESSION - JS/CSS
+# ============================================
+[[headers]]
+  # Compression Brotli automatique pour JavaScript
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  # Compression Brotli automatique pour CSS
+  for = "/*.css"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"

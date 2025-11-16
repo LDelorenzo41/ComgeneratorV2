@@ -32,12 +32,14 @@ export interface ReplyParams {
   signature?: string | null;
 }
 
+// ⭐ MODIFICATION : Ajout de documentContext optionnel
 export interface LessonParams {
   subject: string;
   topic: string;
   level: string;
-  pedagogy_type: string;  // ← Correspond à l'Edge Function
-  duration: string;       // ← En string, pas number
+  pedagogy_type: string;
+  duration: string;
+  documentContext?: string;  // ⭐ NOUVEAU - Texte extrait du PDF de référence
 }
 
 // ✅ INTERFACE MISE À JOUR pour SynthesisParams

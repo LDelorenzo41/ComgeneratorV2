@@ -401,11 +401,15 @@ export function LandingPage() {
           
           <div className="rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 p-2">
             <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden">
-              <img 
-                src="https://res.cloudinary.com/dhva6v5n8/image/upload/landingProfAssist_ukidup.png"
-                alt="Interface ProfAssist - Dashboard complet"
-                className="w-full h-auto"
-              />
+              <img
+  src="https://res.cloudinary.com/dhva6v5n8/image/upload/f_auto,q_auto,dpr_auto,w_1200/landing_mhnrfm.webp"
+  alt="Interface ProfAssist - Dashboard complet"
+  className="w-full h-auto"
+  loading="lazy"
+  decoding="async"
+/>
+
+
             </div>
           </div>
         </div>

@@ -206,7 +206,7 @@ export function PolitiqueConfidentialitePage() {
                 Hébergement sécurisé de la base de données (serveurs en Europe).
               </p>
               <p className="text-gray-600 text-sm">
-                <strong>Conformité :</strong> Certifié RGPD et SOC 2.
+                <strong>Conformité :</strong> Certifié RGPD.
               </p>
             </div>
           </div>

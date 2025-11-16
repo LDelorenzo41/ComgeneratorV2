@@ -2,12 +2,14 @@
 
 // @ts-ignore - Deno global disponible en runtime
 
+// ⭐ MODIFICATION : Ajout de documentContext optionnel
 interface LessonRequest {
   subject: string;
   topic: string;
   level: string;
   pedagogy_type: string;
   duration: string;
+  documentContext?: string;  // ⭐ NOUVEAU - Texte extrait du PDF
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -90,7 +92,7 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
 
-    // Reproduction exacte de votre prompt complet
+    // ⭐ MODIFICATION : Prompt enrichi avec contexte documentaire
     const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
 
 **CONTEXTE DE LA SÉANCE :**
@@ -99,6 +101,27 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 - Niveau : ${data.level}
 - Durée : ${data.duration} minutes
 - Approche pédagogique : ${pedagogyDescription}
+
+${data.documentContext ? `
+**📎 DOCUMENT DE RÉFÉRENCE FOURNI PAR L'ENSEIGNANT :**
+
+L'enseignant a fourni un document de contexte (bulletin officiel, programme, manuel, exercices...) pour guider la conception de cette séance.
+Voici le contenu extrait de ce document :
+
+---
+${data.documentContext}
+---
+
+**Consigne importante :** Utilise les informations de ce document pour :
+- Aligner la séance avec les programmes officiels mentionnés
+- Intégrer les compétences et objectifs spécifiques indiqués
+- Respecter le niveau de difficulté et les prérequis décrits
+- T'inspirer des exemples d'exercices ou d'activités fournis
+- Adapter le vocabulaire et les concepts au cadre pédagogique précisé
+
+Intègre ces éléments de manière naturelle dans la séance tout en respectant la structure demandée ci-dessous.
+
+` : ''}
 
 ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 
 `**🏃 SPÉCIFICITÉS EPS - INSTRUCTIONS PRIORITAIRES :**
