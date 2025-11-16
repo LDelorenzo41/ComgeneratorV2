@@ -25,11 +25,10 @@
   ],
   "categories": ["education", "productivity", "utilities"],
   "screenshots": [
-    {
-      "src": "https://res.cloudinary.com/dhva6v5n8/image/upload/landingProfAssist_ukidup.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "label": "Interface ProfAssist - Dashboard complet"
-    }
-  ]
-}
+  {
+    "src": "https://res.cloudinary.com/dhva6v5n8/image/upload/f_auto,q_auto,dpr_auto,w_1200/landing_mhnrfm.webp",
+    "sizes": "1920x1080",
+    "type": "image/webp",
+    "label": "Interface ProfAssist – Dashboard complet"
+  }
+]

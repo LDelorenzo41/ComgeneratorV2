@@ -82,7 +82,7 @@ const generateHandler = async (req: Request): Promise<Response> => {
     const prompt = `Tu es un enseignant expérimenté, expert en évaluation pédagogique et en rédaction d'appréciations de bulletins scolaires. Tu maîtrises parfaitement les enjeux de l'évaluation formative et les codes de communication avec les élèves et leurs familles.
 
 **⚠️ CONTRAINTE CRITIQUE #1 - MODE D'ADRESSE (PRIORITÉ ABSOLUE) :**
-${getAddressModeInstructions(params.addressMode)}
+${getAddressModeInstructions(params.addressMode, params.studentName)}
 
 **⚠️ CONTRAINTES CRITIQUES DE LONGUEUR (IMPÉRATIF ABSOLU) :**
 - Version détaillée : EXACTEMENT entre ${params.minLength} et ${params.maxLength} caractères (espaces compris)
@@ -408,7 +408,7 @@ function getToneInstructionsForAppreciation(tone: 'bienveillant' | 'normal' | 's
   }
 }
 
-function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel'): string {
+function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel', studentName: string): string {
   switch (addressMode) {
     case "tutoiement":
       return `Tu DOIS ABSOLUMENT utiliser le TUTOIEMENT dans TOUTE l'appréciation :
@@ -427,7 +427,7 @@ function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 
     case "impersonnel":
       return `Tu DOIS ABSOLUMENT utiliser une FORMULATION IMPERSONNELLE dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "l'élève", "il", "elle", "son", "sa", "ses", le prénom de l'élève
-- Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts", "${params.studentName} démontre"
+- Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts", "${studentName} démontre"
 - INTERDIT : "tu", "te", "ton", "ta", "tes", "vous", "votre", "vos"
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
 

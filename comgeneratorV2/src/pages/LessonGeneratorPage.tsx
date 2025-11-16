@@ -1,9 +1,13 @@
 // src/pages/LessonGeneratorPage.tsx - VERSION MIGRÉE VERS EDGE FUNCTION
 
 import React from 'react';
-// AJOUTEZ CES DEUX LIGNES EN HAUT DU FICHIER
+// ⭐ NOUVEAUX IMPORTS POUR PDF
+import * as pdfjsLib from 'pdfjs-dist';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import { createWorker } from 'tesseract.js';
+// FIN NOUVEAUX IMPORTS
 import { ResizableBox } from 'react-resizable';
-import 'react-resizable/css/styles.css'; 
+import 'react-resizable/css/styles.css';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -35,8 +39,13 @@ import {
   AlertCircle,
   CreditCard,
   Lock,
-  ShoppingCart
+  ShoppingCart,
+  Upload,  // ⭐ NOUVEAU
+  FileText  // ⭐ NOUVEAU
 } from 'lucide-react';
+
+// ⭐ CONFIGURATION PDFJS
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const pedagogies = [
   {
@@ -530,6 +539,12 @@ export function LessonGeneratorPage() {
   const [selectedDuration, setSelectedDuration] = React.useState<string>('60');
   const [lastFormData, setLastFormData] = React.useState<LessonFormData | null>(null);
 
+  // ⭐ NOUVEAUX ÉTATS POUR PDF
+  const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  const [extractedText, setExtractedText] = React.useState<string>('');
+  const [isExtracting, setIsExtracting] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
   // États pour vérifier l'accès banque
   const [hasBankAccess, setHasBankAccess] = React.useState<boolean | null>(null);
 
@@ -574,7 +589,66 @@ export function LessonGeneratorPage() {
     }
   });
 
-  // ✅ FONCTION MODIFIÉE - Utilisation de secureApi au lieu d'OpenAI direct
+  // ⭐ NOUVELLE FONCTION : Extraction de texte du PDF
+  const extractTextFromPDF = async (pdf: pdfjsLib.PDFDocumentProxy): Promise<string> => {
+    try {
+      setIsExtracting(true);
+      let fullText = '';
+      
+      // Extraire le texte de toutes les pages
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n\n';
+      }
+      
+      // Nettoyer et limiter le texte
+      const cleanedText = fullText
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 4000); // Limiter à 4000 caractères
+      
+      setExtractedText(cleanedText);
+      return cleanedText;
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction du texte:', error);
+      return '';
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  // ⭐ NOUVELLE FONCTION : Gestion de l'upload PDF
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      setPdfDoc(pdf);
+      
+      // Extraction automatique du texte
+      await extractTextFromPDF(pdf);
+    } catch (error) {
+      console.error('Erreur lors du chargement du PDF:', error);
+      alert('Erreur lors du chargement du PDF. Veuillez réessayer.');
+    }
+  };
+
+  // ⭐ NOUVELLE FONCTION : Réinitialiser le PDF
+  const resetPDF = () => {
+    setPdfDoc(null);
+    setExtractedText('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // ✅ FONCTION MODIFIÉE - Utilisation de secureApi avec documentContext
   const onSubmit = async (data: LessonFormData) => {
     if (!user) return;
 
@@ -588,13 +662,14 @@ export function LessonGeneratorPage() {
     setGeneratedContent('');
 
     try {
-      // ✅ REMPLACEMENT - Appel à secureApi au lieu d'OpenAI direct
+      // ✅ REMPLACEMENT - Appel à secureApi avec documentContext optionnel
       const result = await secureApi.generateLesson({
         subject: data.subject,
         topic: data.topic,
         level: data.level,
         pedagogy_type: data.pedagogy_type,
-        duration: data.duration
+        duration: data.duration,
+        documentContext: extractedText || undefined  // ⭐ AJOUT DU CONTEXTE PDF
       });
 
       const content = result.content;
@@ -805,6 +880,22 @@ export function LessonGeneratorPage() {
               {tokenCount === 0 ? 'Rechargez vos crédits pour générer des séances pédagogiques' : 'Configurez les détails de votre séance pédagogique'}
             </p>
           </div>
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800 space-y-2 mb-8">
+  <div className="flex items-start">
+      <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mr-3 mt-0.5 flex-shrink-0" />
+      <div>
+          <h4 className="font-semibold text-amber-800 dark:text-amber-200">Conseils pour une génération optimale :</h4>
+          <ul className="list-disc pl-5 mt-1 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+              <li>
+                  <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
+              </li>
+              <li>
+                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore grandement la qualité de la séance. Attention, son analyse peut consommer <strong>jusqu'à 4000 tokens supplémentaires</strong>.
+              </li>
+          </ul>
+      </div>
+  </div>
+</div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid md:grid-cols-2 gap-6">
@@ -899,6 +990,78 @@ export function LessonGeneratorPage() {
                 </div>
               )}
             </div>
+
+            {/* ⭐ NOUVELLE SECTION : Document de référence (optionnel) */}
+            <div className="space-y-4 border-t-2 border-gray-200 dark:border-gray-600 pt-6">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  <FileText className="w-4 h-4 inline mr-2" />
+                  📎 Document de référence (optionnel)
+                </label>
+                {pdfDoc && (
+                  <button
+                    onClick={resetPDF}
+                    className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                  >
+                    Supprimer le document
+                  </button>
+                )}
+              </div>
+
+              {!pdfDoc ? (
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-xl p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                  <div className="text-center">
+                    <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Uploadez un PDF de référence (bulletin officiel, programme, manuel, exemples d'exercices...)
+                      pour optimiser la génération de séance
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handlePDFUpload}
+                      disabled={tokenCount === 0}
+                      className="hidden"
+                      id="pdf-upload"
+                    />
+                    <label
+                      htmlFor="pdf-upload"
+                      className={`inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all duration-200 ${
+                        tokenCount === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Sélectionner un PDF
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6 border-2 border-green-200 dark:border-green-800">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">
+                        Document chargé ({pdfDoc.numPages} page{pdfDoc.numPages > 1 ? 's' : ''})
+                      </h4>
+                      {isExtracting ? (
+                        <div className="flex items-center text-sm text-green-700 dark:text-green-300">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-600 border-t-transparent mr-2"></div>
+                          Extraction du texte en cours...
+                        </div>
+                      ) : (
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                          ✓ Texte extrait ({extractedText.length} caractères) - Ce contenu sera utilisé pour enrichir la génération
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* FIN NOUVELLE SECTION */}
 
             {error && (
               <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
