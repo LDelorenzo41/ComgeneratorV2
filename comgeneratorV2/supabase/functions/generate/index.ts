@@ -160,10 +160,81 @@ ${params.personalNotes || "Aucune observation particulière"}
    - "Acquis" pour des aspects comportementaux
    - Vocabulaire technique pour des savoir-être
 
-6. **Adaptation tonale selon le profil :**
+6. **⚠️ RÈGLE CRITIQUE : Distinction entre critères ACTIONNABLES et critères de RÉSULTATS :**
+
+   **CRITÈRES ACTIONNABLES** (peuvent être travaillés directement par l'élève) :
+   - **Exemples** : attitude, écoute, application des consignes, participation, organisation, soin, autonomie, comportement, attention, rigueur, méthode de travail
+   - **Comment les traiter** : Ces critères PEUVENT être mentionnés comme axes d'amélioration directs
+   - **Formulations correctes** :
+     - ✅ "L'attitude doit être améliorée"
+     - ✅ "Il conviendrait de renforcer l'écoute en classe"
+     - ✅ "L'application des consignes nécessite plus d'attention"
+     - ✅ "Ton organisation doit être travaillée"
+   
+   **CRITÈRES DE RÉSULTATS** (conséquences du travail, ne peuvent PAS être travaillés directement) :
+   - **Exemples** : résultats, notes, performances, réussite aux évaluations, résultats aux contrôles, moyenne
+   - **ERREUR ABSOLUE À ÉVITER** : ❌ "Tu dois travailler tes résultats" / "Les résultats doivent être améliorés" / "Il faut travailler les notes"
+   - **Comment les traiter** : Présenter comme des CONSTATS et mentionner les CAUSES à travailler pour les améliorer
+   - **Formulations OBLIGATOIRES** :
+     - ✅ "Les résultats reflètent des difficultés de compréhension qui nécessitent un approfondissement des notions"
+     - ✅ "Les performances aux évaluations traduisent un besoin de renforcer la maîtrise des fondamentaux"
+     - ✅ "Pour améliorer les résultats, il conviendrait de travailler la méthodologie et d'approfondir les révisions"
+     - ✅ "Les notes témoignent d'un manque d'assimilation des concepts, un travail régulier permettrait de progresser"
+     - ✅ "Les résultats peuvent être améliorés par un investissement accru dans l'apprentissage des leçons"
+
+   **RÈGLE D'OR** : Les résultats sont une CONSÉQUENCE, jamais un objectif direct. On travaille les CAUSES (compréhension, révisions, méthode, apprentissage), pas les résultats eux-mêmes.
+   **⚠️ RÈGLE SUPPLÉMENTAIRE – Analyse causale STRICTEMENT basée sur les critères fournis (OPTION A – Synonymes autorisés mais stricts)**
+
+Tu dois impérativement réaliser une analyse causale fondée UNIQUEMENT sur les critères réellement évalués.
+
+1. **Identification obligatoire des catégories :**
+   - Critères de **RÉSULTATS** (ex : résultats, performances, réussite aux évaluations)
+   - Critères **ACTIONNABLES** (ex : attitude, participation, écoute, application des consignes, organisation, autonomie…)
+
+2. **Lien causal OBLIGATOIRE :**
+   Tu dois relier :
+   - les critères de résultats faibles
+   - aux critères actionnables faibles ou moyens
+   mais UNIQUEMENT si ces critères figurent dans la liste fournie.
+
+   - Exemple correct :
+     « Les résultats insuffisants s'expliquent en partie par une application des consignes encore moyenne. »
+
+   - Exemple INTERDIT :
+     « Les résultats montrent un manque de révisions. »
+       (→ “révisions” n'est PAS un critère évalué)
+
+3. **Synonymes autorisés (OPTION A) :**
+   Tu peux reformuler un critère avec un synonyme, mais uniquement si :
+   - le sens reste EXACTEMENT identique,
+   - aucun nouveau concept n'est introduit,
+   - la reformulation ne sort pas du champ sémantique du critère.
+
+   EXEMPLES AUTORISÉS :
+   - « application des consignes » → « respect des consignes »
+   - « participation » → « implication en classe »
+   - « attitude » → « comportement général »
+
+   EXEMPLES INTERDITS :
+   - « compréhension », « révisions », « apprentissage des notions », 
+   - « méthode de travail », « fondamentaux », « concepts »
+
+   (Tu ne peux PAS utiliser ces termes sauf si un critère strictement identique existe.)
+
+4. **Si aucun critère actionnable n’explique les résultats :**
+   Tu dois écrire :
+   « Les résultats sont en retrait, sans qu’un critère particulier ne permette d’en expliquer clairement l’origine. »
+   Puis donner des conseils généraux et non causaux, SANS invention.
+
+5. **Gestion impérative des priorités :**
+   - Critères **Crucial** → prioritaires, à traiter en premier.
+   - Critères **Important** → développés dans la version détaillée.
+   - Critères **Normal** → mentionnés seulement si utile.
+
+7. **Adaptation tonale selon le profil :**
 ${getToneInstructionsForAppreciation(params.tone)}
 
-7. **Cohérence évaluative :**
+8. **Cohérence évaluative :**
    - L'appréciation doit être **parfaitement cohérente** avec les niveaux attribués
    - Les critères d'importance "Crucial" doivent être **prioritaires** dans l'analyse
    - Les critères "Important" sont **développés** dans la version détaillée
@@ -171,18 +242,21 @@ ${getToneInstructionsForAppreciation(params.tone)}
 
 **PROCESSUS DE VÉRIFICATION OBLIGATOIRE :**
 1. VÉRIFIE d'abord que tu respectes le mode d'adresse : ${addressModeDescriptions[params.addressMode]}
-2. Rédige tes deux versions selon les instructions ci-dessus
-3. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
-4. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
-5. Si une version dépasse les limites : RACCOURCIS immédiatement
-6. Si une version est trop courte : DÉVELOPPE avec plus de détails
-7. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
-8. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
+2. IDENTIFIE les critères de RÉSULTATS et assure-toi de les traiter comme des CONSTATS avec mention des CAUSES à travailler
+3. Rédige tes deux versions selon les instructions ci-dessus
+4. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
+5. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
+6. Si une version dépasse les limites : RACCOURCIS immédiatement
+7. Si une version est trop courte : DÉVELOPPE avec plus de détails
+8. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
+9. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
+10. VÉRIFIE que tu n'as JAMAIS suggéré de "travailler les résultats/notes/performances" directement
 
 **CONSIGNES DE FINALISATION :**
 - **Respect ABSOLU** du mode d'adresse ${addressModeDescriptions[params.addressMode]}
 - **Respect ABSOLU** des limites de caractères imposées
 - **Vocabulaire adapté** au type de compétence (disciplinaire/comportementale/méthodologique)
+- **Traitement correct** des critères de résultats (constats + causes, jamais comme axes d'action directs)
 - **Exclusion totale** des critères "Non évalué" (déjà filtrés)
 - **Lisibilité** pour élèves, parents et équipe pédagogique
 - **Professionnalisme** dans le style et la présentation
@@ -195,7 +269,7 @@ Version détaillée :
 Version synthétique :
 [Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
 
-⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES et le vocabulaire doit être adapté au type de compétence évaluée.`;
+⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, et les critères de RÉSULTATS doivent TOUJOURS être présentés comme des CONSTATS avec mention des CAUSES à travailler (jamais "travailler les résultats").`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -215,7 +289,9 @@ ${getSystemAddressModeMessage(params.addressMode)}
 
 RÈGLE #2 : Tu dois ABSOLUMENT ignorer tous les critères marqués comme "Non évalué" et ne jamais les mentionner dans l'appréciation.
 
-RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).`
+RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).
+
+RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES, pas des actions. JAMAIS dire "travailler les résultats" mais toujours mentionner les CAUSES à améliorer (compréhension, révisions, méthode, etc.).`
           },
           {
             role: 'user',

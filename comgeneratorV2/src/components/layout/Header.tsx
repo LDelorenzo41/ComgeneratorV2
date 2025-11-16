@@ -40,7 +40,7 @@ export function Header() {
       console.log('💰 Payment completed, refreshing tokens...');
       setTimeout(() => {
         window.location.reload();
-      }, 1500);
+      }, 3000);
     };
 
     window.addEventListener('tokensUpdated', handlePaymentUpdate);
