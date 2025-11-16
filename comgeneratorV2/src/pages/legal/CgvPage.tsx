@@ -82,7 +82,7 @@ export function CgvPage() {
                       <span className="text-green-600 font-bold">A</span>
                     </div>
                     <p className="text-sm text-gray-700">Appréciation</p>
-                    <p className="text-lg font-semibold text-gray-900">~1500</p>
+                    <p className="text-lg font-semibold text-gray-900">~3000</p>
                   </div>
                   <div className="text-center">
                     <div className="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
@@ -122,9 +122,9 @@ export function CgvPage() {
                 
                 <div className="space-y-4">
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-2xl font-bold text-gray-900 mb-1">200 000 tokens</p>
+                    <p className="text-2xl font-bold text-gray-900 mb-1">300 000 tokens</p>
                     <p className="text-lg font-semibold text-green-600">3,50 €</p>
-                    <p className="text-sm text-gray-600 mt-2">Soit ~0,0175 € / 1000 tokens</p>
+                    <p className="text-sm text-gray-600 mt-2">Soit ~0,0117 € / 1000 tokens</p>
                   </div>
                   
                   <div className="bg-amber-50 rounded-lg p-4">
@@ -154,9 +154,9 @@ export function CgvPage() {
                 
                 <div className="space-y-4">
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-2xl font-bold text-gray-900 mb-1">400 000 tokens</p>
+                    <p className="text-2xl font-bold text-gray-900 mb-1">600 000 tokens</p>
                     <p className="text-lg font-semibold text-green-600">6,00 €</p>
-                    <p className="text-sm text-gray-600 mt-2">Soit ~0,015 € / 1000 tokens</p>
+                    <p className="text-sm text-gray-600 mt-2">Soit ~0,01 € / 1000 tokens</p>
                   </div>
                   
                   <div className="bg-amber-50 rounded-lg p-4">

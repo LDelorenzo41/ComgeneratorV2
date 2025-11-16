@@ -40,22 +40,22 @@ export function BuyTokensPage() {
       name: 'Professeur',
       icon: Star,
       color: 'blue',
-      tokens: '200 000',
+      tokens: '300 000',
       basePrice: 3.50,
       description: 'Parfait pour un usage régulier',
       examples: {
         withBank: [
-          '🎯 133 appréciations détaillées',
-          '💬 100 communications + 67 appréciations',
-          '📄 56 synthèses + 33 appréciations',
-          '📚 29 séances + 32 appréciations',
+          '🎯 100 appréciations détaillées',
+          '💬 150 communications + 50 appréciations',
+          '📄 80 synthèses + 52 appréciations',
+          '📚 45 séances + 47 appréciations',
           '🔄 Mix équilibré selon vos besoins'
         ],
         withoutBank: [
-          '🎯 133 appréciations détaillées',
-          '💬 100 communications + 67 appréciations', 
-          '📄 56 synthèses + 33 appréciations',
-          '📚 29 séances + 32 appréciations',
+          '🎯 100 appréciations détaillées',
+          '💬 150 communications + 50 appréciations', 
+          '📄 80 synthèses + 52 appréciations',
+          '📚 45 séances + 47 appréciations',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -66,22 +66,22 @@ export function BuyTokensPage() {
       name: 'Professeur Principal',
       icon: Crown,
       color: 'purple',
-      tokens: '400 000',
+      tokens: '600 000',
       basePrice: 6.00,
       description: 'Usage intensif avec plus de flexibilité',
       examples: {
         withBank: [
-          '🎯 267 appréciations détaillées',
-          '💬 200 communications + 134 appréciations',
-          '📄 111 synthèses + 67 appréciations',
-          '📚 57 séances + 67 appréciations',
+          '🎯 200 appréciations détaillées',
+          '💬 300 communications + 100 appréciations',
+          '📄 150 synthèses + 110 appréciations',
+          '📚 85 séances + 100 appréciations',
           '🔥 Usage intensif toute l\'année'
         ],
         withoutBank: [
-          '🎯 267 appréciations détaillées',
-          '💬 200 communications + 134 appréciations',
-          '📄 111 synthèses + 67 appréciations', 
-          '📚 57 séances + 67 appréciations',
+          '🎯 200 appréciations détaillées',
+          '💬 300 communications + 100 appréciations',
+          '📄 150 synthèses + 110 appréciations', 
+          '📚 85 séances + 100 appréciations',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -218,7 +218,7 @@ export function BuyTokensPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
               <div className="flex items-center">
                 <PenTool className="w-4 h-4 text-green-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Appréciation: 1500 tokens</span>
+                <span className="text-gray-600 dark:text-gray-400">Appréciation: 3000 tokens</span>
               </div>
               <div className="flex items-center">
                 <FileText className="w-4 h-4 text-blue-600 mr-2" />

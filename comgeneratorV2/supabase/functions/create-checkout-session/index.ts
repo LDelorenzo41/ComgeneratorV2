@@ -75,23 +75,23 @@ serve(async (req)=>{
     const productMapping = new Map();
     // Ajout forcé des Price IDs exacts
     productMapping.set('price_1RvCvoJ3he5yh4f3AfRNYZko', {
-      tokens: 200000,
+      tokens: 300000,
       bankAccess: false,
       productType: 'professor_200k'
     });
     productMapping.set('price_1RvD4rJ3he5yh4f35QfXb1gP', {
-      tokens: 200000,
+      tokens: 300000,
       bankAccess: true,
       productType: 'professor_200k_bank'
     });
     productMapping.set('price_1RvD6mJ3he5yh4f35Y6HuHZl', {
-      tokens: 400000,
+      tokens: 600000,
       bankAccess: false,
       productType: 'principal_400k'
     });
     // ✅ NOUVEAU PRICE ID AJOUTÉ
     productMapping.set('price_1RvZD0J3he5yh4f3dP4OwHIe', {
-      tokens: 400000,
+      tokens: 600000,
       bankAccess: true,
       productType: 'principal_400k_bank'
     });

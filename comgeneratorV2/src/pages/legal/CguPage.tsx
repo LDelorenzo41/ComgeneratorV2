@@ -161,7 +161,7 @@ export function CguPage() {
                 <div className="bg-white rounded-lg p-4">
                   <h4 className="font-semibold text-gray-900 mb-2">💰 Consommation moyenne</h4>
                   <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Appréciation : ~1500 tokens</li>
+                    <li>• Appréciation : ~3000 tokens</li>
                     <li>• Synthèse : ~1800 tokens</li>
                     <li>• Communication : ~1000 tokens</li>
                     <li>• Séance : ~3500 tokens</li>

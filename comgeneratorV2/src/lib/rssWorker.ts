@@ -133,7 +133,7 @@ async function fetchRSSFeed(feed) {
           cacheEverything: true,
         },
       },
-      15000 // 15 secondes timeout
+      30000 // 15 secondes timeout
     );
 
     const text = await response.text();

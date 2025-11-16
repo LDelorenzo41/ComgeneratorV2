@@ -142,7 +142,7 @@ profiles (1) --> (N) lessons_bank
 ## 💰 **Système de tokens**
 
 ### Consommation moyenne
-- **Appréciation** : ~1500 tokens
+- **Appréciation** : ~3000 tokens
 - **Synthèse de bulletin** : ~1800 tokens  
 - **Communication** : ~1000 tokens
 - **Séance pédagogique** : ~3500 tokens
