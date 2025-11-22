@@ -40,8 +40,9 @@ import {
   CreditCard,
   Lock,
   ShoppingCart,
-  Upload,  // ⭐ NOUVEAU
-  FileText  // ⭐ NOUVEAU
+  Upload,
+  FileText,
+  Video
 } from 'lucide-react';
 
 // ⭐ CONFIGURATION PDFJS
@@ -810,9 +811,19 @@ export function LessonGeneratorPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Générateur de séance
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
+          
+          <a 
+            href="https://youtube.com/shorts/j3N7ZSTlXjc" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-6"
+          >
+            <Video className="w-4 h-4" />
+            <span className="underline hover:no-underline">Voir un court tuto vidéo</span>
+          </a>
 
           <p className="text-sm italic text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
             La séance générée est une aide proposée par l'IA : elle peut contenir des approximations. Elle ne remplace pas votre expertise professionnelle, mais constitue une orientation à adapter avec votre jugement.
