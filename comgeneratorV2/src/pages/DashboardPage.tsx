@@ -3,7 +3,7 @@ import { SubjectList } from '../components/dashboard/SubjectList';
 import { AppreciationForm } from '../components/dashboard/AppreciationForm';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance'; // MODIFICATION : Remplacement de la logique locale
-import { AlertCircle, Sparkles, User, Target, PenTool, Settings, CreditCard, AlertTriangle } from 'lucide-react'; // AJOUT : AlertTriangle
+import { AlertCircle, Sparkles, User, Target, PenTool, Settings, CreditCard, AlertTriangle, Video } from 'lucide-react'; // AJOUT : AlertTriangle
 import { Link } from 'react-router-dom';
 import { AIDisclaimer } from '../components/ui/AIDisclaimer'; // AJOUT : Import du disclaimer
 
@@ -43,9 +43,19 @@ export function DashboardPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Bonjour {user?.email ? getDisplayName(user.email) : 'Utilisateur'} !
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
             Bienvenue dans votre espace de génération d'appréciations personnalisées
           </p>
+          
+          <a 
+            href="https://youtube.com/shorts/z-JrL_0KUiI" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-6"
+          >
+            <Video className="w-4 h-4" />
+            <span className="underline hover:no-underline">Voir un court tuto vidéo</span>
+          </a>
           
           {/* Compteur de tokens stylisé avec alerte si 0 tokens */}
           {tokenCount !== null && (

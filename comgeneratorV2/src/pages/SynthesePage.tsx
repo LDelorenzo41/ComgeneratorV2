@@ -28,7 +28,8 @@ import {
   Printer,
   AlertCircle,
   ExternalLink,
-  Settings
+  Settings,
+  Video
 } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -263,9 +264,24 @@ export function SynthesePage() {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Synthèse de bulletin
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
             Analysez vos bulletins PDF avec l'IA pour générer des synthèses personnalisées et pertinentes
           </p>
+         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
+            Analysez vos bulletins PDF avec l'IA pour générer des synthèses personnalisées et pertinentes
+          </p>
+          
+          <div className="mb-6">
+            <a 
+              href="https://youtube.com/shorts/2zcbtC02w9Y" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+            >
+              <Video className="w-4 h-4" />
+              <span className="underline hover:no-underline">Voir un court tuto vidéo</span>
+            </a>
+          </div>
           
           {tokenCount !== null && (
             <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
