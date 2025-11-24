@@ -926,19 +926,25 @@ export function LessonGeneratorPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  <BookOpen className="w-4 h-4 inline mr-2" />
-                  Thème
-                </label>
-                <Input
-                  id="topic"
-                  {...register('topic')}
-                  disabled={tokenCount === 0}
-                  error={errors.topic?.message}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Ex: Les fractions, La Renaissance, L'écosystème..."
-                />
-              </div>
+  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+    <BookOpen className="w-4 h-4 inline mr-2" />
+    Thème
+  </label>
+  <textarea
+    id="topic"
+    {...register('topic')}
+    disabled={tokenCount === 0}
+    rows={3}
+    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+    placeholder="Ex: La description d'un lieu dans un récit  👉 Objectifs :  Comprendre l'importance de la description pour créer une atmosphère.  Identifier les procédés d'écriture (adjectifs qualificatifs, expansions du nom, verbes de perception, champs lexicaux).  S'exercer à écrire une description en suivant un plan."
+  />
+  {errors.topic && (
+    <p className="text-sm text-red-600 mt-1 flex items-center">
+      <span className="mr-1">⚠️</span>
+      {errors.topic.message}
+    </p>
+  )}
+</div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">

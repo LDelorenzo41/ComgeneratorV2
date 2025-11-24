@@ -433,7 +433,7 @@ export function CommunicationPage() {
                   value={contenu}
                   onChange={(e) => setContenu(e.target.value)}
                   placeholder="Décrivez les éléments à faire apparaître dans votre communication..."
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 />
               </div>
 
@@ -593,7 +593,8 @@ export function CommunicationPage() {
                   placeholder="Collez ici le message reçu auquel vous souhaitez répondre..."
                   value={messageRecu}
                   onChange={(e) => setMessageRecu(e.target.value)}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 resize-none"
+                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+
                 />
               </div>
 
@@ -626,7 +627,7 @@ export function CommunicationPage() {
                     placeholder="Quels éléments doit contenir la réponse ?"
                     value={objectifsReponse}
                     onChange={(e) => setObjectifsReponse(e.target.value)}
-                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200 resize-none"
+                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   />
                 </div>
               </div>
