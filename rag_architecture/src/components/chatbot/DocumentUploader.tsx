@@ -1,17 +1,25 @@
 // src/components/chatbot/DocumentUploader.tsx
 // Composant d'upload de documents pour le RAG
+// Les PDF sont convertis en TXT côté client avant l'upload
 
 import React, { useCallback, useState } from 'react';
 import { Upload, File, X, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import {
-  ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE,
   MIME_TYPE_LABELS,
   formatFileSize,
-  isAllowedMimeType,
 } from '../../lib/rag.types';
 import type { AllowedMimeType } from '../../lib/rag.types';
 import { uploadAndIngestDocument } from '../../lib/ragApi';
+import { isPDF, convertPDFToTextFile } from '../../lib/pdfExtractor';
+
+// Types de fichiers acceptés (inclut PDF pour la conversion client-side)
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'text/plain',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+];
 
 interface DocumentUploaderProps {
   onUploadComplete?: (documentId: string, chunksCreated: number) => void;
@@ -19,7 +27,7 @@ interface DocumentUploaderProps {
 }
 
 interface UploadState {
-  status: 'idle' | 'uploading' | 'processing' | 'complete' | 'error';
+  status: 'idle' | 'converting' | 'uploading' | 'processing' | 'complete' | 'error';
   progress: number;
   statusText: string;
   fileName?: string;
@@ -37,9 +45,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   });
   const [isDragOver, setIsDragOver] = useState(false);
 
+  const isAllowedType = (mimeType: string): boolean => {
+    return ACCEPTED_TYPES.includes(mimeType);
+  };
+
   const handleFile = useCallback(async (file: File) => {
     // Validation du type
-    if (!isAllowedMimeType(file.type)) {
+    if (!isAllowedType(file.type)) {
       const error = `Type de fichier non supporté: ${file.type}. Formats acceptés: PDF, DOCX, TXT`;
       setUploadState({
         status: 'error',
@@ -67,14 +79,44 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
 
     try {
+      let fileToUpload = file;
+
+      // Si c'est un PDF, le convertir en TXT côté client
+      if (isPDF(file)) {
+        setUploadState({
+          status: 'converting',
+          progress: 0,
+          statusText: 'Conversion du PDF en cours...',
+          fileName: file.name,
+        });
+
+        try {
+          fileToUpload = await convertPDFToTextFile(file);
+          console.log(`PDF converti: ${file.name} -> ${fileToUpload.name}`);
+        } catch (conversionError) {
+          const errorMsg = conversionError instanceof Error
+            ? conversionError.message
+            : 'Erreur lors de la conversion du PDF';
+          setUploadState({
+            status: 'error',
+            progress: 0,
+            statusText: errorMsg,
+            error: errorMsg,
+            fileName: file.name,
+          });
+          onError?.(errorMsg);
+          return;
+        }
+      }
+
       setUploadState({
         status: 'uploading',
         progress: 0,
-        statusText: 'Préparation...',
-        fileName: file.name,
+        statusText: 'Upload en cours...',
+        fileName: file.name, // On garde le nom original pour l'affichage
       });
 
-      const result = await uploadAndIngestDocument(file, (status, progress) => {
+      const result = await uploadAndIngestDocument(fileToUpload, (status, progress) => {
         setUploadState((prev) => ({
           ...prev,
           status: progress < 50 ? 'uploading' : 'processing',
@@ -151,7 +193,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     });
   }, []);
 
-  const isProcessing = uploadState.status === 'uploading' || uploadState.status === 'processing';
+  const isProcessing = uploadState.status === 'converting' ||
+                       uploadState.status === 'uploading' ||
+                       uploadState.status === 'processing';
 
   return (
     <div className="w-full">
@@ -177,7 +221,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         <input
           type="file"
           className="hidden"
-          accept={ALLOWED_MIME_TYPES.join(',')}
+          accept={ACCEPTED_TYPES.join(',')}
           onChange={handleFileSelect}
           disabled={isProcessing}
         />
