@@ -34,6 +34,7 @@ interface SourceChunk {
   chunkIndex: number;
   excerpt: string;
   score: number;
+  scope?: 'global' | 'user';
 }
 
 interface ChatResponse {
@@ -50,7 +51,7 @@ const CONFIG = {
   maxTopK: 10,
   similarityThreshold: 0.5,       // Seuil de similarité minimum
   excerptLength: 300,              // Longueur max des extraits dans les sources
-  chatModel: 'gpt-4.1-mini',       // Modèle pour le chat
+  chatModel: 'gpt-4o-mini',        // ✅ CORRIGÉ: Modèle correct
   embeddingModel: 'text-embedding-3-small',
   maxTokensResponse: 2000,
 };
@@ -91,6 +92,7 @@ interface MatchedChunk {
   chunk_index: number;
   content: string;
   similarity: number;
+  scope?: 'global' | 'user';
 }
 
 async function searchChunks(
@@ -100,7 +102,7 @@ async function searchChunks(
   topK: number,
   documentId?: string
 ): Promise<MatchedChunk[]> {
-  // Appel à la fonction RPC match_rag_chunks
+  // Appel à la fonction RPC match_rag_chunks (cherche global + user)
   const { data, error } = await supabase.rpc('match_rag_chunks', {
     p_user_id: userId,
     p_query_embedding: `[${queryEmbedding.join(',')}]`,
@@ -118,40 +120,49 @@ async function searchChunks(
 }
 
 // ============================================================================
-// GÉNÉRATION DE LA RÉPONSE
+// GÉNÉRATION DE LA RÉPONSE - PROMPTS OPTIMISÉS
 // ============================================================================
 
 function buildSystemPrompt(mode: ChatMode): string {
   if (mode === 'corpus_only') {
-    return `Tu es un assistant de recherche documentaire. Tu réponds UNIQUEMENT en te basant sur les extraits de documents fournis dans le contexte.
+    // ✅ PROMPT OPTIMISÉ : moins strict, encourage à chercher l'info
+    return `Tu es un assistant de recherche documentaire expert en éducation et programmes scolaires français.
 
-RÈGLES STRICTES :
-1. Tu NE PEUX PAS inventer ou ajouter d'informations qui ne sont pas dans les extraits fournis.
-2. Si les extraits ne contiennent pas l'information demandée, réponds exactement : "Je n'ai pas trouvé cette information dans vos documents."
-3. Cite toujours les sources en mentionnant le titre du document et le numéro de l'extrait.
-4. Si tu n'es pas sûr, dis-le clairement.
-5. N'utilise JAMAIS tes connaissances générales.
+Tu réponds en te basant sur les extraits de documents fournis dans le contexte.
 
-Format de réponse :
-- Réponds de manière claire et structurée
-- Mentionne les sources entre crochets [Document: X, Extrait: Y]
-- Si aucune information pertinente n'est trouvée, indique-le explicitement`;
+INSTRUCTIONS :
+1. Analyse attentivement TOUS les extraits fournis, même s'ils semblent partiellement pertinents.
+2. Les extraits avec un score de pertinence ≥60% contiennent probablement des informations utiles. Examine-les en détail.
+3. Si l'information est présente même partiellement dans un extrait, utilise-la pour répondre.
+4. Reformule et synthétise les informations des extraits de manière claire et pédagogique.
+5. Cite tes sources avec le format [Document: X, Extrait: Y].
+
+QUAND DIRE "Je n'ai pas trouvé" :
+- UNIQUEMENT si après analyse approfondie de TOUS les extraits, aucun ne contient d'information liée à la question.
+- Si les extraits parlent d'un sujet connexe mais pas exactement de la question, essaie quand même de faire le lien.
+
+FORMAT DE RÉPONSE :
+- Structure ta réponse de manière claire (listes, titres si nécessaire)
+- Sois précis et cite les éléments clés des documents
+- Termine par les références aux sources utilisées`;
   }
 
   // Mode corpus_plus_ai
-  return `Tu es un assistant de recherche documentaire intelligent. Tu utilises prioritairement les extraits de documents fournis, mais tu peux compléter avec tes connaissances générales si nécessaire.
+  return `Tu es un assistant de recherche documentaire expert en éducation et programmes scolaires français.
 
-RÈGLES IMPORTANTES :
+Tu utilises prioritairement les extraits de documents fournis, et tu peux compléter avec tes connaissances générales si nécessaire.
+
+INSTRUCTIONS :
 1. PRIORITÉ ABSOLUE aux informations des extraits fournis.
-2. Cite toujours tes sources documentaires entre crochets [Document: X, Extrait: Y].
-3. Si tu complètes avec des informations générales, signale-le CLAIREMENT avec la mention "[Complément IA]" ou "[Information générale]".
-4. Distingue toujours ce qui vient des documents de ce qui vient de tes connaissances.
+2. Analyse attentivement tous les extraits, même ceux avec un score de pertinence modéré (≥60%).
+3. Cite tes sources documentaires avec [Document: X, Extrait: Y].
+4. Si tu complètes avec des informations générales, signale-le CLAIREMENT avec "[Complément IA]".
 5. En cas de contradiction entre un document et tes connaissances, privilégie le document.
 
-Format de réponse :
+FORMAT DE RÉPONSE :
 - Commence par les informations issues des documents
-- Sépare clairement les compléments d'information
-- Utilise des marqueurs visuels pour distinguer les sources`;
+- Sépare clairement les compléments d'information avec "[Complément IA]"
+- Sois pédagogique et structuré`;
 }
 
 function buildUserPrompt(
@@ -163,34 +174,40 @@ function buildUserPrompt(
     if (mode === 'corpus_only') {
       return `Question : ${question}
 
-[Aucun extrait pertinent trouvé dans les documents]
+[Aucun extrait trouvé dans les documents]
 
-Rappel : En mode "Corpus uniquement", tu dois répondre "Je n'ai pas trouvé cette information dans vos documents."`;
+Réponds : "Je n'ai pas trouvé d'information pertinente dans vos documents pour cette question. Essayez de reformuler votre question ou vérifiez que vous avez uploadé des documents traitant de ce sujet."`;
     }
 
     return `Question : ${question}
 
-[Aucun extrait pertinent trouvé dans les documents]
+[Aucun extrait trouvé dans les documents]
 
-Tu peux répondre avec tes connaissances générales, mais signale clairement que cette réponse ne provient pas des documents de l'utilisateur.`;
+Tu peux répondre avec tes connaissances générales, mais signale clairement que cette réponse ne provient pas des documents de l'utilisateur avec le préfixe "[Complément IA]".`;
   }
 
+  // ✅ AMÉLIORATION : Meilleure présentation des extraits
   const contextParts = chunks.map((chunk, index) => {
-    return `--- Extrait ${index + 1} ---
-Document : ${chunk.document_title}
-Score de pertinence : ${(chunk.similarity * 100).toFixed(1)}%
-Contenu :
+    const scopeLabel = chunk.scope === 'global' ? '📚 Document officiel' : '📄 Document personnel';
+    return `━━━ Extrait ${index + 1} ━━━
+${scopeLabel}
+Titre : ${chunk.document_title}
+Pertinence : ${(chunk.similarity * 100).toFixed(0)}%
+
 ${chunk.content}
----`;
+━━━━━━━━━━━━━━━━`;
   });
+
+  // ✅ AMÉLIORATION : Instruction plus claire pour utiliser les extraits
+  const instruction = mode === 'corpus_only'
+    ? `\n\n⚠️ IMPORTANT : Analyse bien chaque extrait. Les informations peuvent être réparties sur plusieurs extraits. Si tu trouves des éléments de réponse, même partiels, utilise-les.`
+    : `\n\nUtilise prioritairement les extraits, et complète avec tes connaissances si nécessaire (marque "[Complément IA]").`;
 
   return `Question : ${question}
 
-CONTEXTE - Extraits pertinents de vos documents :
+📋 CONTEXTE - ${chunks.length} extrait(s) trouvé(s) dans vos documents :
 
-${contextParts.join('\n\n')}
-
-Réponds à la question en te basant sur ces extraits.${mode === 'corpus_only' ? ' Si l\'information n\'est pas dans les extraits, dis-le.' : ''}`;
+${contextParts.join('\n\n')}${instruction}`;
 }
 
 async function generateAnswer(
@@ -391,28 +408,38 @@ const chatHandler = async (req: Request): Promise<Response> => {
 
     console.log(`Chat request from user ${user.id}, mode: ${mode}, topK: ${actualTopK}`);
 
-    // Vérifier qu'au moins un document existe pour l'utilisateur
-    const { count: docCount } = await supabaseAdmin
+    // ✅ CORRIGÉ : Vérifier documents USER + GLOBAL
+    const { count: userDocCount } = await supabaseAdmin
       .from('rag_documents')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('status', 'ready');
 
-    if (!docCount || docCount === 0) {
+    const { count: globalDocCount } = await supabaseAdmin
+      .from('rag_documents')
+      .select('*', { count: 'exact', head: true })
+      .eq('scope', 'global')
+      .eq('status', 'ready');
+
+    const totalDocs = (userDocCount || 0) + (globalDocCount || 0);
+
+    if (totalDocs === 0) {
       return new Response(
         JSON.stringify({
-          error: 'Aucun document indexé. Uploadez d\'abord des documents.',
+          error: 'Aucun document indexé. Uploadez d\'abord des documents ou attendez que l\'administrateur ajoute des documents officiels.',
           noDocuments: true,
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log(`Available documents: ${userDocCount || 0} user + ${globalDocCount || 0} global = ${totalDocs} total`);
+
     // 1. Générer l'embedding de la question
     console.log('Generating query embedding...');
     const queryEmbedding = await embedQuery(message, OPENAI_API_KEY);
 
-    // 2. Rechercher les chunks pertinents
+    // 2. Rechercher les chunks pertinents (global + user via RPC)
     console.log('Searching relevant chunks...');
     const matchedChunks = await searchChunks(
       supabaseAdmin,
@@ -423,6 +450,13 @@ const chatHandler = async (req: Request): Promise<Response> => {
     );
 
     console.log(`Found ${matchedChunks.length} relevant chunks`);
+
+    // Log détaillé pour debug
+    if (matchedChunks.length > 0) {
+      matchedChunks.forEach((chunk, i) => {
+        console.log(`  Chunk ${i + 1}: "${chunk.document_title}" (${chunk.scope || 'user'}) - similarity: ${(chunk.similarity * 100).toFixed(1)}%`);
+      });
+    }
 
     // 3. Construire les prompts
     const systemPrompt = buildSystemPrompt(mode);
@@ -445,6 +479,7 @@ const chatHandler = async (req: Request): Promise<Response> => {
       excerpt: chunk.content.substring(0, CONFIG.excerptLength) +
         (chunk.content.length > CONFIG.excerptLength ? '...' : ''),
       score: chunk.similarity,
+      scope: chunk.scope,
     }));
 
     // 6. Gérer la conversation et sauvegarder les messages
