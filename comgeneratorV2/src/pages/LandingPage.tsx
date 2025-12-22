@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// import { Link } from 'react-router-dom';
 import { 
   ArrowRight, 
   Sparkles, 
@@ -21,13 +20,14 @@ import {
   Eye,
   ChevronDown,
   Play,
-  Gift  // ✅ AJOUT
+  Gift,
+  Bot  // ✅ AJOUT pour le chatbot
 } from 'lucide-react';
 
 export function LandingPage() {
   const [activeFeature, setActiveFeature] = useState(0);
   const [isVisible, setIsVisible] = useState({});
-  const [showSpecialOffer, setShowSpecialOffer] = useState(false); // ✅ AJOUT
+  const [showSpecialOffer, setShowSpecialOffer] = useState(false);
 
   const features = [
     {
@@ -65,11 +65,18 @@ export function LandingPage() {
       description: "Actualités éducatives",
       icon: TrendingUp,
       color: "bg-red-500"
+    },
+    // ✅ AJOUT : Nouveau module Chatbot
+    {
+      title: "Chatbot personnel",
+      description: "Interrogez vos documents avec l'IA",
+      icon: Bot,
+      color: "bg-indigo-500"
     }
   ];
 
   const stats = [
-    { number: "6", label: "Outils intégrés", icon: Target },
+    { number: "7", label: "Outils intégrés", icon: Target },  // ✅ MODIFIÉ : 6 → 7
     { number: "100%", label: "Personnalisable", icon: Star },
     { number: "75%*", label: "Temps économisé", sublabel: "* Estimation", icon: Clock },
     { number: "∞", label: "Possibilités créatives", icon: Brain }
@@ -82,7 +89,6 @@ export function LandingPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ AJOUT : Vérifier si on doit afficher l'offre spéciale
   useEffect(() => {
     const currentDate = new Date();
     const deadlineDate = new Date('2025-12-10T23:59:59');
@@ -94,18 +100,15 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
-      {/* ✅ AJOUT : Post-it offre spéciale - Position fixe en bas à gauche */}
+      {/* Post-it offre spéciale */}
       {showSpecialOffer && (
         <div className="fixed bottom-6 left-6 z-50 animate-bounce-slow">
           <div className="relative group">
-            {/* Post-it */}
             <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 dark:from-yellow-600 dark:to-yellow-700 rounded-2xl shadow-lg p-6 max-w-xs border-2 border-yellow-300 dark:border-yellow-500 transform hover:scale-105 transition-all duration-300">
-              {/* Emoji en haut */}
               <div className="text-4xl mb-3 text-center animate-pulse">
                 🎁
               </div>
               
-              {/* Texte */}
               <div className="text-center space-y-2">
                 <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
                   Offre spéciale bulletins
@@ -118,7 +121,6 @@ export function LandingPage() {
                 </p>
               </div>
 
-              {/* Bouton CTA */}
               <a
                 href="/register"
                 className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
@@ -128,7 +130,6 @@ export function LandingPage() {
               </a>
             </div>
 
-            {/* Effet de collage (petit triangle en haut pour simuler un post-it) */}
             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-8 h-3 bg-yellow-300 dark:bg-yellow-600 rounded-t-sm opacity-60"></div>
           </div>
         </div>
@@ -162,7 +163,7 @@ export function LandingPage() {
             <p className="mt-6 max-w-3xl mx-auto text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
               Une suite complète d'outils intelligents pour automatiser vos tâches administratives : 
               appréciations personnalisées, synthèses de bulletins, communications professionnelles, 
-              et création de séances pédagogiques.
+              création de séances pédagogiques et chatbot personnel pour interroger vos documents.
             </p>
             
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -220,7 +221,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              6 outils puissants en un seul endroit
+              7 outils puissants en un seul endroit
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Découvrez comment ProfAssist transforme votre quotidien d'enseignant
@@ -308,6 +309,22 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
+                    {activeFeature === 2 && (
+                      <div className="text-left">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Génération de messages professionnels</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Réponses automatiques aux parents</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Ton et style personnalisables</span>
+                        </div>
+                      </div>
+                    )}
                     {activeFeature === 3 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
@@ -324,7 +341,109 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
+                    {activeFeature === 4 && (
+                      <div className="text-left">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Stockage illimité de vos contenus</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Recherche par tags et mots-clés</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Organisation par catégories</span>
+                        </div>
+                      </div>
+                    )}
+                    {activeFeature === 5 && (
+                      <div className="text-left">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Actualités éducatives en temps réel</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Sources officielles (Éduscol, etc.)</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Veille pédagogique automatisée</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* ✅ AJOUT : Contenu spécifique pour le Chatbot */}
+                    {activeFeature === 6 && (
+                      <div className="text-left">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Upload de vos documents (PDF, DOCX, TXT)</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Technologie RAG pour des réponses précises</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">2 modes : Corpus seul ou Corpus + IA</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Documents privés et sécurisés</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ AJOUT : Section mise en avant du Chatbot */}
+      <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 text-center lg:text-left">
+              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
+                <Bot className="w-4 h-4 mr-2" />
+                Nouveau • Version Bêta
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Votre chatbot personnel pour interroger vos documents
+              </h2>
+              <p className="text-lg text-blue-100 mb-8 max-w-2xl">
+                Uploadez vos cours, programmes, fiches pédagogiques... et posez vos questions ! 
+                Grâce à la technologie RAG (Retrieval-Augmented Generation), le chatbot trouve 
+                les informations pertinentes dans VOS documents.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Documents privés</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Réponses sourcées</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Upload gratuit</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                <div className="w-32 h-32 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Bot className="w-16 h-16 text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="text-white font-semibold mb-2">Exemple de question :</p>
+                  <p className="text-blue-100 text-sm italic">
+                    "Quels sont les objectifs du cycle 3 en EPS ?"
+                  </p>
                 </div>
               </div>
             </div>
@@ -402,14 +521,12 @@ export function LandingPage() {
           <div className="rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 p-2">
             <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden">
               <img
-  src="https://res.cloudinary.com/dhva6v5n8/image/upload/f_auto,q_auto,dpr_auto,w_1200/landing_mhnrfm.webp"
-  alt="Interface ProfAssist - Dashboard complet"
-  className="w-full h-auto"
-  loading="lazy"
-  decoding="async"
-/>
-
-
+                src="https://res.cloudinary.com/dhva6v5n8/image/upload/f_auto,q_auto,dpr_auto,w_1200/landing_mhnrfm.webp"
+                alt="Interface ProfAssist - Dashboard complet"
+                className="w-full h-auto"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           </div>
         </div>
@@ -452,7 +569,7 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* ✅ AJOUT : Animation CSS pour le post-it */}
+      {/* Animation CSS pour le post-it */}
       <style>{`
         @keyframes bounce-slow {
           0%, 100% {

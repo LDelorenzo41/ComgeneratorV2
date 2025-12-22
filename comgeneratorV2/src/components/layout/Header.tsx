@@ -13,7 +13,8 @@ import {
   Coins,
   FileText,
   TrendingUp,
-  Settings
+  Settings,
+  Bot
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
@@ -181,6 +182,17 @@ export function Header() {
                           <TrendingUp className="w-4 h-4 mr-2" />
                           Flux RSS
                         </Link>
+                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                        <Link 
+                          to="/chatbot" 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsResourcesDropdownOpen(false)}
+                        >
+                          <Bot className="w-4 h-4 mr-2" />
+                          Mon Chatbot
+                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                        </Link>
+
                       </div>
                     </div>
                   )}
@@ -381,6 +393,17 @@ export function Header() {
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Flux RSS
                 </Link>
+                <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
+                <Link 
+                  to="/chatbot" 
+                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Bot className="w-4 h-4 mr-2" />
+                  Mon Chatbot
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                </Link>
+
               </div>
             </div>
             <Link

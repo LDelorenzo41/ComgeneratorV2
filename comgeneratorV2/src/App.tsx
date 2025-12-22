@@ -26,6 +26,8 @@ import { LegalRoutes } from './routes/LegalRoutes';
 
 // Import de la page de paramètres
 import { SettingsPage } from './pages/SettingsPage';
+// Import de la page Chatbot RAG
+import { ChatbotPage } from './pages/ChatbotPage';
 
 // Import des composants cookies
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
@@ -33,6 +35,9 @@ import { CookieBanner } from './components/CookieBanner';
 
 // ✅ AJOUT : Import de la modale cadeau
 import { SpecialOfferModal } from './components/SpecialOfferModal';
+
+// ✅ AJOUT : Import du bouton flottant chatbot
+import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
@@ -48,35 +53,22 @@ function App() {
       setLoading(false);
     });
 
-    const {
+        const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'TOKEN_REFRESHED') {
         console.log('Token rafraîchi avec succès');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
-      } else if (event === 'USER_DELETED') {
-        await signOut();
       }
       setUser(session?.user ?? null);
     });
 
+
     return () => subscription.unsubscribe();
   }, [setUser, setLoading, signOut]);
 
-  React.useEffect(() => {
-    const handleAuthError = async (error: any) => {
-      if (error?.__isAuthError) {
-        console.log('Erreur d\'authentification détectée:', error);
-
-        if (error.message.includes('refresh_token_not_found')) {
-          console.log('Token de rafraîchissement non trouvé, déconnexion...');
-          await signOut();
-          setConnectionError('Votre session a expiré. Veuillez vous reconnecter.');
-        }
-      }
-    };
-
+    React.useEffect(() => {
     const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED' && session) {
         setConnectionError(null);
@@ -86,7 +78,8 @@ function App() {
     return () => {
       unsubscribe.data.subscription.unsubscribe();
     };
-  }, [signOut]);
+  }, []);
+
 
   React.useEffect(() => {
     if (isDark) {
@@ -192,6 +185,12 @@ function App() {
                     <SettingsPage />
                   </EmailConfirmationGuard>
                 } />
+                <Route path="/chatbot" element={
+                  <EmailConfirmationGuard>
+                    <ChatbotPage />
+                  </EmailConfirmationGuard>
+                } />
+
               </Route>
             </Routes>
           </main>
@@ -202,6 +201,9 @@ function App() {
         
         {/* ✅ AJOUT : Modale cadeau spécial - s'affiche uniquement si user connecté */}
         {user && <SpecialOfferModal />}
+        
+        {/* ✅ AJOUT : Bouton flottant chatbot - s'affiche uniquement si user connecté et option activée */}
+        {user && <ChatbotFloatingButton />}
       </BrowserRouter>
     </CookieConsentProvider>
   );
