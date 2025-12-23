@@ -1,12 +1,20 @@
 // src/lib/ragApi.ts
 // Service API pour le module RAG Chatbot
 // Avec support des documents globaux et utilisateur
+// + Double quota bêta: stockage permanent + import mensuel
 
 import { supabase } from './supabase';
 import type { RagDocument, ChatResponse, ChatMode } from './rag.types';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+// ============================================================================
+// CONSTANTES BETA
+// ============================================================================
+
+const BETA_STORAGE_LIMIT = 100000;        // 100k tokens max stockés
+const BETA_MONTHLY_IMPORT_LIMIT = 100000; // 100k tokens/mois d'import
 
 // ============================================================================
 // TYPES
@@ -134,9 +142,6 @@ export async function getDocuments(): Promise<RagDocument[]> {
 // DOCUMENTS - SUPPRESSION
 // ============================================================================
 
-/**
- * Supprime un document utilisateur (pas les globaux)
- */
 /**
  * Supprime un document (user ou global si admin)
  */
@@ -400,39 +405,95 @@ export async function getRagStats(): Promise<RagStats> {
 }
 
 // ============================================================================
-// BETA USAGE
+// BETA USAGE - DOUBLE QUOTA (stockage + import mensuel)
 // ============================================================================
 
 export interface BetaUsageStats {
-  tokensUsed: number;
-  tokensLimit: number;
+  // Stockage permanent (documents actuellement stockés)
+  storageTokensUsed: number;
+  storageTokensLimit: number;
+  storagePercentUsed: number;
+  // Import mensuel (volume importé ce mois)
+  monthlyTokensUsed: number;
+  monthlyTokensLimit: number;
+  monthlyPercentUsed: number;
+  // Date de réinitialisation du quota mensuel
   resetDate: string | null;
-  percentUsed: number;
 }
 
+/**
+ * Récupère les statistiques d'utilisation bêta avec double quota:
+ * - Stockage permanent: tokens actuellement stockés (max 100k)
+ * - Import mensuel: tokens importés ce mois (max 100k/mois)
+ */
 export async function getBetaUsageStats(): Promise<BetaUsageStats> {
   const { data: { user } } = await supabase.auth.getUser();
+  
   if (!user) {
-    return { tokensUsed: 0, tokensLimit: 200000, resetDate: null, percentUsed: 0 };
+    return {
+      storageTokensUsed: 0,
+      storageTokensLimit: BETA_STORAGE_LIMIT,
+      storagePercentUsed: 0,
+      monthlyTokensUsed: 0,
+      monthlyTokensLimit: BETA_MONTHLY_IMPORT_LIMIT,
+      monthlyPercentUsed: 0,
+      resetDate: null,
+    };
   }
 
-  const { data: profile, error } = await (supabase as any)
+  // 1. Calculer le stockage actuel (somme des tokens des chunks personnels)
+  const { data: chunksData, error: chunksError } = await (supabase as any)
+    .from('rag_chunks')
+    .select('token_count')
+    .eq('user_id', user.id)
+    .eq('scope', 'user');
+
+  if (chunksError) {
+    console.warn('Error fetching chunks for storage calculation:', chunksError);
+  }
+
+  const storageTokensUsed = (chunksData || []).reduce(
+    (sum: number, chunk: { token_count?: number }) => sum + (chunk.token_count || 0),
+    0
+  );
+
+  // 2. Récupérer le quota mensuel d'import depuis le profil
+  const { data: profile, error: profileError } = await (supabase as any)
     .from('profiles')
     .select('rag_beta_tokens_used, rag_beta_tokens_limit, rag_beta_reset_date')
     .eq('user_id', user.id)
     .single();
 
-  if (error || !profile) {
-    return { tokensUsed: 0, tokensLimit: 200000, resetDate: null, percentUsed: 0 };
+  if (profileError && profileError.code !== 'PGRST116') {
+    console.warn('Error fetching profile for beta stats:', profileError);
   }
 
-  const tokensUsed = profile.rag_beta_tokens_used || 0;
-  const tokensLimit = profile.rag_beta_tokens_limit || 200000;
-  const resetDate = profile.rag_beta_reset_date || null;
-  const percentUsed = Math.min(100, Math.round((tokensUsed / tokensLimit) * 100));
+  const monthlyTokensUsed = profile?.rag_beta_tokens_used || 0;
+  const monthlyTokensLimit = profile?.rag_beta_tokens_limit || BETA_MONTHLY_IMPORT_LIMIT;
+  const resetDate = profile?.rag_beta_reset_date || null;
 
-  return { tokensUsed, tokensLimit, resetDate, percentUsed };
+  // Calculer les pourcentages (plafonnés à 100%)
+  const storagePercentUsed = Math.min(
+    100,
+    Math.round((storageTokensUsed / BETA_STORAGE_LIMIT) * 100)
+  );
+  
+  const monthlyPercentUsed = Math.min(
+    100,
+    Math.round((monthlyTokensUsed / monthlyTokensLimit) * 100)
+  );
+
+  return {
+    storageTokensUsed,
+    storageTokensLimit: BETA_STORAGE_LIMIT,
+    storagePercentUsed,
+    monthlyTokensUsed,
+    monthlyTokensLimit,
+    monthlyPercentUsed,
+    resetDate,
+  };
 }
+
 
 
 

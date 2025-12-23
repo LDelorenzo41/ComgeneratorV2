@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User 
+  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
@@ -187,7 +187,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                 <li className="flex items-start gap-2">
                   <span className="text-amber-500 mt-1">•</span>
-                  <span><strong>Chaque question au chatbot :</strong> Consomme des tokens selon la longueur de la question et de la réponse (entre 500 et 2000 tokens en moyenne)</span>
+                  <span><strong>Chaque question au chatbot :</strong> Consomme des tokens selon la longueur de la question et de la réponse (entre 2000 et 5000 tokens en moyenne)</span>
                 </li>
               </ul>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
@@ -199,7 +199,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
-          {/* Offre Bêta */}
+          {/* Offre Bêta - MISE À JOUR */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Gift className="w-5 h-5 text-pink-500" />
@@ -208,23 +208,29 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               </h3>
             </div>
             <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800">
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                Pendant la phase bêta, l'indexation de vos documents personnels est <strong>offerte</strong> !
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                Pendant la phase bêta, l'indexation de vos documents personnels est <strong>offerte</strong> avec un double quota :
               </p>
-              <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                 <li className="flex items-start gap-2">
-                  <span className="text-pink-500 mt-1">🎁</span>
-                  <span>200 000 tokens/mois offerts pour l'import de vos documents</span>
+                  <HardDrive className="w-4 h-4 text-pink-500 mt-0.5 flex-shrink-0" />
+                  <span><strong>100 000 tokens de stockage</strong> : capacité maximale de documents personnels que vous pouvez conserver à tout moment</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Upload className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <span><strong>100 000 tokens d'import/mois</strong> : volume total d'imports autorisé chaque mois (réinitialisé le 1er du mois)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-pink-500 mt-1">📚</span>
-                  <span>Corpus officiel inclus gratuitement et sans limite</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-pink-500 mt-1">🔄</span>
-                  <span>Quota personnel réinitialisé chaque mois</span>
+                  <span>Corpus officiel inclus <strong>gratuitement et sans limite</strong></span>
                 </li>
               </ul>
+              <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-pink-200 dark:border-pink-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  💡 <strong>Astuce :</strong> Supprimez des documents pour libérer de l'espace de stockage. 
+                  Le quota d'import mensuel vous permet de renouveler régulièrement vos documents.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -269,7 +275,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   );
 };
 
-// Composant encart Bêta
+// Composant encart Bêta - MISE À JOUR avec double quota
 const BetaUsageCard: React.FC<{ betaStats: BetaUsageStats; isLoading: boolean }> = ({ betaStats, isLoading }) => {
   const getProgressColor = (percent: number) => {
     if (percent >= 90) return 'bg-red-500';
@@ -283,50 +289,91 @@ const BetaUsageCard: React.FC<{ betaStats: BetaUsageStats; isLoading: boolean }>
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   };
 
+  const storageAvailable = Math.max(0, betaStats.storageTokensLimit - betaStats.storageTokensUsed);
+  const monthlyAvailable = Math.max(0, betaStats.monthlyTokensLimit - betaStats.monthlyTokensUsed);
+
   return (
     <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800 mb-6">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-4">
         <Gift className="w-5 h-5 text-pink-500" />
         <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-          Offre Bêta - Import de documents personnels
+          Offre Bêta - Documents personnels
         </h3>
       </div>
       
       {isLoading ? (
-        <div className="flex justify-center py-2">
+        <div className="flex justify-center py-4">
           <Loader2 className="w-5 h-5 animate-spin text-pink-500" />
         </div>
       ) : (
-        <>
-          <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-            <span>{betaStats.tokensUsed.toLocaleString('fr-FR')} tokens utilisés</span>
-            <span>{betaStats.tokensLimit.toLocaleString('fr-FR')} tokens offerts</span>
-          </div>
-          
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${getProgressColor(betaStats.percentUsed)} transition-all duration-500`}
-              style={{ width: `${betaStats.percentUsed}%` }}
-            />
-          </div>
-          
-          <div className="flex justify-between mt-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {betaStats.percentUsed}% utilisé
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Réinitialisation : {formatDate(betaStats.resetDate)}
-            </span>
+        <div className="space-y-4">
+          {/* Quota de stockage */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <HardDrive className="w-4 h-4 text-pink-500" />
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Stockage</span>
+            </div>
+            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <span>{betaStats.storageTokensUsed.toLocaleString('fr-FR')} tokens stockés</span>
+              <span>{betaStats.storageTokensLimit.toLocaleString('fr-FR')} max</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${getProgressColor(betaStats.storagePercentUsed)} transition-all duration-500`}
+                style={{ width: `${Math.min(betaStats.storagePercentUsed, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {betaStats.storagePercentUsed}% utilisé
+              </span>
+              <span className="text-xs text-green-600 dark:text-green-400">
+                {storageAvailable.toLocaleString('fr-FR')} disponible
+              </span>
+            </div>
           </div>
 
-          {betaStats.percentUsed >= 80 && (
+          {/* Quota mensuel d'import */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Upload className="w-4 h-4 text-purple-500" />
+              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Import mensuel</span>
+            </div>
+            <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+              <span>{betaStats.monthlyTokensUsed.toLocaleString('fr-FR')} tokens importés</span>
+              <span>{betaStats.monthlyTokensLimit.toLocaleString('fr-FR')} /mois</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${getProgressColor(betaStats.monthlyPercentUsed)} transition-all duration-500`}
+                style={{ width: `${Math.min(betaStats.monthlyPercentUsed, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {betaStats.monthlyPercentUsed}% utilisé
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Réinit. : {formatDate(betaStats.resetDate)}
+              </span>
+            </div>
+          </div>
+
+          {/* Alertes */}
+          {(betaStats.storagePercentUsed >= 80 || betaStats.monthlyPercentUsed >= 80) && (
             <div className="mt-3 p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
               <p className="text-xs text-orange-700 dark:text-orange-300">
-                ⚠️ Vous approchez de votre limite mensuelle d'import.
+                {betaStats.storagePercentUsed >= 80 && betaStats.monthlyPercentUsed >= 80 ? (
+                  <>⚠️ Vous approchez de vos limites de stockage et d'import mensuel.</>
+                ) : betaStats.storagePercentUsed >= 80 ? (
+                  <>⚠️ Vous approchez de votre limite de stockage. Supprimez des documents pour libérer de l'espace.</>
+                ) : (
+                  <>⚠️ Vous approchez de votre limite mensuelle d'import.</>
+                )}
               </p>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -348,7 +395,15 @@ export const ChatbotPage: React.FC = () => {
     userDocuments: 0
   });
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [betaStats, setBetaStats] = useState<BetaUsageStats>({ tokensUsed: 0, tokensLimit: 200000, resetDate: null, percentUsed: 0 });
+  const [betaStats, setBetaStats] = useState<BetaUsageStats>({ 
+    storageTokensUsed: 0, 
+    storageTokensLimit: 100000, 
+    storagePercentUsed: 0,
+    monthlyTokensUsed: 0, 
+    monthlyTokensLimit: 100000, 
+    monthlyPercentUsed: 0,
+    resetDate: null 
+  });
   const [isLoadingBeta, setIsLoadingBeta] = useState(true);
 
   useEffect(() => {
@@ -655,6 +710,7 @@ export const ChatbotPage: React.FC = () => {
 };
 
 export default ChatbotPage;
+
 
 
 
