@@ -41,6 +41,48 @@ export type Database = {
         }
         Relationships: []
       }
+          chatbot_answers: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          content: string
+          category: string
+          subject: string | null
+          level: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          content: string
+          category: string
+          subject?: string | null
+          level?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          content?: string
+          category?: string
+          subject?: string | null
+          level?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_answers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+
       articles: {
         Row: {
           created_at: string | null

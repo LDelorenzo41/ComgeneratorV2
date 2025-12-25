@@ -432,10 +432,15 @@ JSON: {"scores": [{"id": 0, "score": 8}, ...]}`;
 // EXTRACTION DE TERMES-CLÉS
 // ============================================================================
 
+// ============================================================================
+// EXTRACTION DE TERMES-CLÉS - VERSION AMÉLIORÉE
+// ============================================================================
+
 function extractKeyTerms(query: string): string[] {
   const lowerQuery = query.toLowerCase();
   const terms: string[] = [];
 
+  // 1. Mappings sémantiques (synonymes et variantes)
   const mappings: Record<string, string[]> = {
     'maternelle': ['maternelle', 'cycle 1'],
     'cycle 1': ['maternelle', 'cycle 1'],
@@ -443,12 +448,15 @@ function extractKeyTerms(query: string): string[] {
     'cycle 3': ['cycle 3', 'CM1', 'CM2', '6e', '6ème'],
     'cycle 4': ['cycle 4', '5e', '4e', '3e', 'collège'],
     'collège': ['collège', 'cycle 3', 'cycle 4'],
-    'eps': ['EPS', 'éducation physique', 'sport', 'activité physique', 'champ d\'apprentissage'],
-    'éducation physique': ['EPS', 'éducation physique', 'sport'],
+    'lycée': ['lycée', 'seconde', 'première', 'terminale'],
+    'eps': ['EPS', 'éducation physique', 'sport', 'activité physique'],
+    'éducation physique': ['EPS', 'éducation physique'],
     'sport': ['EPS', 'sport', 'activité physique'],
-    'objectif': ['objectif', 'attendu', 'compétence', 'visée'],
+    'natation': ['natation', 'nager', 'piscine', 'aquatique'],
+    'objectif': ['objectif', 'attendu', 'compétence'],
     'compétence': ['compétence', 'attendu', 'objectif'],
-    'différence': ['spécificité', 'particularité', 'évolution', 'progression'],
+    'attendu': ['attendu', 'objectif', 'compétence', 'fin de cycle'],
+    'champ': ['champ', 'champ d\'apprentissage', 'domaine'],
   };
 
   for (const [key, values] of Object.entries(mappings)) {
@@ -457,8 +465,32 @@ function extractKeyTerms(query: string): string[] {
     }
   }
 
+  // 2. NOUVEAU: Extraire les mots significatifs de la question (> 3 caractères)
+  //    pour la recherche par titre de document
+  const stopWords = new Set([
+    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'pour',
+    'dans', 'sur', 'avec', 'sans', 'par', 'que', 'qui', 'quoi', 'quel',
+    'quelle', 'quels', 'quelles', 'comment', 'pourquoi', 'est', 'sont',
+    'fait', 'faire', 'donne', 'donner', 'moi', 'nous', 'vous', 'leur',
+    'cette', 'ces', 'mon', 'ton', 'son', 'notre', 'votre', 'être', 'avoir'
+  ]);
+
+  const words = lowerQuery
+    .replace(/['']/g, ' ')  // Apostrophes
+    .replace(/[^\w\sàâäéèêëïîôùûüç-]/g, ' ')  // Ponctuation
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !stopWords.has(word));
+
+  // Ajouter les mots significatifs (pour recherche par titre)
+  for (const word of words) {
+    if (!terms.some(t => t.toLowerCase() === word)) {
+      terms.push(word);
+    }
+  }
+
   return [...new Set(terms)];
 }
+
 
 // ============================================================================
 // RECHERCHE VECTORIELLE
@@ -688,9 +720,67 @@ async function searchChunksHybrid(
     
     console.log(`[rag-chat] Comparative search total: ${allChunks.length} chunks`);
   }
-  // ========== STRATÉGIE STANDARD ==========
+    // ========== STRATÉGIE STANDARD ==========
+  
   else {
-    // 1. Recherche par mots-clés
+    // 0. NOUVEAU: Recherche DIRECTE par titre de document sur les mots de la question
+    const stopWords = new Set([
+      'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'pour',
+      'dans', 'sur', 'avec', 'sans', 'par', 'que', 'qui', 'quoi', 'quel',
+      'quelle', 'quels', 'quelles', 'comment', 'pourquoi', 'est', 'sont',
+      'fait', 'faire', 'donne', 'donner', 'moi', 'nous', 'vous', 'leur'
+    ]);
+
+    const queryWords = originalQuery
+      .toLowerCase()
+      .replace(/[^\w\sàâäéèêëïîôùûüç-]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !stopWords.has(w));
+    
+    console.log(`[rag-chat] Title search with words: ${queryWords.join(', ')}`);
+    
+    for (const word of queryWords.slice(0, 5)) {
+      // Chercher dans TOUS les documents (global + user)
+      const { data: matchingDocs } = await supabase
+        .from('rag_documents')
+        .select('id, title, scope, user_id')
+        .or(`scope.eq.global,user_id.eq.${userId}`)
+        .eq('status', 'ready')
+        .ilike('title', `%${word}%`)
+        .limit(3);
+
+      if (matchingDocs && matchingDocs.length > 0) {
+        console.log(`[rag-chat] Title match "${word}": ${matchingDocs.map((d: any) => d.title).join(', ')}`);
+        
+        for (const doc of matchingDocs) {
+          const { data: chunks } = await supabase
+            .from('rag_chunks')
+            .select('id, document_id, chunk_index, content, scope')
+            .eq('document_id', doc.id)
+            .order('chunk_index', { ascending: true })
+            .limit(5);
+
+          if (chunks) {
+            for (const chunk of chunks) {
+              if (!seenIds.has(chunk.id)) {
+                seenIds.add(chunk.id);
+                allChunks.push({
+                  id: chunk.id,
+                  documentId: doc.id,
+                  documentTitle: doc.title,
+                  chunkIndex: chunk.chunk_index,
+                  content: chunk.content,
+                  score: 0.92,  // Score élevé car match sur titre
+                  scope: chunk.scope || doc.scope,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 1. Recherche par mots-clés (termes sémantiques)
     for (const query of queryVariations.slice(0, 4)) {
       const terms = extractKeyTerms(query);
       if (terms.length > 0) {
@@ -730,6 +820,7 @@ async function searchChunksHybrid(
 
   return allChunks.sort((a, b) => b.score - a.score);
 }
+
 
 // ============================================================================
 // EMBEDDINGS

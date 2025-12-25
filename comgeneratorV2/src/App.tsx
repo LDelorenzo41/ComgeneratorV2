@@ -20,6 +20,9 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
+// Import de la nouvelle page banque de réponses chatbot
+import { ChatbotAnswerBankPage } from './pages/ChatbotAnswerBankPage';
+
 
 // Import des routes légales
 import { LegalRoutes } from './routes/LegalRoutes';
@@ -188,6 +191,11 @@ function App() {
                 <Route path="/chatbot" element={
                   <EmailConfirmationGuard>
                     <ChatbotPage />
+                  </EmailConfirmationGuard>
+                } />
+                                <Route path="/chatbot-answers" element={
+                  <EmailConfirmationGuard>
+                    <ChatbotAnswerBankPage />
                   </EmailConfirmationGuard>
                 } />
 

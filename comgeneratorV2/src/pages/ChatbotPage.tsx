@@ -624,6 +624,29 @@ export const ChatbotPage: React.FC = () => {
           </div>
         </div>
       </div>
+            {/* Avertissement version en cours d'amélioration */}
+      <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
+            <span className="text-lg">🛠️</span>
+          </div>
+          <div>
+            <h3 className="font-semibold text-amber-800 dark:text-amber-300 mb-1">
+              À propos de ce chatbot
+            </h3>
+            <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
+              Ce chatbot est une version en cours d'amélioration. Les documents officiels intégrés seront ajoutés progressivement, 
+              et les techniques de recherche et de restitution des réponses seront affinées au fur et à mesure de son utilisation.
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
+              Vos retours de terrain sont les bienvenus : demande d'ajout de textes officiels, signalement d'erreurs ou remarques d'usage.
+            </p>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-2">
+              Ensemble, nous construisons un outil au plus proche de vos besoins.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Encart Bêta */}
       <BetaUsageCard betaStats={betaStats} isLoading={isLoadingBeta} />

@@ -192,6 +192,14 @@ export function Header() {
                           Mon Chatbot
                           <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
                         </Link>
+                                                <Link 
+                          to="/chatbot-answers" 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsResourcesDropdownOpen(false)}
+                        >
+                          <Database className="w-4 h-4 mr-2" />
+                          Ma banque de réponses
+                        </Link>
 
                       </div>
                     </div>
@@ -402,6 +410,14 @@ export function Header() {
                   <Bot className="w-4 h-4 mr-2" />
                   Mon Chatbot
                   <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                </Link>
+                                <Link 
+                  to="/chatbot-answers" 
+                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Database className="w-4 h-4 mr-2" />
+                  Ma banque de réponses
                 </Link>
 
               </div>
