@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload
+  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
@@ -146,6 +146,88 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
+          {/* 🆕 NOUVELLE SECTION : Modes de recherche */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Search className="w-5 h-5 text-cyan-500" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Deux modes de recherche
+              </h3>
+            </div>
+            <div className="grid gap-3">
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">
+                      Rapide
+                    </h4>
+                  </div>
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">
+                    ~1000-2000 tokens
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                  Recherche directe dans vos documents sans traitement supplémentaire.
+                </p>
+                <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Réponse rapide et économique</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Idéal pour les questions simples et directes</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Recommandé pour économiser vos tokens</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    <h4 className="font-semibold text-amber-700 dark:text-amber-400">
+                      Précis
+                    </h4>
+                  </div>
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">
+                    ~3000-5000 tokens
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                  Recherche approfondie avec techniques avancées d'IA pour de meilleurs résultats.
+                </p>
+                <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-amber-500 mt-0.5">✓</span>
+                    <span><strong>Reformulation automatique</strong> de votre question pour mieux chercher</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-amber-500 mt-0.5">✓</span>
+                    <span><strong>Recherche hypothétique</strong> (HyDE) pour trouver des passages pertinents</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-amber-500 mt-0.5">✓</span>
+                    <span><strong>Reclassement intelligent</strong> des résultats par pertinence</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <span className="text-amber-500 mt-0.5">✓</span>
+                    <span>Idéal pour les <strong>questions complexes</strong> ou <strong>comparatives</strong></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                💡 <strong>Conseil :</strong> Commencez en mode <strong>Rapide</strong>. Si la réponse n'est pas satisfaisante 
+                ou pour des questions comme "Quelles différences entre X et Y ?", passez en mode <strong>Précis</strong>.
+              </p>
+            </div>
+          </div>
+
           {/* Sources et scores de pertinence */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -175,24 +257,39 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
-          {/* Consommation de tokens */}
+          {/* Consommation de tokens - Mise à jour */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-5 h-5 text-amber-500" />
+              <Sparkles className="w-5 h-5 text-amber-500" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Consommation de tokens
               </h3>
             </div>
             <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800 space-y-3">
-              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-500 mt-1">•</span>
-                  <span><strong>Chaque question au chatbot :</strong> Consomme des tokens selon la longueur de la question et de la réponse (entre 2000 et 5000 tokens en moyenne)</span>
-                </li>
-              </ul>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Chaque question au chatbot consomme des tokens. Le coût dépend du <strong>mode de recherche</strong> choisi :
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-green-500" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Rapide</span>
+                  </div>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">~1000-2000</p>
+                  <p className="text-xs text-gray-500">tokens/question</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-4 h-4 text-amber-500" />
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Précis</span>
+                  </div>
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400">~3000-5000</p>
+                  <p className="text-xs text-gray-500">tokens/question</p>
+                </div>
+              </div>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  💡 <strong>Astuce :</strong> Les questions courtes et précises consomment moins de tokens. 
+                  💡 <strong>Astuce :</strong> Utilisez le mode <strong>Rapide</strong> par défaut pour économiser vos tokens. 
                   Le mode "Corpus seul" consomme généralement moins que "Corpus + IA".
                 </p>
               </div>
@@ -710,6 +807,7 @@ export const ChatbotPage: React.FC = () => {
 };
 
 export default ChatbotPage;
+
 
 
 

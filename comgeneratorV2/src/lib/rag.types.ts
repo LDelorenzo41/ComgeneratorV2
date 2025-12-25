@@ -5,6 +5,9 @@ export type DocumentStatus = 'uploaded' | 'processing' | 'ready' | 'error';
 export type ChatMode = 'corpus_only' | 'corpus_plus_ai';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type DocumentScope = 'global' | 'user';  // AJOUT
+// Ajouter avec les autres types
+export type SearchMode = 'fast' | 'precise';
+
 
 export interface RagDocument {
   id: string;

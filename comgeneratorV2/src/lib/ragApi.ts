@@ -349,6 +349,7 @@ export async function uploadAndIngestGlobalDocument(
 export async function sendChatMessage(request: {
   message: string;
   mode: ChatMode;
+  searchMode?: 'fast' | 'precise';  // 🆕 Nouveau paramètre
   conversationId?: string;
   documentId?: string;
   topK?: number;
@@ -363,6 +364,7 @@ export async function sendChatMessage(request: {
   
   return response;
 }
+
 
 // ============================================================================
 // STATS
