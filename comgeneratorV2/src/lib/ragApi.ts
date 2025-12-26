@@ -165,7 +165,7 @@ export async function deleteDocument(documentId: string): Promise<void> {
   if (doc.scope === 'global') {
     const isAdmin = await checkIsAdmin(user.id);
     if (!isAdmin) {
-      throw new Error('Les documents officiels ne peuvent pas être supprimés');
+      throw new Error('Les documents PROFASSIST ne peuvent pas être supprimés');
     }
   } else {
     // Pour les documents user, vérifier que c'est le propriétaire

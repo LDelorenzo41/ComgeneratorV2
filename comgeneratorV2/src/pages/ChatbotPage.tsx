@@ -741,36 +741,8 @@ export const ChatbotPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-64 overflow-y-auto">
-                    {/* Documents officiels */}
-                    {globalDocs.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Globe className="w-3.5 h-3.5 text-purple-500" />
-                          <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase">
-                            Corpus officiel
-                          </span>
-                        </div>
-                        <ul className="space-y-1">
-                          {globalDocs.slice(0, 5).map((doc) => (
-                            <li
-                              key={doc.id}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm text-gray-600 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/20"
-                            >
-                              <Globe className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-                              <span className="truncate">{doc.title}</span>
-                            </li>
-                          ))}
-                          {globalDocs.length > 5 && (
-                            <li className="text-xs text-purple-500 px-2">
-                              +{globalDocs.length - 5} autres...
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Documents personnels */}
+                                    <div className="space-y-4 max-h-64 overflow-y-auto">
+                    {/* Documents personnels - EN PREMIER */}
                     {userDocs.length > 0 && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
@@ -798,6 +770,34 @@ export const ChatbotPage: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Corpus ProfAssist - EN SECOND */}
+                    {globalDocs.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Globe className="w-3.5 h-3.5 text-purple-500" />
+                          <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase">
+                            Corpus ProfAssist
+                          </span>
+                        </div>
+                        <ul className="space-y-1">
+                          {globalDocs.slice(0, 5).map((doc) => (
+                            <li
+                              key={doc.id}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm text-gray-600 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/20"
+                            >
+                              <Globe className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                              <span className="truncate">{doc.title}</span>
+                            </li>
+                          ))}
+                          {globalDocs.length > 5 && (
+                            <li className="text-xs text-purple-500 px-2">
+                              +{globalDocs.length - 5} autres...
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+
                     {/* Lien vers Documents */}
                     <button
                       onClick={() => setActiveTab('documents')}
@@ -806,6 +806,7 @@ export const ChatbotPage: React.FC = () => {
                       Gérer mes documents →
                     </button>
                   </div>
+
                 )}
               </div>
             )}

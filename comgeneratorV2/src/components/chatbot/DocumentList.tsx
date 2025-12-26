@@ -29,7 +29,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
   const handleDelete = async (doc: RagDocument) => {
     // Bloquer si document global et pas admin
     if (doc.scope === 'global' && !isAdmin) {
-      alert('Les documents officiels ne peuvent pas être supprimés.');
+      alert('Les documents PROFASSIST ne peuvent pas être supprimés.');
       return;
     }
 
@@ -173,26 +173,8 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
         </button>
       </div>
 
-      <div className="space-y-4 max-h-80 overflow-y-auto">
-        {globalDocs.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-4 h-4 text-purple-500" />
-              <h4 className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
-                Corpus officiel
-              </h4>
-              {isAdmin && (
-                <span className="text-xs text-purple-400">(admin: suppression possible)</span>
-              )}
-            </div>
-            <div className="space-y-2">
-              {globalDocs.map((doc) => (
-                <DocumentItem key={doc.id} doc={doc} />
-              ))}
-            </div>
-          </div>
-        )}
-
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+        {/* Mes documents - EN PREMIER */}
         {userDocs.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -209,6 +191,26 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
           </div>
         )}
 
+        {/* Corpus ProfAssist - EN SECOND */}
+        {globalDocs.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="w-4 h-4 text-purple-500" />
+              <h4 className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+                Corpus ProfAssist
+              </h4>
+              {isAdmin && (
+                <span className="text-xs text-purple-400">(admin: suppression possible)</span>
+              )}
+            </div>
+            <div className="space-y-2">
+              {globalDocs.map((doc) => (
+                <DocumentItem key={doc.id} doc={doc} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {globalDocs.length > 0 && userDocs.length === 0 && (
           <div className="text-center py-4 border-t border-gray-200 dark:border-gray-700">
             <User className="w-6 h-6 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
@@ -218,6 +220,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
           </div>
         )}
       </div>
+
     </div>
   );
 };

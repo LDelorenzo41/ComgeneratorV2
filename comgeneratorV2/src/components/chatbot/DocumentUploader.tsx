@@ -231,7 +231,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             }`}
           >
             <Globe className="w-4 h-4" />
-            Officiel
+            ProfAssist
           </button>
         </div>
       )}
