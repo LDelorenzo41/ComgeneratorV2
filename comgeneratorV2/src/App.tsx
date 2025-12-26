@@ -42,6 +42,9 @@ import { SpecialOfferModal } from './components/SpecialOfferModal';
 // ✅ AJOUT : Import du bouton flottant chatbot
 import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
+// Import du feature flag
+import { FEATURES } from './lib/features';
+
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
 
@@ -188,16 +191,24 @@ function App() {
                     <SettingsPage />
                   </EmailConfirmationGuard>
                 } />
-                <Route path="/chatbot" element={
-                  <EmailConfirmationGuard>
-                    <ChatbotPage />
-                  </EmailConfirmationGuard>
-                } />
-                                <Route path="/chatbot-answers" element={
-                  <EmailConfirmationGuard>
-                    <ChatbotAnswerBankPage />
-                  </EmailConfirmationGuard>
-                } />
+                
+                {/* Chatbot - uniquement si activé */}
+                {FEATURES.CHATBOT_ENABLED && (
+                  <Route path="/chatbot" element={
+                    <EmailConfirmationGuard>
+                      <ChatbotPage />
+                    </EmailConfirmationGuard>
+                  } />
+                )}
+
+                {/* Banque de réponses chatbot - uniquement si activé */}
+                {FEATURES.CHATBOT_ENABLED && (
+                  <Route path="/chatbot-answers" element={
+                    <EmailConfirmationGuard>
+                      <ChatbotAnswerBankPage />
+                    </EmailConfirmationGuard>
+                  } />
+                )}
 
               </Route>
             </Routes>
@@ -210,11 +221,12 @@ function App() {
         {/* ✅ AJOUT : Modale cadeau spécial - s'affiche uniquement si user connecté */}
         {user && <SpecialOfferModal />}
         
-        {/* ✅ AJOUT : Bouton flottant chatbot - s'affiche uniquement si user connecté et option activée */}
-        {user && <ChatbotFloatingButton />}
+        {/* ✅ Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
+        {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
       </BrowserRouter>
     </CookieConsentProvider>
   );
 }
 
 export default App;
+
