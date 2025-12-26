@@ -13,10 +13,12 @@ import {
   Coins,
   FileText,
   TrendingUp,
-  Settings
+  Settings,
+  Bot
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
+import { FEATURES } from '../../lib/features';
 
 // Event pour notifier les changements de tokens ajout commentaire
 export const tokenUpdateEvent = new EventTarget();
@@ -181,6 +183,45 @@ export function Header() {
                           <TrendingUp className="w-4 h-4 mr-2" />
                           Flux RSS
                         </Link>
+                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                        
+                        {/* Mon Chatbot - Desktop */}
+                        {FEATURES.CHATBOT_ENABLED ? (
+                          <Link 
+                            to="/chatbot" 
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={() => setIsResourcesDropdownOpen(false)}
+                          >
+                            <Bot className="w-4 h-4 mr-2" />
+                            Mon Chatbot
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                          </Link>
+                        ) : (
+                          <span className="flex items-center px-4 py-2 text-sm text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                            <Bot className="w-4 h-4 mr-2" />
+                            Mon Chatbot
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                          </span>
+                        )}
+
+                        {/* Ma banque de réponses - Desktop */}
+                        {FEATURES.CHATBOT_ENABLED ? (
+                          <Link 
+                            to="/chatbot-answers" 
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={() => setIsResourcesDropdownOpen(false)}
+                          >
+                            <Database className="w-4 h-4 mr-2" />
+                            Ma banque de réponses
+                          </Link>
+                        ) : (
+                          <span className="flex items-center px-4 py-2 text-sm text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                            <Database className="w-4 h-4 mr-2" />
+                            Ma banque de réponses
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                          </span>
+                        )}
+
                       </div>
                     </div>
                   )}
@@ -381,6 +422,45 @@ export function Header() {
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Flux RSS
                 </Link>
+                <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
+                
+                {/* Mon Chatbot - Mobile */}
+                {FEATURES.CHATBOT_ENABLED ? (
+                  <Link 
+                    to="/chatbot" 
+                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Bot className="w-4 h-4 mr-2" />
+                    Mon Chatbot
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                  </Link>
+                ) : (
+                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                    <Bot className="w-4 h-4 mr-2" />
+                    Mon Chatbot
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                  </span>
+                )}
+
+                {/* Ma banque de réponses - Mobile */}
+                {FEATURES.CHATBOT_ENABLED ? (
+                  <Link 
+                    to="/chatbot-answers" 
+                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    Ma banque de réponses
+                  </Link>
+                ) : (
+                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                    <Database className="w-4 h-4 mr-2" />
+                    Ma banque de réponses
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                  </span>
+                )}
+
               </div>
             </div>
             <Link

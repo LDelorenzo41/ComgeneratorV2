@@ -162,6 +162,8 @@ ${params.personalNotes || "Aucune observation particulière"}
 
 6. **⚠️ RÈGLE CRITIQUE : Distinction entre critères ACTIONNABLES et critères de RÉSULTATS :**
 
+   **PRIORITÉ ABSOLUE : Établir des liens causaux UNIQUEMENT avec les critères évalués**
+   
    **CRITÈRES ACTIONNABLES** (peuvent être travaillés directement par l'élève) :
    - **Exemples** : attitude, écoute, application des consignes, participation, organisation, soin, autonomie, comportement, attention, rigueur, méthode de travail
    - **Comment les traiter** : Ces critères PEUVENT être mentionnés comme axes d'amélioration directs
@@ -172,69 +174,91 @@ ${params.personalNotes || "Aucune observation particulière"}
      - ✅ "Ton organisation doit être travaillée"
    
    **CRITÈRES DE RÉSULTATS** (conséquences du travail, ne peuvent PAS être travaillés directement) :
-   - **Exemples** : résultats, notes, performances, réussite aux évaluations, résultats aux contrôles, moyenne
-   - **ERREUR ABSOLUE À ÉVITER** : ❌ "Tu dois travailler tes résultats" / "Les résultats doivent être améliorés" / "Il faut travailler les notes"
-   - **Comment les traiter** : Présenter comme des CONSTATS et mentionner les CAUSES à travailler pour les améliorer
-   - **Formulations OBLIGATOIRES** :
-     - ✅ "Les résultats reflètent des difficultés de compréhension qui nécessitent un approfondissement des notions"
-     - ✅ "Les performances aux évaluations traduisent un besoin de renforcer la maîtrise des fondamentaux"
-     - ✅ "Pour améliorer les résultats, il conviendrait de travailler la méthodologie et d'approfondir les révisions"
-     - ✅ "Les notes témoignent d'un manque d'assimilation des concepts, un travail régulier permettrait de progresser"
-     - ✅ "Les résultats peuvent être améliorés par un investissement accru dans l'apprentissage des leçons"
+   - **Exemples** : résultats, notes, performances, réussite aux évaluations, résultats aux contrôles, moyenne, niveau
+   - **ERREUR ABSOLUE À ÉVITER** : 
+     - ❌ "Tu dois travailler tes résultats" / "Les résultats doivent être améliorés" / "Il faut travailler les notes"
+     - ❌ INVENTER des causes non évaluées (révisions, compréhension, etc.)
+   
+   **RÈGLE D'OR - ANALYSE CAUSALE STRICTE :**
+   
+   **CAS 1 : Il existe des critères ACTIONNABLES évalués qui peuvent expliquer les résultats**
+   → Tu DOIS faire le lien explicite entre résultats et critères actionnables évalués
+   
+   Exemples avec critères évalués [Résultats: Insuffisant, Application des consignes: Moyen] :
+   - ✅ "Les résultats insuffisants s'expliquent en partie par une application des consignes qui reste moyenne. En renforçant le respect des consignes, les performances progresseront."
+   - ✅ "Le niveau actuel est lié à une application encore fragile des consignes. Un effort sur ce point améliorera les résultats."
+   
+   **CAS 2 : Aucun critère actionnable évalué n'explique directement les résultats**
+   → Reste FACTUEL, ne mentionne QUE les critères évalués, n'invente RIEN
+   
+   Exemples avec critères évalués [Résultats: Insuffisant, Attitude: Bien, Participation: Bien] :
+   - ✅ "Les résultats restent insuffisants malgré une attitude et une participation satisfaisantes."
+   - ✅ "Le niveau actuel ne reflète pas encore l'attitude positive et la participation active."
+   - ❌ "Les résultats nécessitent un approfondissement des révisions" (INTERDIT si "révisions" n'est pas un critère évalué)
 
-   **RÈGLE D'OR** : Les résultats sont une CONSÉQUENCE, jamais un objectif direct. On travaille les CAUSES (compréhension, révisions, méthode, apprentissage), pas les résultats eux-mêmes.
-   **⚠️ RÈGLE SUPPLÉMENTAIRE – Analyse causale STRICTEMENT basée sur les critères fournis (OPTION A – Synonymes autorisés mais stricts)**
+7. **⚠️ RÈGLE GRAMMATICALE CRITIQUE pour les formulations avec les critères évalués :**
 
-Tu dois impérativement réaliser une analyse causale fondée UNIQUEMENT sur les critères réellement évalués.
+   Tu NE DOIS JAMAIS reprendre mot pour mot les niveaux "Très insuffisant / Insuffisant / Moyen / Assez bien / Bien / Très bien / Excellent" derrière un nom comme "attitude", "participation", "application des consignes", "comportement", "écoute", etc.
+   Tu dois TOUJOURS transformer ces niveaux en adjectifs corrects en français.
 
-1. **Identification obligatoire des catégories :**
-   - Critères de **RÉSULTATS** (ex : résultats, performances, réussite aux évaluations)
-   - Critères **ACTIONNABLES** (ex : attitude, participation, écoute, application des consignes, organisation, autonomie…)
+   ---
 
-2. **Lien causal OBLIGATOIRE :**
-   Tu dois relier :
-   - les critères de résultats faibles
-   - aux critères actionnables faibles ou moyens
-   mais UNIQUEMENT si ces critères figurent dans la liste fournie.
+   **7.1. Pour "niveau / résultats / notes / performances" :**
 
-   - Exemple correct :
-     « Les résultats insuffisants s'expliquent en partie par une application des consignes encore moyenne. »
+   Tu dois transformer le niveau en adjectif AVANT le nom.
 
-   - Exemple INTERDIT :
-     « Les résultats montrent un manque de révisions. »
-       (→ “révisions” n'est PAS un critère évalué)
+   - "Très insuffisant" → "un niveau très insuffisant" / "des résultats très insuffisants"
+   - "Insuffisant" → "des résultats insuffisants"
+   - "Moyen" → "un niveau moyen"
+   - "Assez bien" → "un assez **bon** niveau"
+   - "Bien" → "de **bons** résultats"
+   - "Très bien" → "un très **bon** niveau"
+   - "Excellent" → "d'**excellents** résultats"
 
-3. **Synonymes autorisés (OPTION A) :**
-   Tu peux reformuler un critère avec un synonyme, mais uniquement si :
-   - le sens reste EXACTEMENT identique,
-   - aucun nouveau concept n'est introduit,
-   - la reformulation ne sort pas du champ sémantique du critère.
+   **INTERDIT** :
+   - "un niveau assez bien"
+   - "des résultats bien"
+   - "un niveau très bien"
 
-   EXEMPLES AUTORISÉS :
-   - « application des consignes » → « respect des consignes »
-   - « participation » → « implication en classe »
-   - « attitude » → « comportement général »
+   ---
 
-   EXEMPLES INTERDITS :
-   - « compréhension », « révisions », « apprentissage des notions », 
-   - « méthode de travail », « fondamentaux », « concepts »
+   **7.2. Pour les critères de comportement, attitude et implication :**
 
-   (Tu ne peux PAS utiliser ces termes sauf si un critère strictement identique existe.)
+   Tu dois absolument convertir le niveau en adjectif adapté :
 
-4. **Si aucun critère actionnable n’explique les résultats :**
-   Tu dois écrire :
-   « Les résultats sont en retrait, sans qu’un critère particulier ne permette d’en expliquer clairement l’origine. »
-   Puis donner des conseils généraux et non causaux, SANS invention.
+   - "Attitude : Bien" → "une bonne attitude"
+   - "Attitude : Assez bien" → "une attitude assez bonne" ou "une attitude globalement satisfaisante"
+   - "Participation : Bien" → "une bonne participation"
+   - "Participation : Moyen" → "une participation moyenne"
+   - "Application des consignes : Assez bien" → 
+     - "une application des consignes assez bonne"
+     - ou "elle applique globalement bien les consignes"
+   - "Comportement : Très bien" → "un très bon comportement"
 
-5. **Gestion impérative des priorités :**
-   - Critères **Crucial** → prioritaires, à traiter en premier.
-   - Critères **Important** → développés dans la version détaillée.
-   - Critères **Normal** → mentionnés seulement si utile.
+   **INTERDIT** :
+   - "une attitude bien"
+   - "une attitude assez bien"
+   - "l'application des consignes est assez bien"
+   - "une participation bien"
+   - "un comportement bien"
 
-7. **Adaptation tonale selon le profil :**
+   ---
+
+   **7.3. RÈGLE D’OR**
+
+   Tu peux conserver les niveaux EXACTS dans la liste des critères (c’est ce que voit le professeur),  
+   mais dans l’appréciation tu dois TOUJOURS :
+
+   - transformer le niveau en adjectif grammaticalement correct,
+   - choisir parmi : bon / satisfaisant / correct / faible / limité / solide / attentif / sérieux / rigoureux…
+   - ne JAMAIS coller littéralement : “attitude + niveau”, “participation + niveau”, etc.
+
+   Ton texte DOIT toujours être du français naturel et professionnel.
+
+8. **Adaptation tonale selon le profil :**
 ${getToneInstructionsForAppreciation(params.tone)}
 
-8. **Cohérence évaluative :**
+9. **Cohérence évaluative :**
    - L'appréciation doit être **parfaitement cohérente** avec les niveaux attribués
    - Les critères d'importance "Crucial" doivent être **prioritaires** dans l'analyse
    - Les critères "Important" sont **développés** dans la version détaillée
@@ -242,21 +266,24 @@ ${getToneInstructionsForAppreciation(params.tone)}
 
 **PROCESSUS DE VÉRIFICATION OBLIGATOIRE :**
 1. VÉRIFIE d'abord que tu respectes le mode d'adresse : ${addressModeDescriptions[params.addressMode]}
-2. IDENTIFIE les critères de RÉSULTATS et assure-toi de les traiter comme des CONSTATS avec mention des CAUSES à travailler
-3. Rédige tes deux versions selon les instructions ci-dessus
-4. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
-5. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
-6. Si une version dépasse les limites : RACCOURCIS immédiatement
-7. Si une version est trop courte : DÉVELOPPE avec plus de détails
-8. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
-9. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
-10. VÉRIFIE que tu n'as JAMAIS suggéré de "travailler les résultats/notes/performances" directement
+2. IDENTIFIE les critères de RÉSULTATS et les critères ACTIONNABLES dans la liste fournie
+3. Si des résultats sont faibles ET qu'il existe des critères actionnables faibles : FAIS LE LIEN explicite
+4. N'INVENTE JAMAIS de causes non présentes dans les critères évalués
+5. VÉRIFIE la grammaire pour niveau/résultats/notes (adjectif AVANT le nom)
+6. Rédige tes deux versions selon les instructions ci-dessus
+7. VÉRIFIE que tu utilises le bon vocabulaire selon le type de compétence
+8. COMPTE PRÉCISÉMENT les caractères de chaque version (espaces compris)
+9. Si une version dépasse les limites : RACCOURCIS immédiatement
+10. Si une version est trop courte : DÉVELOPPE avec plus de détails
+11. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
+12. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
 
 **CONSIGNES DE FINALISATION :**
 - **Respect ABSOLU** du mode d'adresse ${addressModeDescriptions[params.addressMode]}
 - **Respect ABSOLU** des limites de caractères imposées
 - **Vocabulaire adapté** au type de compétence (disciplinaire/comportementale/méthodologique)
-- **Traitement correct** des critères de résultats (constats + causes, jamais comme axes d'action directs)
+- **Analyse causale STRICTE** : liens uniquement avec critères évalués, pas d'invention
+- **Grammaire correcte** : "un assez bon niveau" (PAS "un niveau assez bien")
 - **Exclusion totale** des critères "Non évalué" (déjà filtrés)
 - **Lisibilité** pour élèves, parents et équipe pédagogique
 - **Professionnalisme** dans le style et la présentation
@@ -269,8 +296,7 @@ Version détaillée :
 Version synthétique :
 [Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
 
-⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, et les critères de RÉSULTATS doivent TOUJOURS être présentés comme des CONSTATS avec mention des CAUSES à travailler (jamais "travailler les résultats").`;
-
+⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom.`;
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -278,11 +304,18 @@ Version synthétique :
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: 'system',
             content: `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
+
+⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
+Tu dois rester STRICTEMENT FACTUEL. 
+Tu NE DOIS JAMAIS inventer une cause, une explication, un raisonnement ou un lien qui n’est PAS explicitement présent dans les critères évalués.
+Si aucun lien causal évident n’existe entre les critères évalués, tu dois écrire : 
+"Aucun critère ne permet d'expliquer clairement ce niveau." 
+Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.
 
 ⚠️ RÈGLE ABSOLUE #1 - MODE D'ADRESSE :
 ${getSystemAddressModeMessage(params.addressMode)}
@@ -291,7 +324,9 @@ RÈGLE #2 : Tu dois ABSOLUMENT ignorer tous les critères marqués comme "Non é
 
 RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).
 
-RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES, pas des actions. JAMAIS dire "travailler les résultats" mais toujours mentionner les CAUSES à améliorer (compréhension, révisions, méthode, etc.).`
+RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES. Tu dois faire des liens causaux UNIQUEMENT avec les critères actionnables effectivement évalués. N'INVENTE JAMAIS de causes (révisions, compréhension, etc.) qui ne sont pas dans les critères évalués.
+
+RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").`
           },
           {
             role: 'user',
@@ -299,7 +334,7 @@ RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont 
           }
         ],
         max_tokens: Math.floor(params.maxLength * 2.5),
-        temperature: 0.7
+        temperature: 0.2
       })
     });
 
@@ -344,12 +379,30 @@ RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont 
     const expectedSummaryMin = Math.floor(params.maxLength * 0.35);
     const expectedSummaryMax = Math.floor(params.maxLength * 0.45);
 
-    // Correction de la version détaillée si nécessaire
     if (detailedLength > params.maxLength) {
-      console.warn(`Version détaillée trop longue (${detailedLength}/${params.maxLength}), troncature automatique`);
-      const lastSpace = detailed.lastIndexOf(' ', params.maxLength - 3);
-      detailed = detailed.substring(0, lastSpace > params.maxLength * 0.8 ? lastSpace : params.maxLength - 3) + '...';
-    }
+  console.warn(`Version détaillée trop longue (${detailedLength}/${params.maxLength}), coupe douce`);
+
+  // 1. On coupe à maxLength
+  let cut = detailed.substring(0, params.maxLength);
+
+  // 2. On cherche un point propre avant la fin
+  const lastDot = cut.lastIndexOf('.');
+  const lastSemi = cut.lastIndexOf(';');
+  const lastExcl = cut.lastIndexOf('!');
+  const lastQuest = cut.lastIndexOf('?');
+
+  const cutPoints = [lastDot, lastSemi, lastExcl, lastQuest];
+  const bestCut = Math.max(...cutPoints);
+
+  // 3. Si on a trouvé une fin de phrase → on coupe là
+  if (bestCut > params.maxLength * 0.6) {
+    detailed = cut.substring(0, bestCut + 1).trim();
+  } else {
+    // 4. Sinon coupe au dernier espace pour éviter une coupure de mot
+    const lastSpace = cut.lastIndexOf(' ');
+    detailed = cut.substring(0, lastSpace).trim();
+  }
+}
 
     // Correction de la version synthétique si nécessaire
     if (summaryLength > expectedSummaryMax) {

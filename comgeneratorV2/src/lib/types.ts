@@ -91,3 +91,32 @@ export interface BlogArticle {
   createdAt: string;
   updatedAt: string;
 }
+
+// ============================================
+// Types pour la banque de réponses chatbot
+// ============================================
+
+export type ChatbotAnswerCategory = 
+  | 'Cadre officiel'
+  | 'Conseil pédagogique'
+  | 'Exemple concret'
+  | 'Formulation institutionnelle';
+
+export interface ChatbotAnswer {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  category: ChatbotAnswerCategory;
+  subject: string | null;
+  level: string | null;
+  created_at: string;
+}
+
+export interface ChatbotAnswerInsert {
+  title: string;
+  content: string;
+  category: ChatbotAnswerCategory;
+  subject?: string | null;
+  level?: string | null;
+}
