@@ -267,9 +267,7 @@ export function SynthesePage() {
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
             Analysez vos bulletins PDF avec l'IA pour générer des synthèses personnalisées et pertinentes
           </p>
-         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-3">
-            Analysez vos bulletins PDF avec l'IA pour générer des synthèses personnalisées et pertinentes
-          </p>
+        
           
           <div className="mb-6">
             <a 
