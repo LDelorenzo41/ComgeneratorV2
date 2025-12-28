@@ -14,7 +14,9 @@ import {
   FileText,
   TrendingUp,
   Settings,
-  Bot
+  Bot,
+  Layers,      // ✅ AJOUT pour "Concevoir"
+  ClipboardList // ✅ AJOUT pour "Scénario"
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
@@ -31,6 +33,7 @@ export function Header() {
   const tokenCount = useTokenBalance();
   const [isResourcesDropdownOpen, setIsResourcesDropdownOpen] = React.useState(false);
   const [isSettingsDropdownOpen, setIsSettingsDropdownOpen] = React.useState(false);
+  const [isConcevoirDropdownOpen, setIsConcevoirDropdownOpen] = React.useState(false); // ✅ AJOUT
   const location = useLocation();
 
   const isLandingPage = location.pathname === '/landing' || 
@@ -70,11 +73,16 @@ export function Header() {
       if (!target.closest('.dropdown-settings')) {
         setIsSettingsDropdownOpen(false);
       }
+      // ✅ AJOUT : Fermer le dropdown Concevoir
+      if (!target.closest('.dropdown-concevoir')) {
+        setIsConcevoirDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ✅ MODIFICATION : "Leçons" retiré de navigationItems (sera dans "Concevoir")
   const navigationItems = [
     {
       name: 'Appréciations',
@@ -85,11 +93,6 @@ export function Header() {
       name: 'Synthèse',
       path: '/synthese',
       icon: <FileText className="w-5 h-5" />
-    },
-    {
-      name: 'Leçons',
-      path: '/generate-lesson',
-      icon: <BookOpen className="w-5 h-5" />
     }
   ];
 
@@ -133,6 +136,53 @@ export function Header() {
                     <span className="ml-2">{item.name}</span>
                   </Link>
                 ))}
+
+                {/* ✅ NOUVEAU : Menu déroulant "Concevoir" - Desktop */}
+                <div className="relative dropdown-concevoir">
+                  <button
+                    onClick={() => setIsConcevoirDropdownOpen(!isConcevoirDropdownOpen)}
+                    className={`flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors ${
+                      ['/scenario-pedagogique', '/generate-lesson', '/scenarios-bank'].includes(location.pathname)
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
+                        : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Layers className="w-5 h-5" />
+                    <span className="ml-2">Concevoir</span>
+                  </button>
+                  {isConcevoirDropdownOpen && (
+                    <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-56">
+                      <div className="flex flex-col py-2">
+                        <Link 
+                          to="/scenario-pedagogique" 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsConcevoirDropdownOpen(false)}
+                        >
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Scénario pédagogique
+                        </Link>
+                        <Link 
+                          to="/generate-lesson" 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsConcevoirDropdownOpen(false)}
+                        >
+                          <BookOpen className="w-4 h-4 mr-2" />
+                          Séances pédagogiques
+                        </Link>
+                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                        <Link 
+                          to="/scenarios-bank" 
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsConcevoirDropdownOpen(false)}
+                        >
+                          <Database className="w-4 h-4 mr-2" />
+                          Banque de scénarios
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <Link
                   to="/communication"
                   className={`flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -376,6 +426,42 @@ export function Header() {
                 <span className="ml-2">{item.name}</span>
               </Link>
             ))}
+
+            {/* ✅ NOUVEAU : Menu "Concevoir" - Mobile */}
+            <div className="block px-3 py-2">
+              <span className="text-gray-700 dark:text-gray-200 font-semibold flex items-center">
+                <Layers className="w-4 h-4 mr-2" />
+                Concevoir
+              </span>
+              <div className="ml-6 mt-1 space-y-1">
+                <Link 
+                  to="/scenario-pedagogique" 
+                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <ClipboardList className="w-4 h-4 mr-2" />
+                  Scénario pédagogique
+                </Link>
+                <Link 
+                  to="/generate-lesson" 
+                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Séances pédagogiques
+                </Link>
+                <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
+                <Link 
+                  to="/scenarios-bank" 
+                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Database className="w-4 h-4 mr-2" />
+                  Banque de scénarios
+                </Link>
+              </div>
+            </div>
+
             <Link
               to="/communication"
               className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
@@ -507,3 +593,4 @@ export function Header() {
     </header>
   );
 }
+

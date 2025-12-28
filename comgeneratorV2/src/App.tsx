@@ -23,6 +23,10 @@ import LessonsBankPage from './pages/LessonsBankPage';
 // Import de la nouvelle page banque de réponses chatbot
 import { ChatbotAnswerBankPage } from './pages/ChatbotAnswerBankPage';
 
+// Import de la page Scénario pédagogique
+import { ScenarioPedagogiquePage } from './pages/ScenarioPedagogiquePage';
+// Import de la page Banque de scénarios
+import { ScenariosBankPage } from './pages/ScenariosBankPage';
 
 // Import des routes légales
 import { LegalRoutes } from './routes/LegalRoutes';
@@ -36,10 +40,10 @@ import { ChatbotPage } from './pages/ChatbotPage';
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
 
-// ✅ AJOUT : Import de la modale cadeau
+// Import de la modale cadeau
 import { SpecialOfferModal } from './components/SpecialOfferModal';
 
-// ✅ AJOUT : Import du bouton flottant chatbot
+// Import du bouton flottant chatbot
 import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
 // Import du feature flag
@@ -186,6 +190,18 @@ function App() {
                     <LessonGeneratorPage />
                   </EmailConfirmationGuard>
                 } />
+                {/* Route Scénario pédagogique */}
+                <Route path="/scenario-pedagogique" element={
+                  <EmailConfirmationGuard>
+                    <ScenarioPedagogiquePage />
+                  </EmailConfirmationGuard>
+                } />
+                {/* Route Banque de scénarios */}
+                <Route path="/scenarios-bank" element={
+                  <EmailConfirmationGuard>
+                    <ScenariosBankPage />
+                  </EmailConfirmationGuard>
+                } />
                 <Route path="/settings" element={
                   <EmailConfirmationGuard>
                     <SettingsPage />
@@ -218,10 +234,10 @@ function App() {
         
         <CookieBanner />
         
-        {/* ✅ AJOUT : Modale cadeau spécial - s'affiche uniquement si user connecté */}
+        {/* Modale cadeau spécial - s'affiche uniquement si user connecté */}
         {user && <SpecialOfferModal />}
         
-        {/* ✅ Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
+        {/* Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
         {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
       </BrowserRouter>
     </CookieConsentProvider>
@@ -229,4 +245,5 @@ function App() {
 }
 
 export default App;
+
 

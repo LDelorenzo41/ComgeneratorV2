@@ -4,7 +4,7 @@
 
 export const FEATURES = {
   // Chatbot et banque de réponses - à activer quand prêt
-  CHATBOT_ENABLED: false,
+  CHATBOT_ENABLED: true,
   
   // Autres features à venir...
 } as const;
