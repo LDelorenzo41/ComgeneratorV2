@@ -1,12 +1,10 @@
 // supabase/functions/rag-chat/index.ts
-// Edge Function pour le chat RAG avec:
-// - Mode de recherche: Rapide (économique) / Précis (complet)
-// - Query Rewriting amélioré pour questions comparatives
-// - HyDE (Hypothetical Document Embeddings)
-// - Re-ranking LLM
-// - text-embedding-3-large (dimensions réduites à 1536)
-// - Déduction des tokens du compte utilisateur
-// - Citation des sources dans les réponses
+// VERSION "MULTI-DOMAINES" (V1 Intelligence + V2 Sécurité + Architecture Générique)
+// - Supporte: LANGUES (CECR), EPS, SCIENCES, HUMANITES (Configurable)
+// - Sécurité: Filtrage strict des documents autorisés
+// - Ranking: Hybride (Ne supprime pas les documents pertinents)
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 declare const Deno: {
   env: {
@@ -16,36 +14,98 @@ declare const Deno: {
 };
 
 // ============================================================================
-// CONFIGURATION
+// 1. CONFIGURATION DES DOMAINES MÉTIER (Le Cœur du Système)
 // ============================================================================
+
+interface DomainConfig {
+  id: string;
+  name: string;
+  keywords: RegExp[];       // Regex pour détecter l'intention dans la question
+  docPatterns: string[];    // Mots-clés pour identifier les documents (titre)
+  bonus: number;            // Bonus de score
+  minDocs: number;          // Minimum de documents à garantir (Rescue)
+  promptRole: string;       // Rôle pour le prompt système
+}
+
+const DOMAINS: Record<string, DomainConfig> = {
+  LANGUES: {
+    id: 'LANGUES',
+    name: 'Langues Vivantes / CECR',
+    keywords: [
+      /\bcecr\b/i, /\bniveau\s*de\s*langue/i, /\b[a-c][1-2]\b/i, 
+      /\bcompétence\s*linguistique/i, /\blangue\s*vivante/i, /\blv[1-2]\b/i,
+      /\boral\s*(compréhension|production)/i, /\bécrit\s*(compréhension|production)/i
+    ],
+    docPatterns: ['cecr', 'cecrl', 'cadre européen', 'guide-langue', 'reperles'],
+    bonus: 0.25,
+    minDocs: 3,
+    promptRole: "Expert en didactique des langues et CECR"
+  },
+  EPS: {
+    id: 'EPS',
+    name: 'Éducation Physique et Sportive',
+    keywords: [
+      /\beps\b/i, /\béducation\s*physique/i, /\bchamp\s*d'apprentissage/i, 
+      /\bapsa\b/i, /\bmotricité/i, /\bperformance\s*sportive/i, /\bsport\b/i
+    ],
+    docPatterns: ['eps', 'éducation physique', 'sport', 'apsa', 'guide-eps'],
+    bonus: 0.20,
+    minDocs: 2,
+    promptRole: "Expert en pédagogie de l'EPS et motricité"
+  },
+  SCIENCES: {
+    id: 'SCIENCES',
+    name: 'Mathématiques et Sciences',
+    keywords: [
+      /\bmath[s]?\b/i, /\bmathématique/i, /\bgéométrie/i, /\balgèbre/i, 
+      /\bthéorème/i, /\bcalcul\b/i, /\bphysique\b/i, /\bchimie\b/i, /\bsvt\b/i
+    ],
+    docPatterns: ['math', 'science', 'physique', 'chimie'],
+    bonus: 0.15,
+    minDocs: 2,
+    promptRole: "Expert en didactique des sciences"
+  },
+  HUMANITES: {
+    id: 'HUMANITES',
+    name: 'Histoire-Géo et Français',
+    keywords: [
+      /\bhistoire\b/i, /\bgéographie\b/i, /\bemc\b/i, /\bfrançais\b/i, 
+      /\blittérature/i, /\bgrammaire/i, /\bchronologie/i
+    ],
+    docPatterns: ['histoire', 'géographie', 'français', 'littérature'],
+    bonus: 0.15,
+    minDocs: 2,
+    promptRole: "Expert en humanités et culture générale"
+  }
+};
 
 const CONFIG = {
   // Recherche
   defaultTopK: 8,
   maxTopK: 15,
-  similarityThreshold: 0.30,
+  similarityThreshold: 0.28,
+  
+  // Bonus générique (hors domaines)
+  referenceDocBonus: 0.10, // Bonus pour tout document "officiel" (Programme, Guide...)
   
   // Modèles
   chatModel: 'gpt-4o-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
   
-  // Query Rewriting
+  // LLM Helpers
   queryRewritingModel: 'gpt-4o-mini',
-  
-  // HyDE (Hypothetical Document Embeddings)
   hydeModel: 'gpt-4o-mini',
-  
-  // Re-ranking
   rerankingModel: 'gpt-4o-mini',
-  rerankingChunkCount: 20,
+  
+  // Paramètres Re-ranking Hybride
+  rerankingChunkCount: 25,
+  rerankingContextLength: 1000,
   finalChunkCount: 10,
   
   // Historique
   maxHistoryMessages: 10,
-  
-  // Sources
-  excerptLength: 400,
+  excerptLength: 450,
 };
 
 // ============================================================================
@@ -64,6 +124,12 @@ interface ChatRequest {
   topK?: number;
 }
 
+interface DocumentInfo {
+  id: string;
+  title: string;
+  scope: string;
+}
+
 interface MatchedChunk {
   id: string;
   documentId: string;
@@ -72,6 +138,8 @@ interface MatchedChunk {
   content: string;
   score: number;
   scope?: 'global' | 'user';
+  rerankScore?: number;
+  llmRawScore?: number;
 }
 
 interface SourceChunk {
@@ -84,16 +152,6 @@ interface SourceChunk {
   scope?: 'global' | 'user';
 }
 
-interface ChatResponse {
-  answer: string;
-  sources: SourceChunk[];
-  conversationId: string;
-  tokensUsed: number;
-  tokensRemaining?: number;
-  mode: ChatMode;
-  searchMode: SearchMode;
-}
-
 // ============================================================================
 // HELPERS - CORS & AUTH
 // ============================================================================
@@ -104,135 +162,134 @@ const corsHeaders = {
 };
 
 async function createSupabaseClient(authHeader: string) {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-  return createClient(supabaseUrl, supabaseKey, {
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: authHeader } },
   });
 }
 
 async function createServiceClient() {
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-  return createClient(supabaseUrl, serviceRoleKey);
+  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 }
 
 // ============================================================================
-// DÉTECTION DE QUESTION COMPARATIVE
+// INTELLIGENCE MÉTIER & DÉTECTION
 // ============================================================================
 
+// 1. Détection du Domaine
+function detectDomainIntent(query: string): DomainConfig | null {
+  for (const domain of Object.values(DOMAINS)) {
+    if (domain.keywords.some(regex => regex.test(query))) {
+      console.log(`[rag-chat] Domain detected: ${domain.id}`);
+      return domain;
+    }
+  }
+  return null;
+}
+
+// 2. Identification Document <-> Domaine
+function isDomainDocument(docTitle: string, domain: DomainConfig): boolean {
+  const titleLower = docTitle.toLowerCase();
+  return domain.docPatterns.some(p => titleLower.includes(p));
+}
+
+// 3. Identification Document "Officiel" (Générique)
+function isReferenceDocument(title: string): boolean {
+  return /programme|guide|référentiel|officiel|accompagnement/i.test(title.toLowerCase());
+}
+
+// 4. Détection Comparative (V1 Logic)
 function isComparativeQuestion(query: string): boolean {
   const comparativePatterns = [
-    /diff[ée]ren/i,
-    /compar/i,
-    /entre.+et/i,
-    /versus|vs/i,
-    /par rapport/i,
-    /contrairement/i,
-    /similitude/i,
-    /commun/i,
-    /cycle\s*\d.+cycle\s*\d/i,
+    /diff[ée]ren/i, /compar/i, /entre.+et/i, /versus|vs/i, /par rapport/i,
+    /contrairement/i, /similitude/i, /commun/i, /cycle\s*\d.+cycle\s*\d/i,
+    /niveau\s*[A-C][1-2].+niveau\s*[A-C][1-2]/i,
   ];
   return comparativePatterns.some(p => p.test(query));
 }
 
 function extractComparisonTargets(query: string): string[] {
   const targets: string[] = [];
-  
   const cycleMatches = query.match(/cycle\s*(\d)/gi);
   if (cycleMatches) {
     const seenNums = new Set<string>();
-    for (const match of cycleMatches) {
-      const num = match.match(/\d/)?.[0];
-      if (num && !seenNums.has(num)) {
-        seenNums.add(num);
-        targets.push(`cycle_${num}`);
-      }
-    }
+    cycleMatches.forEach(m => {
+      const num = m.match(/\d/)?.[0];
+      if (num && !seenNums.has(num)) { seenNums.add(num); targets.push(`cycle_${num}`); }
+    });
   }
-  
+  // Extraction spécifique pour le domaine Langues (legacy support)
+  const cecrMatches = query.match(/\b[A-Ca-c][1-2]\b/gi);
+  if (cecrMatches) {
+    const seen = new Set<string>();
+    cecrMatches.forEach(m => {
+      const l = m.toUpperCase();
+      if (!seen.has(l)) { seen.add(l); targets.push(`cecr_${l}`); }
+    });
+  }
   return targets;
 }
 
+// Helper pour Langues (V1)
+function extractCECRLevels(query: string): string[] {
+  const matches = query.match(/\b[A-Ca-c][1-2]\b/gi);
+  return matches ? [...new Set(matches.map(m => m.toUpperCase()))] : [];
+}
+
 // ============================================================================
-// HyDE: HYPOTHETICAL DOCUMENT EMBEDDINGS
+// HyDE: HYPOTHETICAL DOCUMENT EMBEDDINGS (ADAPTATIF)
 // ============================================================================
 
 async function generateHypotheticalAnswer(
   query: string,
+  domain: DomainConfig | null,
   apiKey: string
 ): Promise<{ hypotheticalAnswer: string; tokensUsed: number }> {
   const isComparative = isComparativeQuestion(query);
   const targets = extractComparisonTargets(query);
 
-  console.log(`[rag-chat] HyDE: Generating for "${query.substring(0, 50)}..." (comparative: ${isComparative})`);
-
   let prompt: string;
   
-  if (isComparative && targets.length >= 2) {
-    prompt = `Tu es un expert en programmes scolaires français. Génère une réponse comparative détaillée.
-
-Question: "${query}"
-
-IMPORTANT pour cette question COMPARATIVE:
-- Compare explicitement ${targets.map(t => t.replace('_', ' ')).join(' et ')}
-- Structure la réponse avec les spécificités de CHAQUE niveau/cycle
-- Utilise le vocabulaire officiel (compétences, attendus, objectifs, etc.)
-- Mentionne les différences ET les points communs
-- 200-400 mots
-
-Réponse hypothétique structurée:`;
+  if (domain?.id === 'LANGUES') {
+    // Prompt Spécifique Langues (V1)
+    const levels = extractCECRLevels(query).join(', ') || 'les niveaux';
+    prompt = `Tu es un ${domain.promptRole}. Génère une réponse technique sur "${query}".
+    IMPORTANT (${levels}):
+    - Utilise vocabulaire CECR: descripteurs, production/réception.
+    - Décris ce que l'élève "peut faire".
+    - 200-400 mots.`;
+  } else if (domain?.id === 'EPS') {
+    // Prompt Spécifique EPS
+    prompt = `Tu es un ${domain.promptRole}. Réponds à "${query}".
+    IMPORTANT:
+    - Utilise le vocabulaire officiel (Champs d'Apprentissage, AFC, Attendus).
+    - Mentionne les conduites motrices et situations d'apprentissage.
+    - 200-400 mots.`;
+  } else if (isComparative && targets.length >= 2) {
+    // Prompt Comparatif V1
+    prompt = `Expert Programmes Scolaires. Compare explicitement ${targets.map(t => t.replace('_', ' ')).join(' et ')} pour "${query}".
+    - Structure par différences et similitudes.
+    - Spécificités de chaque cycle.`;
   } else {
-    prompt = `Tu es un expert en éducation nationale française. Génère une réponse complète et détaillée.
-
-Question: "${query}"
-
-IMPORTANT:
-- Écris une réponse factuelle et structurée
-- Utilise le vocabulaire officiel de l'Éducation Nationale
-- Inclus des termes spécifiques (cycles, compétences, attendus, programmes)
-- 150-300 mots
-
-Réponse hypothétique:`;
+    // Prompt Standard
+    prompt = `Expert Éducation Nationale. Réponds factuellement à "${query}".
+    - Utilise le vocabulaire officiel.
+    - Structure claire.`;
   }
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CONFIG.hydeModel,
-        messages: [
-          { 
-            role: 'system', 
-            content: 'Tu es un assistant expert en programmes scolaires français. Tu génères des réponses détaillées basées sur les textes officiels.' 
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 600,
+        messages: [{ role: 'system', content: 'Tu es un expert pédagogique.' }, { role: 'user', content: prompt }],
+        temperature: 0.3, max_tokens: 600,
       }),
     });
 
-    if (!response.ok) {
-      console.warn('[rag-chat] HyDE generation failed, using original query');
-      return { hypotheticalAnswer: query, tokensUsed: 0 };
-    }
-
+    if (!response.ok) return { hypotheticalAnswer: query, tokensUsed: 0 };
     const data = await response.json();
-    const hypotheticalAnswer = data.choices[0]?.message?.content || query;
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    console.log(`[rag-chat] HyDE: Generated ${hypotheticalAnswer.length} chars`);
-
-    return { hypotheticalAnswer, tokensUsed };
+    return { hypotheticalAnswer: data.choices[0]?.message?.content || query, tokensUsed: data.usage?.total_tokens || 0 };
   } catch (error) {
     console.warn('[rag-chat] HyDE error:', error);
     return { hypotheticalAnswer: query, tokensUsed: 0 };
@@ -240,96 +297,320 @@ Réponse hypothétique:`;
 }
 
 // ============================================================================
-// QUERY REWRITING
+// QUERY REWRITING (ADAPTATIF)
 // ============================================================================
 
 async function rewriteQueryForSearch(
   query: string,
+  domain: DomainConfig | null,
   apiKey: string
 ): Promise<{ queries: string[]; tokensUsed: number }> {
-  const isComparative = isComparativeQuestion(query);
-  const targets = extractComparisonTargets(query);
-
-  console.log(`[rag-chat] Query Rewriting: "${query.substring(0, 50)}..."`);
-
   let prompt: string;
   
-  if (isComparative && targets.length >= 2) {
-    prompt = `Tu es un expert en recherche documentaire pour l'éducation nationale.
-
-Question COMPARATIVE originale: "${query}"
-
-Cette question compare: ${targets.map(t => t.replace('_', ' ')).join(' et ')}
-
-Génère des requêtes de recherche SÉPARÉES:
-1. Des requêtes spécifiques pour ${targets[0]?.replace('_', ' ')}
-2. Des requêtes spécifiques pour ${targets[1]?.replace('_', ' ')}
-3. Des requêtes sur le thème général (sans filtre de niveau)
-
-Inclus les termes: EPS, éducation physique, objectifs, compétences, attendus, programmes
-
-Réponds UNIQUEMENT avec un JSON:
-{"queries": ["requête 1", "requête 2", ...]}
-
-Génère 5-6 requêtes variées.`;
+  if (domain?.id === 'LANGUES') {
+    const levels = extractCECRLevels(query).join(', ');
+    prompt = `Expert Recherche CECR. Question: "${query}"
+    Génère des mots-clés ciblant:
+    1. Termes CECR (descripteurs, compétences)
+    2. Niveaux spécifiques (${levels})
+    JSON: {"queries": ["q1", "q2", ...]}`;
+  } else if (domain?.id === 'EPS') {
+    prompt = `Expert Recherche EPS. Question: "${query}"
+    Génère des mots-clés ciblant:
+    1. Champs d'apprentissage
+    2. Activités physiques (APSA)
+    3. Compétences visées
+    JSON: {"queries": ["q1", "q2", ...]}`;
   } else {
-    prompt = `Tu es un expert en éducation nationale française. Reformule cette question pour la recherche documentaire.
-
-Question: "${query}"
-
-Génère 3-4 reformulations avec:
-1. Termes officiels de l'Éducation Nationale
-2. Synonymes pertinents
-3. Niveaux scolaires précisés
-4. Abréviations ET formes longues (EPS/éducation physique)
-
-Réponds en JSON: {"queries": ["reformulation 1", "reformulation 2", ...]}`;
+    prompt = `Expert Recherche Éducation. Reformule: "${query}" pour moteur documentaire.
+    Utilise synonymes officiels et niveaux scolaires.
+    JSON: {"queries": ["q1", "q2", ...]}`;
   }
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CONFIG.queryRewritingModel,
-        messages: [
-          { role: 'system', content: 'Tu génères des requêtes de recherche. Réponds uniquement en JSON valide.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 400,
+        messages: [{ role: 'system', content: 'JSON only.' }, { role: 'user', content: prompt }],
+        temperature: 0.3, max_tokens: 300,
       }),
     });
-
-    if (!response.ok) {
-      console.warn('[rag-chat] Query Rewriting failed');
-      return { queries: [query], tokensUsed: 0 };
-    }
-
+    if (!response.ok) return { queries: [query], tokensUsed: 0 };
     const data = await response.json();
-    const content = data.choices[0]?.message?.content || '';
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = data.choices[0]?.message?.content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      const queries = [query, ...(parsed.queries || [])];
-      console.log(`[rag-chat] Query variations: ${queries.length}`);
-      return { queries: queries.slice(0, 7), tokensUsed };
+      return { queries: [query, ...(parsed.queries || [])].slice(0, 6), tokensUsed: data.usage?.total_tokens || 0 };
     }
-
-    return { queries: [query], tokensUsed };
+    return { queries: [query], tokensUsed: data.usage?.total_tokens || 0 };
   } catch (error) {
-    console.warn('[rag-chat] Query Rewriting error:', error);
     return { queries: [query], tokensUsed: 0 };
   }
 }
 
 // ============================================================================
-// RE-RANKING
+// EXTRACTION TERMES-CLÉS (ÉLARGIE)
+// ============================================================================
+
+function extractKeyTerms(query: string): string[] {
+  const lowerQuery = query.toLowerCase();
+  const terms: string[] = [];
+
+  const mappings: Record<string, string[]> = {
+    // Cycles
+    'maternelle': ['cycle 1'], 'cycle 1': ['maternelle'],
+    'cycle 2': ['CP', 'CE1', 'CE2'],
+    'cycle 3': ['CM1', 'CM2', '6e'], 'cycle 4': ['5e', '4e', '3e'],
+    // EPS
+    'eps': ['éducation physique', 'sport', 'apsa'],
+    'sport': ['eps', 'éducation physique'],
+    // Langues
+    'a1': ['A1', 'débutant'], 'a2': ['A2', 'élémentaire'],
+    'b1': ['B1', 'indépendant'], 'b2': ['B2', 'avancé'],
+    'c1': ['C1', 'autonome'],
+    'cecr': ['cadre européen', 'descripteur'],
+    // Maths
+    'math': ['mathématiques', 'calcul'], 'géométrie': ['figure', 'espace'],
+  };
+
+  // Mots simples
+  query.split(/[\s,.?!]+/).forEach(w => {
+    if (w.length > 3 && !['pour','avec','dans','quel','comment'].includes(w.toLowerCase())) terms.push(w);
+  });
+
+  // Regex Niveaux
+  const levelMatch = query.match(/\b([A-Ca-c][1-2])\b/g);
+  if (levelMatch) levelMatch.forEach(l => terms.push(l.toUpperCase()));
+
+  // Mapping
+  for (const [k, v] of Object.entries(mappings)) {
+    if (lowerQuery.includes(k)) terms.push(...v);
+  }
+
+  return [...new Set(terms)];
+}
+
+// ============================================================================
+// GESTION DOCUMENTS (SÉCURITÉ V2)
+// ============================================================================
+
+async function getAllowedDocuments(supabase: any, userId: string, docId?: string): Promise<Map<string, DocumentInfo>> {
+  const docsMap = new Map<string, DocumentInfo>();
+  console.log(`[rag-chat] === SECURITY: Fetching allowed documents ===`);
+
+  let query = supabase.from('rag_documents').select('id, title, scope, user_id').eq('status', 'ready');
+  if (docId) query = query.eq('id', docId);
+  else query = query.or(`scope.eq.global,user_id.eq.${userId}`);
+
+  const { data } = await query;
+  if (data) {
+    data.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
+    console.log(`[rag-chat] Allowed docs count: ${data.length}`);
+  }
+  return docsMap;
+}
+
+// ============================================================================
+// EMBEDDINGS
+// ============================================================================
+
+async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CONFIG.embeddingModel,
+        input: text.replace(/\n/g, ' '),
+        dimensions: CONFIG.embeddingDimensions,
+      }),
+    });
+    if (!response.ok) throw new Error(`Embedding API Error: ${response.statusText}`);
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (err) {
+    console.error('[rag-chat] Embedding Error:', err);
+    throw err;
+  }
+}
+
+// ============================================================================
+// STRATÉGIES DE RECHERCHE (V1 + V2 Unifiées)
+// ============================================================================
+
+// 1. Vectorielle
+async function searchByVector(supabase: any, userId: string, embedding: number[], topK: number, allowedDocIds: Set<string>): Promise<MatchedChunk[]> {
+  try {
+    const { data, error } = await supabase.rpc('match_rag_chunks', {
+      p_query_embedding: `[${embedding.join(',')}]`,
+      p_similarity_threshold: CONFIG.similarityThreshold,
+      p_match_count: topK * 3,
+      p_user_id: userId,
+      p_document_id: null,
+    });
+
+    if (error) return [];
+
+    return (data || [])
+      .filter((item: any) => allowedDocIds.has(item.document_id))
+      .map((item: any) => ({
+        id: item.id, documentId: item.document_id, documentTitle: item.document_title,
+        chunkIndex: item.chunk_index, content: item.content, score: item.similarity, scope: item.scope,
+      }));
+  } catch (err) { return []; }
+}
+
+// 2. Mots-clés (Robust V2)
+async function searchByKeywords(
+  supabase: any,
+  allowedDocIds: string[],
+  allowedDocs: Map<string, DocumentInfo>,
+  keywords: string[]
+): Promise<MatchedChunk[]> {
+  if (keywords.length === 0 || allowedDocIds.length === 0) return [];
+  
+  const chunkScores = new Map<string, { chunk: MatchedChunk; score: number }>();
+  const effectiveKeywords = keywords.slice(0, 5);
+
+  for (const keyword of effectiveKeywords) {
+    if (keyword.length < 3) continue;
+    const { data: chunks } = await supabase
+      .from('rag_chunks')
+      .select('id, document_id, chunk_index, content, scope')
+      .in('document_id', allowedDocIds)
+      .ilike('content', `%${keyword}%`)
+      .limit(8);
+
+    if (chunks) {
+      for (const chunk of chunks) {
+        const doc = allowedDocs.get(chunk.document_id);
+        if (!doc) continue;
+        
+        const key = chunk.id;
+        const existing = chunkScores.get(key);
+        const titleBonus = doc.title.toLowerCase().includes(keyword.toLowerCase()) ? 0.2 : 0;
+
+        if (existing) {
+          existing.score += 0.3 + titleBonus;
+        } else {
+          chunkScores.set(key, {
+            chunk: {
+              id: chunk.id, documentId: doc.id, documentTitle: doc.title,
+              chunkIndex: chunk.chunk_index, content: chunk.content,
+              score: 0.70 + titleBonus, scope: chunk.scope as any || doc.scope,
+            },
+            score: 0.70 + titleBonus,
+          });
+        }
+      }
+    }
+  }
+  return Array.from(chunkScores.values()).sort((a, b) => b.score - a.score).map(i => i.chunk);
+}
+
+// 3. Recherche Spécifique Domaine (Généralisation de searchCECRDocuments)
+async function searchSpecificDomainDocuments(
+  supabase: any,
+  allowedDocs: Map<string, DocumentInfo>,
+  domain: DomainConfig,
+  query: string
+): Promise<MatchedChunk[]> {
+  const targetDocIds: string[] = [];
+  
+  // Filtrer les documents qui correspondent au pattern du domaine (ex: contient "EPS")
+  allowedDocs.forEach((doc, id) => {
+    if (isDomainDocument(doc.title, domain)) targetDocIds.push(id);
+  });
+
+  if (targetDocIds.length === 0) return [];
+  console.log(`[rag-chat] Searching specific ${domain.id} docs (${targetDocIds.length} found)...`);
+
+  const { data: chunks } = await supabase
+    .from('rag_chunks')
+    .select('id, document_id, chunk_index, content, scope')
+    .in('document_id', targetDocIds)
+    .limit(30);
+
+  const results: MatchedChunk[] = [];
+  
+  if (chunks) {
+    for (const chunk of chunks) {
+      const contentLower = chunk.content.toLowerCase();
+      let score = 0.85; // Base élevée car doc spécifique
+
+      // Bonus si mots-clés de la query présents
+      const queryWords = extractKeyTerms(query);
+      let matches = 0;
+      queryWords.forEach(w => { if (contentLower.includes(w.toLowerCase())) matches++; });
+      
+      score += (matches * 0.05);
+
+      if (matches > 0 || domain.id === 'LANGUES') { // Pour langues on est plus permissif (niveaux)
+         results.push({
+           id: chunk.id, documentId: chunk.document_id, documentTitle: allowedDocs.get(chunk.document_id)!.title,
+           chunkIndex: chunk.chunk_index, content: chunk.content, score, scope: chunk.scope as any
+         });
+      }
+    }
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 15);
+}
+
+// ============================================================================
+// LOGIQUE MÉTIER & BONUS (V2 GENERALISÉE)
+// ============================================================================
+
+function applyDomainBonus(
+  chunks: MatchedChunk[],
+  domain: DomainConfig | null
+): MatchedChunk[] {
+  console.log(`[rag-chat] Applying Domain Bonuses (${domain?.id || 'None'})...`);
+  
+  return chunks.map(chunk => {
+    let newScore = chunk.score;
+    
+    // 1. Bonus Document Officiel (Générique)
+    if (isReferenceDocument(chunk.documentTitle)) newScore += CONFIG.referenceDocBonus;
+
+    // 2. Bonus Domaine Spécifique
+    if (domain && isDomainDocument(chunk.documentTitle, domain)) {
+      newScore += domain.bonus;
+    }
+    
+    return { ...chunk, score: newScore };
+  }).sort((a, b) => b.score - a.score);
+}
+
+function ensureDomainDocuments(
+  chunks: MatchedChunk[],
+  allAvailableChunks: MatchedChunk[],
+  domain: DomainConfig | null,
+  topK: number
+): MatchedChunk[] {
+  if (!domain) return chunks.slice(0, topK);
+
+  const domainChunks = chunks.filter(c => isDomainDocument(c.documentTitle, domain));
+  
+  if (domainChunks.length >= domain.minDocs) return chunks.slice(0, topK);
+
+  console.log(`[rag-chat] Rescue: Injecting missing ${domain.id} documents...`);
+  
+  const existingIds = new Set(chunks.map(c => c.id));
+  const missingCount = domain.minDocs - domainChunks.length;
+  
+  const rescueChunks = allAvailableChunks
+    .filter(c => isDomainDocument(c.documentTitle, domain) && !existingIds.has(c.id))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, missingCount);
+    
+  const merged = [...chunks, ...rescueChunks].sort((a, b) => b.score - a.score);
+  return merged.slice(0, topK);
+}
+
+// ============================================================================
+// RE-RANKING (HYBRIDE & DOUX)
 // ============================================================================
 
 async function rerankChunksWithLLM(
@@ -338,926 +619,226 @@ async function rerankChunksWithLLM(
   topN: number,
   apiKey: string
 ): Promise<{ chunks: MatchedChunk[]; tokensUsed: number }> {
-  if (chunks.length === 0) {
-    return { chunks: [], tokensUsed: 0 };
-  }
-
-  if (chunks.length <= topN) {
-    return { chunks, tokensUsed: 0 };
-  }
+  if (chunks.length <= 5) return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
 
   console.log(`[rag-chat] Re-ranking ${chunks.length} chunks...`);
 
-  const excerpts = chunks.slice(0, 20).map((chunk, index) => ({
-    id: index,
-    title: chunk.documentTitle,
-    text: chunk.content.substring(0, 600),
+  const excerpts = chunks.slice(0, CONFIG.rerankingChunkCount).map((chunk, index) => ({
+    id: index, title: chunk.documentTitle, 
+    text: chunk.content.substring(0, CONFIG.rerankingContextLength),
   }));
 
-  const prompt = `Évalue la pertinence de chaque extrait pour cette question.
-
-Question: "${query}"
-
-Extraits:
-${excerpts.map(e => `[${e.id}] (${e.title})\n${e.text}`).join('\n\n---\n\n')}
-
-Score 0-10:
-- 10 = Répond directement avec infos spécifiques
-- 7-9 = Contient la réponse
-- 4-6 = Partiellement pertinent
-- 1-3 = Marginalement lié
-- 0 = Hors sujet
-
-JSON: {"scores": [{"id": 0, "score": 8}, ...]}`;
+  const prompt = `Évalue la pertinence (0-10) pour: "${query}"
+  - 10: Réponse directe.
+  - 5: Pertinent.
+  - 0: Hors sujet.
+  
+  Extraits:
+  ${excerpts.map(e => `[${e.id}] (${e.title})\n${e.text}`).join('\n\n')}
+  
+  JSON: {"scores": [{"id": 0, "score": 8}, ...]}`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: CONFIG.rerankingModel,
-        messages: [
-          { role: 'system', content: 'Tu évalues la pertinence documentaire. Réponds en JSON.' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.1,
-        max_tokens: 800,
+        messages: [{ role: 'system', content: 'JSON only.' }, { role: 'user', content: prompt }],
+        temperature: 0.1, max_tokens: 800,
       }),
     });
 
-    if (!response.ok) {
-      return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
-    }
-
     const data = await response.json();
-    const content = data.choices[0]?.message?.content || '';
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = data.choices[0]?.message?.content.match(/\{[\s\S]*\}/);
+    
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      const scores = parsed.scores || [];
+      const scoreMap = new Map(parsed.scores?.map((s: any) => [s.id, s.score]) || []);
 
-      const scoreMap = new Map<number, number>();
-      for (const s of scores) {
-        scoreMap.set(s.id, s.score);
-      }
+      const reranked = chunks.map((chunk, index) => {
+        const llmScore = scoreMap.get(index) ?? 5;
+        // Hybride: 40% initial, 60% LLM
+        const hybridScore = (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
+        return { ...chunk, rerankScore: hybridScore, llmRawScore: llmScore };
+      });
 
-      const rerankedChunks = chunks
-        .slice(0, 20)
-        .map((chunk, index) => ({
-          ...chunk,
-          rerankScore: scoreMap.get(index) ?? 0,
-        }))
-        .filter(c => c.rerankScore >= 3)
-        .sort((a, b) => b.rerankScore - a.rerankScore)
-        .slice(0, topN);
+      reranked.sort((a, b) => b.rerankScore! - a.rerankScore!);
 
-      console.log(`[rag-chat] Re-ranked: ${rerankedChunks.length} chunks with score >= 3`);
-
-      return { chunks: rerankedChunks, tokensUsed };
+      // Filtrage doux (on garde si > 0 ou si c'est nécessaire pour le topN)
+      const valid = reranked.filter(c => c.llmRawScore! > 0);
+      return { chunks: (valid.length >= topN ? valid : reranked).slice(0, topN), tokensUsed: data.usage?.total_tokens || 0 };
     }
-
-    return { chunks: chunks.slice(0, topN), tokensUsed };
-  } catch (error) {
-    console.warn('[rag-chat] Re-ranking error:', error);
-    return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
-  }
-}
-
-// ============================================================================
-// EXTRACTION DE TERMES-CLÉS
-// ============================================================================
-
-// ============================================================================
-// EXTRACTION DE TERMES-CLÉS - VERSION AMÉLIORÉE
-// ============================================================================
-
-function extractKeyTerms(query: string): string[] {
-  const lowerQuery = query.toLowerCase();
-  const terms: string[] = [];
-
-  // 1. Mappings sémantiques (synonymes et variantes)
-  const mappings: Record<string, string[]> = {
-    'maternelle': ['maternelle', 'cycle 1'],
-    'cycle 1': ['maternelle', 'cycle 1'],
-    'cycle 2': ['cycle 2', 'CP', 'CE1', 'CE2'],
-    'cycle 3': ['cycle 3', 'CM1', 'CM2', '6e', '6ème'],
-    'cycle 4': ['cycle 4', '5e', '4e', '3e', 'collège'],
-    'collège': ['collège', 'cycle 3', 'cycle 4'],
-    'lycée': ['lycée', 'seconde', 'première', 'terminale'],
-    'eps': ['EPS', 'éducation physique', 'sport', 'activité physique'],
-    'éducation physique': ['EPS', 'éducation physique'],
-    'sport': ['EPS', 'sport', 'activité physique'],
-    'natation': ['natation', 'nager', 'piscine', 'aquatique'],
-    'objectif': ['objectif', 'attendu', 'compétence'],
-    'compétence': ['compétence', 'attendu', 'objectif'],
-    'attendu': ['attendu', 'objectif', 'compétence', 'fin de cycle'],
-    'champ': ['champ', 'champ d\'apprentissage', 'domaine'],
-  };
-
-  for (const [key, values] of Object.entries(mappings)) {
-    if (lowerQuery.includes(key)) {
-      terms.push(...values);
-    }
-  }
-
-  // 2. NOUVEAU: Extraire les mots significatifs de la question (> 3 caractères)
-  //    pour la recherche par titre de document
-  const stopWords = new Set([
-    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'pour',
-    'dans', 'sur', 'avec', 'sans', 'par', 'que', 'qui', 'quoi', 'quel',
-    'quelle', 'quels', 'quelles', 'comment', 'pourquoi', 'est', 'sont',
-    'fait', 'faire', 'donne', 'donner', 'moi', 'nous', 'vous', 'leur',
-    'cette', 'ces', 'mon', 'ton', 'son', 'notre', 'votre', 'être', 'avoir'
-  ]);
-
-  const words = lowerQuery
-    .replace(/['']/g, ' ')  // Apostrophes
-    .replace(/[^\w\sàâäéèêëïîôùûüç-]/g, ' ')  // Ponctuation
-    .split(/\s+/)
-    .filter(word => word.length > 3 && !stopWords.has(word));
-
-  // Ajouter les mots significatifs (pour recherche par titre)
-  for (const word of words) {
-    if (!terms.some(t => t.toLowerCase() === word)) {
-      terms.push(word);
-    }
-  }
-
-  return [...new Set(terms)];
-}
-
-
-// ============================================================================
-// RECHERCHE VECTORIELLE
-// ============================================================================
-
-async function searchByVector(
-  supabase: any,
-  userId: string,
-  embedding: number[],
-  topK: number,
-  documentId?: string
-): Promise<MatchedChunk[]> {
-  try {
-    const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
-      p_similarity_threshold: CONFIG.similarityThreshold,
-      p_match_count: topK,
-      p_user_id: userId,
-      p_document_id: documentId || null,
-    });
-
-    if (error) {
-      console.error('[rag-chat] Vector search error:', error);
-      return [];
-    }
-
-    console.log(`[rag-chat] Vector search returned ${data?.length || 0} chunks`);
-
-    return (data || []).map((item: any) => ({
-      id: item.id,
-      documentId: item.document_id,
-      documentTitle: item.document_title,
-      chunkIndex: item.chunk_index,
-      content: item.content,
-      score: item.similarity,
-      scope: item.scope,
-    }));
   } catch (err) {
-    console.error('[rag-chat] Vector search exception:', err);
-    return [];
+    console.warn('[rag-chat] Rerank fail', err);
   }
+  return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
 }
 
 // ============================================================================
-// RECHERCHE PAR MOTS-CLÉS
-// ============================================================================
-
-async function searchByKeywords(
-  supabase: any,
-  userId: string,
-  keywords: string[],
-  limit: number = 10
-): Promise<MatchedChunk[]> {
-  if (keywords.length === 0) return [];
-
-  const chunkScores = new Map<string, { chunk: MatchedChunk; score: number }>();
-
-  for (const keyword of keywords.slice(0, 6)) {
-    try {
-      const { data: docs } = await supabase
-        .from('rag_documents')
-        .select('id, title, scope')
-        .or(`scope.eq.global,user_id.eq.${userId}`)
-        .eq('status', 'ready')
-        .ilike('title', `%${keyword}%`)
-        .limit(5);
-
-      if (docs && docs.length > 0) {
-        for (const doc of docs) {
-          const { data: chunks } = await supabase
-            .from('rag_chunks')
-            .select('id, document_id, chunk_index, content, scope')
-            .eq('document_id', doc.id)
-            .limit(8);
-
-          if (chunks) {
-            for (const chunk of chunks) {
-              const key = chunk.id;
-              const existing = chunkScores.get(key);
-              if (existing) {
-                existing.score += 1;
-              } else {
-                chunkScores.set(key, {
-                  chunk: {
-                    id: chunk.id,
-                    documentId: doc.id,
-                    documentTitle: doc.title,
-                    chunkIndex: chunk.chunk_index,
-                    content: chunk.content,
-                    score: 0.85,
-                    scope: chunk.scope || doc.scope,
-                  },
-                  score: 1,
-                });
-              }
-            }
-          }
-        }
-      }
-
-      const { data: contentChunks } = await supabase
-        .from('rag_chunks')
-        .select(`
-          id, document_id, chunk_index, content, scope,
-          rag_documents!inner(id, title, scope, user_id)
-        `)
-        .or(`scope.eq.global,rag_documents.user_id.eq.${userId}`)
-        .ilike('content', `%${keyword}%`)
-        .limit(5);
-
-      if (contentChunks) {
-        for (const chunk of contentChunks) {
-          const key = chunk.id;
-          const existing = chunkScores.get(key);
-          const doc = chunk.rag_documents;
-          if (existing) {
-            existing.score += 0.5;
-          } else {
-            chunkScores.set(key, {
-              chunk: {
-                id: chunk.id,
-                documentId: doc.id,
-                documentTitle: doc.title,
-                chunkIndex: chunk.chunk_index,
-                content: chunk.content,
-                score: 0.8,
-                scope: chunk.scope || doc.scope,
-              },
-              score: 0.5,
-            });
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`[rag-chat] Keyword search error for "${keyword}":`, err);
-    }
-  }
-
-  const results = Array.from(chunkScores.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(item => item.chunk);
-
-  console.log(`[rag-chat] Keyword search: ${results.length} chunks`);
-  return results;
-}
-
-// ============================================================================
-// RECHERCHE HYBRIDE - AVEC SUPPORT QUESTIONS COMPARATIVES
-// ============================================================================
-
-async function searchChunksHybrid(
-  supabase: any,
-  userId: string,
-  originalQuery: string,
-  queryVariations: string[],
-  hydeEmbedding: number[],
-  queryEmbedding: number[],
-  topK: number,
-  useHyDE: boolean,
-  documentId?: string
-): Promise<MatchedChunk[]> {
-  const allChunks: MatchedChunk[] = [];
-  const seenIds = new Set<string>();
-
-  const isComparative = isComparativeQuestion(originalQuery);
-  const targets = extractComparisonTargets(originalQuery);
-
-  console.log(`[rag-chat] Search: comparative=${isComparative}, targets=${targets.join(', ')}`);
-
-  // ========== STRATÉGIE POUR QUESTIONS COMPARATIVES ==========
-  if (isComparative && targets.length >= 2) {
-    console.log(`[rag-chat] Comparative search for: ${targets.join(' vs ')}`);
-    
-    for (const target of targets) {
-      console.log(`[rag-chat] Searching for: ${target}`);
-      
-      // Recherche par titre de document
-      const { data: docs } = await supabase
-        .from('rag_documents')
-        .select('id, title, scope')
-        .or(`scope.eq.global,user_id.eq.${userId}`)
-        .eq('status', 'ready')
-        .ilike('title', `%${target}%`);
-      
-      if (docs && docs.length > 0) {
-        console.log(`[rag-chat] Found ${docs.length} docs for "${target}"`);
-        
-        for (const doc of docs) {
-          const { data: chunks } = await supabase
-            .from('rag_chunks')
-            .select('id, document_id, chunk_index, content, scope')
-            .eq('document_id', doc.id)
-            .order('chunk_index', { ascending: true })
-            .limit(Math.ceil(topK / targets.length) + 3);
-          
-          if (chunks) {
-            for (const chunk of chunks) {
-              if (!seenIds.has(chunk.id)) {
-                seenIds.add(chunk.id);
-                allChunks.push({
-                  id: chunk.id,
-                  documentId: doc.id,
-                  documentTitle: doc.title,
-                  chunkIndex: chunk.chunk_index,
-                  content: chunk.content,
-                  score: 0.90,
-                  scope: chunk.scope || doc.scope,
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    // Compléter avec recherche vectorielle
-    if (queryEmbedding.length > 0) {
-      const vectorChunks = await searchByVector(supabase, userId, queryEmbedding, topK, documentId);
-      for (const chunk of vectorChunks) {
-        if (!seenIds.has(chunk.id)) {
-          seenIds.add(chunk.id);
-          allChunks.push(chunk);
-        }
-      }
-    }
-    
-    console.log(`[rag-chat] Comparative search total: ${allChunks.length} chunks`);
-  }
-    // ========== STRATÉGIE STANDARD ==========
-  
-  else {
-    // 0. NOUVEAU: Recherche DIRECTE par titre de document sur les mots de la question
-    const stopWords = new Set([
-      'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'pour',
-      'dans', 'sur', 'avec', 'sans', 'par', 'que', 'qui', 'quoi', 'quel',
-      'quelle', 'quels', 'quelles', 'comment', 'pourquoi', 'est', 'sont',
-      'fait', 'faire', 'donne', 'donner', 'moi', 'nous', 'vous', 'leur'
-    ]);
-
-    const queryWords = originalQuery
-      .toLowerCase()
-      .replace(/[^\w\sàâäéèêëïîôùûüç-]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 3 && !stopWords.has(w));
-    
-    console.log(`[rag-chat] Title search with words: ${queryWords.join(', ')}`);
-    
-    for (const word of queryWords.slice(0, 5)) {
-      // Chercher dans TOUS les documents (global + user)
-      const { data: matchingDocs } = await supabase
-        .from('rag_documents')
-        .select('id, title, scope, user_id')
-        .or(`scope.eq.global,user_id.eq.${userId}`)
-        .eq('status', 'ready')
-        .ilike('title', `%${word}%`)
-        .limit(3);
-
-      if (matchingDocs && matchingDocs.length > 0) {
-        console.log(`[rag-chat] Title match "${word}": ${matchingDocs.map((d: any) => d.title).join(', ')}`);
-        
-        for (const doc of matchingDocs) {
-          const { data: chunks } = await supabase
-            .from('rag_chunks')
-            .select('id, document_id, chunk_index, content, scope')
-            .eq('document_id', doc.id)
-            .order('chunk_index', { ascending: true })
-            .limit(5);
-
-          if (chunks) {
-            for (const chunk of chunks) {
-              if (!seenIds.has(chunk.id)) {
-                seenIds.add(chunk.id);
-                allChunks.push({
-                  id: chunk.id,
-                  documentId: doc.id,
-                  documentTitle: doc.title,
-                  chunkIndex: chunk.chunk_index,
-                  content: chunk.content,
-                  score: 0.92,  // Score élevé car match sur titre
-                  scope: chunk.scope || doc.scope,
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // 1. Recherche par mots-clés (termes sémantiques)
-    for (const query of queryVariations.slice(0, 4)) {
-      const terms = extractKeyTerms(query);
-      if (terms.length > 0) {
-        const keywordChunks = await searchByKeywords(supabase, userId, terms, 8);
-        for (const chunk of keywordChunks) {
-          if (!seenIds.has(chunk.id)) {
-            seenIds.add(chunk.id);
-            allChunks.push(chunk);
-          }
-        }
-      }
-    }
-
-    // 2. Recherche vectorielle HyDE
-    if (useHyDE && hydeEmbedding.length > 0) {
-      const hydeChunks = await searchByVector(supabase, userId, hydeEmbedding, topK * 2, documentId);
-      for (const chunk of hydeChunks) {
-        if (!seenIds.has(chunk.id)) {
-          seenIds.add(chunk.id);
-          chunk.score = Math.min(1, chunk.score * 1.1);
-          allChunks.push(chunk);
-        }
-      }
-    }
-
-    // 3. Recherche vectorielle standard
-    const vectorChunks = await searchByVector(supabase, userId, queryEmbedding, topK * 2, documentId);
-    for (const chunk of vectorChunks) {
-      if (!seenIds.has(chunk.id)) {
-        seenIds.add(chunk.id);
-        allChunks.push(chunk);
-      }
-    }
-  }
-
-  console.log(`[rag-chat] Final combined: ${allChunks.length} unique chunks`);
-
-  return allChunks.sort((a, b) => b.score - a.score);
-}
-
-
-// ============================================================================
-// EMBEDDINGS
-// ============================================================================
-
-async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: CONFIG.embeddingModel,
-      input: text,
-      dimensions: CONFIG.embeddingDimensions,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Erreur embedding: ${error}`);
-  }
-
-  const data = await response.json();
-  return data.data[0].embedding;
-}
-
-// ============================================================================
-// GÉNÉRATION DE RÉPONSE
+// GÉNÉRATION & HANDLER
 // ============================================================================
 
 async function generateResponse(
   query: string,
   chunks: MatchedChunk[],
   mode: ChatMode,
-  history: Array<{ role: string; content: string }>,
+  history: any[],
+  domain: DomainConfig | null,
   apiKey: string
-): Promise<{ answer: string; tokensUsed: number }> {
+): Promise<{ answer: string; tokens: number }> {
+  if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information.", tokens: 0 };
+
+  const context = chunks.map((c, i) => `[Source ${i + 1}] ${c.documentTitle}\n${c.content}`).join('\n\n---\n\n');
+
+  // Prompt Système Dynamique
+  let roleDesc = domain ? domain.promptRole : "assistant pédagogique expert";
   
-  if (chunks.length === 0) {
-    return {
-      answer: "Je n'ai pas trouvé d'information pertinente dans les documents disponibles pour répondre à cette question. Essayez de reformuler votre question ou vérifiez que les documents appropriés ont été importés.",
-      tokensUsed: 0,
-    };
-  }
-
-  const context = chunks
-    .map((chunk, i) => {
-      const scopeLabel = chunk.scope === 'global' ? '📚' : '📄';
-      return `[Source ${i + 1}] ${scopeLabel} ${chunk.documentTitle}\n${chunk.content}`;
-    })
-    .join('\n\n---\n\n');
-
-  let systemPrompt: string;
-
-  if (mode === 'corpus_only') {
-    systemPrompt = `Tu es un assistant pédagogique pour les enseignants français. Tu réponds UNIQUEMENT à partir des documents fournis.
-
-RÈGLES STRICTES:
-1. Réponds UNIQUEMENT avec les informations des sources fournies
-2. CITE OBLIGATOIREMENT les sources utilisées avec le format [Source X] ou [Titre du document]
-3. Si l'information n'est pas dans les sources, dis: "Cette information n'est pas présente dans les documents disponibles."
-4. Structure ta réponse clairement (titres, listes à puces)
-5. Pour les questions comparatives, organise par niveau/cycle
-
-IMPORTANT: Chaque affirmation doit être liée à une source.`;
-  } else {
-    systemPrompt = `Tu es un assistant pédagogique expert. Tu utilises les documents fournis comme base, complétés par tes connaissances.
-
-RÈGLES:
-1. Commence TOUJOURS par les informations des sources (prioritaires)
-2. CITE les sources avec [Source X] ou [Titre du document]
-3. Marque tes compléments avec [Complément IA]
-4. Structure clairement la réponse
-
-Pour les questions comparatives, organise par niveau/cycle.`;
-  }
-
-  const userPrompt = `DOCUMENTS DISPONIBLES:
-${context}
-
----
-
-QUESTION: ${query}
-
-Réponds en citant systématiquement les sources utilisées.`;
-
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.slice(-CONFIG.maxHistoryMessages),
-    { role: 'user', content: userPrompt },
-  ];
+  let systemPrompt = `Tu es un ${roleDesc}.
+  ${mode === 'corpus_only' ? "Utilise UNIQUEMENT les sources." : "Utilise les sources en priorité."}
+  RÈGLES:
+  1. Cite les sources [Source X].
+  2. Structure ta réponse.
+  3. ${domain?.id === 'LANGUES' ? "Utilise terminologie CECR." : ""}
+  4. ${domain?.id === 'EPS' ? "Utilise terminologie APSA/Champs d'apprentissage." : ""}`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: CONFIG.chatModel,
-      messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: `SOURCES:\n${context}\n\nQUESTION: ${query}\n\nRéponse:` }
+      ],
       temperature: 0.3,
-      max_tokens: 2000,
     }),
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Erreur génération: ${error}`);
-  }
-
   const data = await response.json();
-  return {
-    answer: data.choices[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.',
-    tokensUsed: data.usage?.total_tokens || 0,
-  };
+  return { answer: data.choices[0]?.message?.content || 'Erreur.', tokens: data.usage?.total_tokens || 0 };
 }
-
-// ============================================================================
-// GESTION DES CONVERSATIONS
-// ============================================================================
-
-async function getOrCreateConversation(
-  supabase: any,
-  userId: string,
-  conversationId?: string
-): Promise<string> {
-  if (conversationId) {
-    const { data } = await supabase
-      .from('rag_conversations')
-      .select('id')
-      .eq('id', conversationId)
-      .eq('user_id', userId)
-      .single();
-
-    if (data) return conversationId;
-  }
-
-  const { data, error } = await supabase
-    .from('rag_conversations')
-    .insert({ user_id: userId })
-    .select('id')
-    .single();
-
-  if (error) throw new Error('Impossible de créer la conversation');
-  return data.id;
-}
-
-async function getConversationHistory(
-  supabase: any,
-  conversationId: string
-): Promise<Array<{ role: string; content: string }>> {
-  const { data } = await supabase
-    .from('rag_messages')
-    .select('role, content')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(CONFIG.maxHistoryMessages * 2);
-
-  return data || [];
-}
-
-async function saveMessage(
-  supabase: any,
-  conversationId: string,
-  role: 'user' | 'assistant',
-  content: string,
-  sources?: SourceChunk[]
-): Promise<void> {
-  await supabase.from('rag_messages').insert({
-    conversation_id: conversationId,
-    role,
-    content,
-    sources: sources || null,
-  });
-}
-
-// ============================================================================
-// GESTION DES TOKENS
-// ============================================================================
-
-async function checkAndDeductUserTokens(
-  supabase: any,
-  userId: string,
-  tokensToDeduct: number
-): Promise<{ success: boolean; newBalance: number; error?: string }> {
-  try {
-    const { data: profile, error: fetchError } = await supabase
-      .from('profiles')
-      .select('tokens')
-      .eq('user_id', userId)
-      .single();
-
-    if (fetchError || !profile) {
-      console.error('[rag-chat] Error fetching profile:', fetchError);
-      return { success: false, newBalance: 0, error: 'Profil non trouvé' };
-    }
-
-    const currentBalance = profile.tokens || 0;
-
-    if (currentBalance < tokensToDeduct) {
-      return { 
-        success: false, 
-        newBalance: currentBalance, 
-        error: `Tokens insuffisants (${currentBalance} disponibles)` 
-      };
-    }
-
-    const newBalance = currentBalance - tokensToDeduct;
-    
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ tokens: newBalance })
-      .eq('user_id', userId);
-
-    if (updateError) {
-      console.error('[rag-chat] Error updating tokens:', updateError);
-      return { success: false, newBalance: currentBalance, error: 'Erreur mise à jour tokens' };
-    }
-
-    console.log(`[rag-chat] Tokens: ${currentBalance} - ${tokensToDeduct} = ${newBalance}`);
-    
-    return { success: true, newBalance };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
-    console.error('[rag-chat] Token error:', errorMessage);
-    return { success: false, newBalance: 0, error: errorMessage };
-  }
-}
-
-// ============================================================================
-// HANDLER PRINCIPAL
-// ============================================================================
 
 async function chatHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Méthode non autorisée' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return new Response('Err', { status: 405, headers: corsHeaders });
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY non configurée');
-    }
-
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Non authentifié' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!authHeader) throw new Error('Auth Missing');
 
     const supabase = await createSupabaseClient(authHeader);
     const serviceClient = await createServiceClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User Invalid');
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Session invalide' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const { message, mode = 'corpus_plus_ai', searchMode = 'fast', conversationId, documentId } = await req.json();
+
+    console.log(`[rag-chat] Handling: "${message}"`);
+
+    // 1. SÉCURITÉ: Docs autorisés
+    const allowedDocsMap = await getAllowedDocuments(serviceClient, user.id, documentId);
+    const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
+    const allowedDocIdsSet = new Set(allowedDocIdsArr);
+    if (allowedDocIdsArr.length === 0) return new Response(JSON.stringify({ answer: "Aucun document.", sources: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+
+    // 2. DÉTECTION
+    const activeDomain = detectDomainIntent(message);
+    const isComparative = isComparativeQuestion(message);
+    const effectiveSearchMode = (activeDomain || isComparative || searchMode === 'precise') ? 'precise' : 'fast';
+    let totalTokens = 0;
+
+    // 3. PRÉPARATION (HyDE / Rewrite)
+    let hypothetical = message;
+    if (effectiveSearchMode === 'precise') {
+      const h = await generateHypotheticalAnswer(message, activeDomain, OPENAI_API_KEY);
+      hypothetical = h.hypotheticalAnswer;
+      totalTokens += h.tokensUsed;
     }
 
-    const {
-      message,
-      mode = 'corpus_plus_ai',
-      searchMode = 'fast',
-      conversationId,
-      documentId,
-      topK = CONFIG.defaultTopK,
-    }: ChatRequest = await req.json();
-
-    if (!message || message.trim().length === 0) {
-      return new Response(JSON.stringify({ error: 'Message requis' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let queries = [message];
+    if (effectiveSearchMode === 'precise') {
+      const rw = await rewriteQueryForSearch(message, activeDomain, OPENAI_API_KEY);
+      queries = rw.queries;
+      totalTokens += rw.tokensUsed;
     }
-
-    // Configuration dynamique selon le mode de recherche
-    const useHyDE = searchMode === 'precise';
-    const useQueryRewriting = searchMode === 'precise';
-    const useReranking = searchMode === 'precise';
-
-    console.log(`[rag-chat] ========================================`);
-    console.log(`[rag-chat] Query: "${message}"`);
-    console.log(`[rag-chat] Mode: ${mode}, SearchMode: ${searchMode}`);
-    console.log(`[rag-chat] HyDE: ${useHyDE}, Rewriting: ${useQueryRewriting}, Reranking: ${useReranking}`);
-
-    let totalTokensUsed = 0;
-
-    // HyDE - seulement en mode précis
-    let hypotheticalAnswer = message;
-    let hydeTokens = 0;
-    if (useHyDE) {
-      const hydeResult = await generateHypotheticalAnswer(message, OPENAI_API_KEY);
-      hypotheticalAnswer = hydeResult.hypotheticalAnswer;
-      hydeTokens = hydeResult.tokensUsed;
-      console.log(`[rag-chat] HyDE: ${hydeTokens} tokens`);
-    }
-    totalTokensUsed += hydeTokens;
-
-    // Query Rewriting - seulement en mode précis
-    let queryVariations = [message];
-    let rewriteTokens = 0;
-    if (useQueryRewriting) {
-      const rewriteResult = await rewriteQueryForSearch(message, OPENAI_API_KEY);
-      queryVariations = rewriteResult.queries;
-      rewriteTokens = rewriteResult.tokensUsed;
-      console.log(`[rag-chat] Query Rewriting: ${rewriteTokens} tokens, ${queryVariations.length} variations`);
-    }
-    totalTokensUsed += rewriteTokens;
 
     // Embeddings
-    console.log(`[rag-chat] Creating embeddings...`);
-    const queryEmbedding = await createEmbedding(message, OPENAI_API_KEY);
-    totalTokensUsed += Math.ceil(message.length / 4);
+    const qEmb = await createEmbedding(message, OPENAI_API_KEY);
+    const hEmb = effectiveSearchMode === 'precise' ? await createEmbedding(hypothetical, OPENAI_API_KEY) : [];
+    totalTokens += Math.ceil((message.length + hypothetical.length) / 4);
 
-    let hydeEmbedding: number[] = [];
-    if (useHyDE && hypotheticalAnswer !== message) {
-      hydeEmbedding = await createEmbedding(hypotheticalAnswer, OPENAI_API_KEY);
-      totalTokensUsed += Math.ceil(hypotheticalAnswer.length / 4);
+    // 4. RECHERCHE UNIFIÉE
+    const allChunks: MatchedChunk[] = [];
+    const seenIds = new Set<string>();
+    const add = (arr: MatchedChunk[]) => arr.forEach(c => { if(!seenIds.has(c.id)) { seenIds.add(c.id); allChunks.push(c); }});
+
+    // A. Recherche Spécifique Domaine
+    if (activeDomain) {
+      add(await searchSpecificDomainDocuments(serviceClient, allowedDocsMap, activeDomain, message));
     }
 
-    // Recherche hybride
-    const chunksToRerank = useReranking ? CONFIG.rerankingChunkCount : topK;
-    const retrievedChunks = await searchChunksHybrid(
-      serviceClient,
-      user.id,
-      message,
-      queryVariations,
-      hydeEmbedding,
-      queryEmbedding,
-      chunksToRerank,
-      useHyDE,
-      documentId
-    );
-
-    console.log(`[rag-chat] Retrieved: ${retrievedChunks.length} chunks`);
-
-    // Re-ranking - seulement en mode précis
-    let finalChunks = retrievedChunks.slice(0, topK);
-    let rerankTokens = 0;
-    if (useReranking && retrievedChunks.length > topK) {
-      const rerankResult = await rerankChunksWithLLM(
-        message,
-        retrievedChunks,
-        CONFIG.finalChunkCount,
-        OPENAI_API_KEY
-      );
-      finalChunks = rerankResult.chunks;
-      rerankTokens = rerankResult.tokensUsed;
-      console.log(`[rag-chat] Re-ranking: ${rerankTokens} tokens`);
+    // B. Recherche Mots-clés (Sur variantes)
+    for (const q of queries.slice(0, 3)) {
+      add(await searchByKeywords(serviceClient, allowedDocIdsArr, allowedDocsMap, extractKeyTerms(q)));
     }
-    totalTokensUsed += rerankTokens;
 
-    console.log(`[rag-chat] Final chunks: ${finalChunks.length}`);
+    // C. Vectorielle
+    if (hEmb.length > 0) {
+      const hydeRes = await searchByVector(serviceClient, user.id, hEmb, CONFIG.defaultTopK, allowedDocIdsSet);
+      hydeRes.forEach(c => c.score *= 1.1); // Boost HyDE
+      add(hydeRes);
+    }
+    add(await searchByVector(serviceClient, user.id, qEmb, CONFIG.defaultTopK, allowedDocIdsSet));
 
-    // Conversation
-    const convId = await getOrCreateConversation(serviceClient, user.id, conversationId);
-    const history = await getConversationHistory(serviceClient, convId);
+    // 5. CLASSEMENT & LOGIQUE MÉTIER
+    let candidates = applyDomainBonus(allChunks, activeDomain);
 
-    await saveMessage(serviceClient, convId, 'user', message);
+    if (effectiveSearchMode === 'precise') {
+      const rr = await rerankChunksWithLLM(message, candidates, CONFIG.finalChunkCount, OPENAI_API_KEY);
+      candidates = rr.chunks;
+      totalTokens += rr.tokensUsed;
+    } else {
+      candidates = candidates.slice(0, CONFIG.finalChunkCount);
+    }
 
-    // Génération
-    const { answer, tokensUsed: genTokens } = await generateResponse(
-      message,
-      finalChunks,
-      mode,
-      history,
-      OPENAI_API_KEY
-    );
-    totalTokensUsed += genTokens;
-    console.log(`[rag-chat] Generation: ${genTokens} tokens`);
+    // Sauvetage (Rescue)
+    candidates = ensureDomainDocuments(candidates, allChunks, activeDomain, CONFIG.finalChunkCount);
+    console.log(`[rag-chat] Final count: ${candidates.length}`);
 
-    // Sources pour la réponse
-    const sources: SourceChunk[] = finalChunks.map(chunk => ({
-      documentId: chunk.documentId,
-      documentTitle: chunk.documentTitle,
-      chunkId: chunk.id,
-      chunkIndex: chunk.chunkIndex,
-      excerpt: chunk.content.substring(0, CONFIG.excerptLength) + 
-        (chunk.content.length > CONFIG.excerptLength ? '...' : ''),
-      score: chunk.score,
-      scope: chunk.scope,
+    // 6. GÉNÉRATION
+    let convId = conversationId;
+    if (!convId) {
+      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
+      convId = data.id;
+    }
+    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
+    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
+
+    const { answer, tokens } = await generateResponse(message, candidates, mode, hist || [], activeDomain, OPENAI_API_KEY);
+    totalTokens += tokens;
+
+    const sources = candidates.map(c => ({
+      documentId: c.documentId, documentTitle: c.documentTitle, chunkId: c.id, chunkIndex: c.chunkIndex,
+      excerpt: c.content.substring(0, CONFIG.excerptLength), score: c.score, scope: c.scope
     }));
-
-    await saveMessage(serviceClient, convId, 'assistant', answer, sources);
-
-    // Déduction tokens
-    console.log(`[rag-chat] Total tokens: ${totalTokensUsed}`);
+    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources});
     
-    const tokenResult = await checkAndDeductUserTokens(serviceClient, user.id, totalTokensUsed);
-    
-    if (!tokenResult.success) {
-      console.warn(`[rag-chat] Token deduction failed: ${tokenResult.error}`);
-    }
+    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
+      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - totalTokens)}).eq('user_id', user.id); });
 
-    console.log(`[rag-chat] ========================================`);
+    return new Response(JSON.stringify({
+      answer, sources, conversationId: convId, tokensUsed: totalTokens, mode, searchMode: effectiveSearchMode
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
 
-    const response: ChatResponse = {
-      answer,
-      sources,
-      conversationId: convId,
-      tokensUsed: totalTokensUsed,
-      tokensRemaining: tokenResult.newBalance,
-      mode,
-      searchMode,
-    };
-
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    console.error('[rag-chat] Error:', errorMessage);
-
-    const status = errorMessage.includes('Tokens insuffisants') ? 402 : 500;
-
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  } catch (e: any) {
+    console.error(e);
+    return new Response(JSON.stringify({error: e.message}), {status: 500, headers: {...corsHeaders, 'Content-Type': 'application/json'}});
   }
 }
 
 Deno.serve(chatHandler);
+
 
