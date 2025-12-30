@@ -15,12 +15,14 @@ import {
   TrendingUp,
   Settings,
   Bot,
-  Layers,      // ✅ AJOUT pour "Concevoir"
-  ClipboardList // ✅ AJOUT pour "Scénario"
+  Layers,
+  ClipboardList,
+  Mail  // ✅ AJOUT pour Newsletter
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
 import { FEATURES } from '../../lib/features';
+import { checkIsAdmin } from '../../lib/ragApi';  // ✅ AJOUT pour vérification admin
 
 // Event pour notifier les changements de tokens ajout commentaire
 export const tokenUpdateEvent = new EventTarget();
@@ -33,7 +35,8 @@ export function Header() {
   const tokenCount = useTokenBalance();
   const [isResourcesDropdownOpen, setIsResourcesDropdownOpen] = React.useState(false);
   const [isSettingsDropdownOpen, setIsSettingsDropdownOpen] = React.useState(false);
-  const [isConcevoirDropdownOpen, setIsConcevoirDropdownOpen] = React.useState(false); // ✅ AJOUT
+  const [isConcevoirDropdownOpen, setIsConcevoirDropdownOpen] = React.useState(false);
+  const [isAdmin, setIsAdmin] = React.useState(false);  // ✅ AJOUT état admin
   const location = useLocation();
 
   const isLandingPage = location.pathname === '/landing' || 
@@ -55,6 +58,15 @@ export function Header() {
     };
   }, []);
 
+  // ✅ AJOUT : Vérifier si l'utilisateur est admin
+  React.useEffect(() => {
+    if (user) {
+      checkIsAdmin().then(setIsAdmin);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
+
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -73,7 +85,6 @@ export function Header() {
       if (!target.closest('.dropdown-settings')) {
         setIsSettingsDropdownOpen(false);
       }
-      // ✅ AJOUT : Fermer le dropdown Concevoir
       if (!target.closest('.dropdown-concevoir')) {
         setIsConcevoirDropdownOpen(false);
       }
@@ -82,7 +93,6 @@ export function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ✅ MODIFICATION : "Leçons" retiré de navigationItems (sera dans "Concevoir")
   const navigationItems = [
     {
       name: 'Appréciations',
@@ -137,7 +147,7 @@ export function Header() {
                   </Link>
                 ))}
 
-                {/* ✅ NOUVEAU : Menu déroulant "Concevoir" - Desktop */}
+                {/* Menu déroulant "Concevoir" - Desktop */}
                 <div className="relative dropdown-concevoir">
                   <button
                     onClick={() => setIsConcevoirDropdownOpen(!isConcevoirDropdownOpen)}
@@ -347,7 +357,22 @@ export function Header() {
                     {isSettingsDropdownOpen && (
                       <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
                         <div className="flex flex-col py-2">
-                          {/* 🆕 NOUVEAU : Lien vers la page de paramètres */}
+                          {/* ✅ AJOUT : Lien admin newsletter (visible uniquement pour admin) */}
+                          {isAdmin && (
+                            <>
+                              <Link
+                                to="/admin/newsletter"
+                                className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => setIsSettingsDropdownOpen(false)}
+                              >
+                                <Mail className="w-4 h-4 mr-2" />
+                                Gestion Newsletter
+                              </Link>
+                              <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                            </>
+                          )}
+                          
+                          {/* Lien vers la page de paramètres */}
                           <Link
                             to="/settings"
                             className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -427,7 +452,7 @@ export function Header() {
               </Link>
             ))}
 
-            {/* ✅ NOUVEAU : Menu "Concevoir" - Mobile */}
+            {/* Menu "Concevoir" - Mobile */}
             <div className="block px-3 py-2">
               <span className="text-gray-700 dark:text-gray-200 font-semibold flex items-center">
                 <Layers className="w-4 h-4 mr-2" />
@@ -557,7 +582,19 @@ export function Header() {
               Acheter des tokens
             </Link>
             <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
-              {/* 🆕 AJOUT : Lien Paramètres dans le menu mobile */}
+              {/* ✅ AJOUT : Lien admin newsletter mobile */}
+              {isAdmin && (
+                <Link
+                  to="/admin/newsletter"
+                  className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Mail className="h-5 w-5 mr-2" />
+                  <span>Gestion Newsletter</span>
+                </Link>
+              )}
+              
+              {/* Lien Paramètres dans le menu mobile */}
               <Link
                 to="/settings"
                 className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
@@ -593,4 +630,5 @@ export function Header() {
     </header>
   );
 }
+
 

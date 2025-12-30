@@ -23,6 +23,7 @@ import LessonsBankPage from './pages/LessonsBankPage';
 // Import de la nouvelle page banque de réponses chatbot
 import { ChatbotAnswerBankPage } from './pages/ChatbotAnswerBankPage';
 
+
 // Import de la page Scénario pédagogique
 import { ScenarioPedagogiquePage } from './pages/ScenarioPedagogiquePage';
 // Import de la page Banque de scénarios
@@ -35,6 +36,8 @@ import { LegalRoutes } from './routes/LegalRoutes';
 import { SettingsPage } from './pages/SettingsPage';
 // Import de la page Chatbot RAG
 import { ChatbotPage } from './pages/ChatbotPage';
+import { AdminNewsletterPage } from './pages/AdminNewsletterPage';
+import { UnsubscribePage } from './pages/UnsubscribePage';
 
 // Import des composants cookies
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
@@ -137,6 +140,9 @@ function App() {
               
               {/* Routes légales (publiques - accessibles sans connexion) */}
               <Route path="/legal/*" element={<LegalRoutes />} />
+
+              {/* Route publique de désabonnement */}
+              <Route path="/unsubscribe" element={<UnsubscribePage />} />
               
               {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
               <Route element={<AuthLayout />}>
@@ -205,6 +211,13 @@ function App() {
                 <Route path="/settings" element={
                   <EmailConfirmationGuard>
                     <SettingsPage />
+                  </EmailConfirmationGuard>
+                } />
+
+                {/* Route admin newsletter */}
+                <Route path="/admin/newsletter" element={
+                  <EmailConfirmationGuard>
+                    <AdminNewsletterPage />
                   </EmailConfirmationGuard>
                 } />
                 
