@@ -148,14 +148,24 @@ export function Header() {
                   {isConcevoirOpen && (
                     <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-56">
                       <div className="flex flex-col py-2">
-                        <Link 
-                          to="/scenario-pedagogique" 
-                          className={menuItemClass}
-                          onClick={() => setIsConcevoirOpen(false)}
-                        >
-                          <ClipboardList className="w-4 h-4 mr-2" />
-                          Scénarios pédagogiques
-                        </Link>
+                        {/* Scénarios pédagogiques */}
+                        {FEATURES.SCENARIO_ENABLED ? (
+                          <Link 
+                            to="/scenario-pedagogique" 
+                            className={menuItemClass}
+                            onClick={() => setIsConcevoirOpen(false)}
+                          >
+                            <ClipboardList className="w-4 h-4 mr-2" />
+                            Scénarios pédagogiques
+                          </Link>
+                        ) : (
+                          <span className={menuItemDisabledClass}>
+                            <ClipboardList className="w-4 h-4 mr-2" />
+                            Scénarios pédagogiques
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                          </span>
+                        )}
+                        
                         <Link 
                           to="/generate-lesson" 
                           className={menuItemClass}
@@ -165,14 +175,25 @@ export function Header() {
                           Séances pédagogiques
                         </Link>
                         <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
-                        <Link 
-                          to="/scenarios-bank" 
-                          className={menuItemClass}
-                          onClick={() => setIsConcevoirOpen(false)}
-                        >
-                          <Database className="w-4 h-4 mr-2" />
-                          Ma banque de scénarios
-                        </Link>
+                        
+                        {/* Ma banque de scénarios */}
+                        {FEATURES.SCENARIO_ENABLED ? (
+                          <Link 
+                            to="/scenarios-bank" 
+                            className={menuItemClass}
+                            onClick={() => setIsConcevoirOpen(false)}
+                          >
+                            <Database className="w-4 h-4 mr-2" />
+                            Ma banque de scénarios
+                          </Link>
+                        ) : (
+                          <span className={menuItemDisabledClass}>
+                            <Database className="w-4 h-4 mr-2" />
+                            Ma banque de scénarios
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                          </span>
+                        )}
+                        
                         <Link 
                           to="/lessons-bank" 
                           className={menuItemClass}
@@ -407,7 +428,7 @@ export function Header() {
                   {isSettingsDropdownOpen && (
                     <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
                       <div className="flex flex-col py-2">
-                        {/* Lien admin newsletter */}
+                        {/* Admin Newsletter */}
                         {isAdmin && (
                           <>
                             <Link
@@ -492,14 +513,24 @@ export function Header() {
                 Concevoir
               </span>
               <div className="ml-6 mt-1 space-y-1">
-                <Link 
-                  to="/scenario-pedagogique" 
-                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <ClipboardList className="w-4 h-4 mr-2" />
-                  Scénarios pédagogiques
-                </Link>
+                {/* Scénarios pédagogiques - Mobile */}
+                {FEATURES.SCENARIO_ENABLED ? (
+                  <Link 
+                    to="/scenario-pedagogique" 
+                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Scénarios pédagogiques
+                  </Link>
+                ) : (
+                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Scénarios pédagogiques
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                  </span>
+                )}
+                
                 <Link 
                   to="/generate-lesson" 
                   className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
@@ -509,14 +540,25 @@ export function Header() {
                   Séances pédagogiques
                 </Link>
                 <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
-                <Link 
-                  to="/scenarios-bank" 
-                  className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Database className="w-4 h-4 mr-2" />
-                  Ma banque de scénarios
-                </Link>
+                
+                {/* Ma banque de scénarios - Mobile */}
+                {FEATURES.SCENARIO_ENABLED ? (
+                  <Link 
+                    to="/scenarios-bank" 
+                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Database className="w-4 h-4 mr-2" />
+                    Ma banque de scénarios
+                  </Link>
+                ) : (
+                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                    <Database className="w-4 h-4 mr-2" />
+                    Ma banque de scénarios
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+                  </span>
+                )}
+                
                 <Link 
                   to="/lessons-bank" 
                   className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
@@ -706,6 +748,7 @@ export function Header() {
     </header>
   );
 }
+
 
 
 

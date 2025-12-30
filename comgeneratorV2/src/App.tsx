@@ -46,6 +46,9 @@ import { CookieBanner } from './components/CookieBanner';
 // Import de la modale cadeau
 import { SpecialOfferModal } from './components/SpecialOfferModal';
 
+// Import de la modale de mise à jour navigation
+import { NavigationUpdateModal } from './components/modals/NavigationUpdateModal';
+
 // Import du bouton flottant chatbot
 import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
@@ -250,6 +253,9 @@ function App() {
         {/* Modale cadeau spécial - s'affiche uniquement si user connecté */}
         {user && <SpecialOfferModal />}
         
+        {/* Modale de mise à jour navigation - s'affiche uniquement si user connecté */}
+        {user && <NavigationUpdateModal />}
+        
         {/* Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
         {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
       </BrowserRouter>
@@ -258,5 +264,6 @@ function App() {
 }
 
 export default App;
+
 
 
