@@ -41,7 +41,7 @@ export type Database = {
         }
         Relationships: []
       }
-          chatbot_answers: {
+      chatbot_answers: {
         Row: {
           id: string
           user_id: string
@@ -307,25 +307,69 @@ export type Database = {
           },
         ]
       }
+      newsletter_logs: {
+        Row: {
+          id: string
+          created_at: string
+          subject: string
+          audience_type: string
+          token_threshold: number | null
+          recipients_count: number
+          sent_by: string | null
+          status: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          subject: string
+          audience_type: string
+          token_threshold?: number | null
+          recipients_count: number
+          sent_by?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          subject?: string
+          audience_type?: string
+          token_threshold?: number | null
+          recipients_count?: number
+          sent_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_logs_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       profiles: {
         Row: {
           has_bank_access: boolean | null
+          is_admin: boolean | null
           newsletter_subscription: boolean | null
-          special_offer_claimed: boolean | null  // ✅ AJOUT
+          special_offer_claimed: boolean | null
           tokens: number
           user_id: string
         }
         Insert: {
           has_bank_access?: boolean | null
+          is_admin?: boolean | null
           newsletter_subscription?: boolean | null
-          special_offer_claimed?: boolean | null  // ✅ AJOUT
+          special_offer_claimed?: boolean | null
           tokens?: number
           user_id: string
         }
         Update: {
           has_bank_access?: boolean | null
+          is_admin?: boolean | null
           newsletter_subscription?: boolean | null
-          special_offer_claimed?: boolean | null  // ✅ AJOUT
+          special_offer_claimed?: boolean | null
           tokens?: number
           user_id?: string
         }
@@ -488,6 +532,10 @@ export type Database = {
       }
       fetch_rss_articles: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      unsubscribe_newsletter: {
+        Args: { user_token: string }
         Returns: Json
       }
     }

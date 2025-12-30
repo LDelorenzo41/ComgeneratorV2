@@ -21,7 +21,8 @@ import {
   ChevronDown,
   Play,
   Gift,
-  Bot  // ✅ AJOUT pour le chatbot
+  Bot,
+  Map  // ✅ AJOUT pour les scénarios pédagogiques
 } from 'lucide-react';
 
 export function LandingPage() {
@@ -34,49 +35,63 @@ export function LandingPage() {
       title: "Appréciations intelligentes",
       description: "Génération personnalisée basée sur vos critères",
       icon: PenTool,
-      color: "bg-blue-500"
+      color: "bg-blue-500",
+      comingSoon: false
     },
     {
       title: "Synthèses de bulletins",
       description: "Upload PDF et résumé automatique par IA",
       icon: FileText,
-      color: "bg-green-500"
+      color: "bg-green-500",
+      comingSoon: false
     },
     {
       title: "Communications",
       description: "Messages et réponses professionnelles",
       icon: MessageSquare,
-      color: "bg-purple-500"
+      color: "bg-purple-500",
+      comingSoon: false
     },
     {
       title: "Séances pédagogiques",
       description: "Création et archivage de cours structurés",
       icon: BookOpen,
-      color: "bg-orange-500"
+      color: "bg-orange-500",
+      comingSoon: false
     },
     {
       title: "Banques de données",
       description: "Stockage et recherche de vos contenus",
       icon: Database,
-      color: "bg-teal-500"
+      color: "bg-teal-500",
+      comingSoon: false
     },
     {
       title: "Ressources éducatives",
       description: "Actualités éducatives",
       icon: TrendingUp,
-      color: "bg-red-500"
+      color: "bg-red-500",
+      comingSoon: false
     },
-    // ✅ AJOUT : Nouveau module Chatbot
     {
       title: "Chatbot personnel",
       description: "Interrogez vos documents avec l'IA",
       icon: Bot,
-      color: "bg-indigo-500"
+      color: "bg-indigo-500",
+      comingSoon: false
+    },
+    // ✅ AJOUT : Nouveau module Scénarios pédagogiques (à venir)
+    {
+      title: "Scénarios pédagogiques",
+      description: "Vision macro de vos séquences d'apprentissage",
+      icon: Map,
+      color: "bg-amber-500",
+      comingSoon: true
     }
   ];
 
   const stats = [
-    { number: "7", label: "Outils intégrés", icon: Target },  // ✅ MODIFIÉ : 6 → 7
+    { number: "8", label: "Outils intégrés", icon: Target },  // ✅ MODIFIÉ : 7 → 8
     { number: "100%", label: "Personnalisable", icon: Star },
     { number: "75%*", label: "Temps économisé", sublabel: "* Estimation", icon: Clock },
     { number: "∞", label: "Possibilités créatives", icon: Brain }
@@ -221,7 +236,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              7 outils puissants en un seul endroit
+              8 outils puissants en un seul endroit
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Découvrez comment ProfAssist transforme votre quotidien d'enseignant
@@ -242,14 +257,20 @@ export function LandingPage() {
                   onClick={() => setActiveFeature(index)}
                 >
                   <div className="flex items-center space-x-4">
-                    <div className={`p-3 rounded-xl ${feature.color}`}>
+                    <div className={`p-3 rounded-xl ${feature.color} ${feature.comingSoon ? 'opacity-60' : ''}`}>
                       <feature.icon className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      <h3 className={`text-lg font-semibold ${feature.comingSoon ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
                         {feature.title}
+                        {/* ✅ Badge "à venir" pour les fonctionnalités non disponibles */}
+                        {feature.comingSoon && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 rounded-full">
+                            à venir
+                          </span>
+                        )}
                       </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
+                      <p className={`${feature.comingSoon ? 'text-gray-400 dark:text-gray-500' : 'text-gray-600 dark:text-gray-400'}`}>
                         {feature.description}
                       </p>
                     </div>
@@ -265,11 +286,17 @@ export function LandingPage() {
             <div className="relative">
               <div className="bg-gradient-to-br from-white to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-3xl shadow-2xl p-8 min-h-[500px] flex items-center justify-center">
                 <div className="text-center">
-                  <div className={`inline-flex p-6 rounded-2xl ${features[activeFeature].color} mb-6`}>
+                  <div className={`inline-flex p-6 rounded-2xl ${features[activeFeature].color} mb-6 ${features[activeFeature].comingSoon ? 'opacity-60' : ''}`}>
                     {React.createElement(features[activeFeature].icon, { className: "w-12 h-12 text-white" })}
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     {features[activeFeature].title}
+                    {/* ✅ Badge "à venir" dans le preview aussi */}
+                    {features[activeFeature].comingSoon && (
+                      <span className="ml-2 px-2 py-1 text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 rounded-full">
+                        à venir
+                      </span>
+                    )}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 text-lg">
                     {features[activeFeature].description}
@@ -373,7 +400,6 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
-                    {/* ✅ AJOUT : Contenu spécifique pour le Chatbot */}
                     {activeFeature === 6 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
@@ -394,6 +420,36 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
+                    {/* ✅ AJOUT : Contenu spécifique pour les Scénarios pédagogiques */}
+                    {activeFeature === 7 && (
+                      <div className="text-left">
+                        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                          <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                            🚀 Fonctionnalité en cours de développement
+                          </p>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Vision macro de vos séquences</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Planification de 2 à 13 séances</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Objectifs, attendus et prérequis par séance</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Export PDF paysage</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Sauvegarde dans votre banque</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -402,7 +458,7 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* ✅ AJOUT : Section mise en avant du Chatbot */}
+      {/* ✅ Section mise en avant du Chatbot */}
       <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row items-center gap-12">
@@ -444,6 +500,55 @@ export function LandingPage() {
                   <p className="text-blue-100 text-sm italic">
                     "Quels sont les objectifs du cycle 3 en EPS ?"
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ✅ AJOUT : Section mise en avant des Scénarios pédagogiques (à venir) */}
+      <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-shrink-0 order-2 lg:order-1">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                <div className="w-32 h-32 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Map className="w-16 h-16 text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="text-white font-semibold mb-2">Exemple de scénario :</p>
+                  <p className="text-amber-100 text-sm italic">
+                    "Séquence de 6 séances sur les fractions en CM2"
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 text-center lg:text-left order-1 lg:order-2">
+              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
+                <Map className="w-4 h-4 mr-2" />
+                Bientôt disponible
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Planifiez vos séquences avec les scénarios pédagogiques
+              </h2>
+              <p className="text-lg text-amber-100 mb-8 max-w-2xl">
+                Créez une vision macro de vos séquences d'apprentissage ! 
+                Définissez les objectifs, attendus et prérequis pour chaque séance, 
+                et exportez le tout en PDF pour une vue d'ensemble claire.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>2 à 13 séances</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Export PDF paysage</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Banque de scénarios</span>
                 </div>
               </div>
             </div>
@@ -586,3 +691,4 @@ export function LandingPage() {
     </div>
   );
 }
+

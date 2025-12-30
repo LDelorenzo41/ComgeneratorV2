@@ -15,7 +15,7 @@ export interface GenerateAppreciationParams {
   minLength: number;
   maxLength: number;
   tone: 'bienveillant' | 'normal' | 'severe';
-  addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';  // ✅ AJOUT
+  addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';
 }
 
 export interface CommunicationParams {
@@ -32,22 +32,34 @@ export interface ReplyParams {
   signature?: string | null;
 }
 
-// ⭐ MODIFICATION : Ajout de documentContext optionnel
 export interface LessonParams {
   subject: string;
   topic: string;
   level: string;
   pedagogy_type: string;
   duration: string;
-  documentContext?: string;  // ⭐ NOUVEAU - Texte extrait du PDF de référence
+  documentContext?: string;
 }
 
-// ✅ INTERFACE MISE À JOUR pour SynthesisParams
 export interface SynthesisParams {
   extractedText: string;
   maxChars: number;
   tone?: 'neutre' | 'encourageant' | 'analytique';
   outputType?: 'complet' | 'essentiel';
+}
+
+// ✅ NOUVELLE INTERFACE - Scénario pédagogique
+export interface ScenarioParams {
+  matiere: string;
+  niveau: string;
+  theme: string;
+  pointDepart?: string;
+  attendus: string;
+  nombreSeances: number;
+  dureeSeance: number;
+  useRag: boolean;
+  documentsContent?: string;
+  documentNames?: string[];
 }
 
 // Classe pour gérer les appels sécurisés aux Edge Functions
@@ -108,7 +120,7 @@ class SecureApiService {
     }
   }
 
-  // Génération d'appréciations (remplace src/lib/api.ts)
+  // Génération d'appréciations
   async generateAppreciation(params: GenerateAppreciationParams) {
     return this.makeRequest<{
       detailed: string;
@@ -117,7 +129,7 @@ class SecureApiService {
     }>('generate', params);
   }
 
-  // Génération de communications (remplace src/lib/generateCommunication.ts)
+  // Génération de communications
   async generateCommunication(params: CommunicationParams) {
     return this.makeRequest<{
       content: string;
@@ -125,29 +137,42 @@ class SecureApiService {
     }>('communication', params);
   }
 
-  // Génération de réponses (remplace src/lib/generateReply.ts)
+  // Génération de réponses
   async generateReply(params: ReplyParams) {
-  return this.makeRequest<{
-    content: string;
-    usage: any;  // ← Correct, comme l'Edge Function le retourne
-  }>('reply', params);
-}
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+    }>('reply', params);
+  }
 
-  // Génération de séances (remplace LessonGeneratorPage.tsx)
+  // Génération de séances
   async generateLesson(params: LessonParams) {
-  return this.makeRequest<{
-    content: string;
-    usage: any;  // ← L'Edge Function retourne "usage", pas "usedTokens"
-  }>('lessons', params);
-}
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+    }>('lessons', params);
+  }
 
-  // Génération de synthèses (remplace SynthesePage.tsx)
+  // Génération de synthèses
   async generateSynthesis(params: SynthesisParams) {
-  return this.makeRequest<{
-    content: string;  // au lieu de synthesis
-    usage: any;       // au lieu de usedTokens
-  }>('synthesis', params);
-}
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+    }>('synthesis', params);
+  }
+
+  // ✅ NOUVELLE MÉTHODE - Génération de scénarios pédagogiques
+  async generateScenario(params: ScenarioParams) {
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+      sources?: Array<{
+        document_name: string;
+        chunk_content: string;
+        similarity: number;
+      }>;
+    }>('scenario', params);
+  }
 }
 
 // Instance singleton

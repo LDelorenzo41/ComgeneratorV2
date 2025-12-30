@@ -24,6 +24,11 @@ import LessonsBankPage from './pages/LessonsBankPage';
 import { ChatbotAnswerBankPage } from './pages/ChatbotAnswerBankPage';
 
 
+// Import de la page Scénario pédagogique
+import { ScenarioPedagogiquePage } from './pages/ScenarioPedagogiquePage';
+// Import de la page Banque de scénarios
+import { ScenariosBankPage } from './pages/ScenariosBankPage';
+
 // Import des routes légales
 import { LegalRoutes } from './routes/LegalRoutes';
 
@@ -31,15 +36,20 @@ import { LegalRoutes } from './routes/LegalRoutes';
 import { SettingsPage } from './pages/SettingsPage';
 // Import de la page Chatbot RAG
 import { ChatbotPage } from './pages/ChatbotPage';
+import { AdminNewsletterPage } from './pages/AdminNewsletterPage';
+import { UnsubscribePage } from './pages/UnsubscribePage';
 
 // Import des composants cookies
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
 
-// ✅ AJOUT : Import de la modale cadeau
+// Import de la modale cadeau
 import { SpecialOfferModal } from './components/SpecialOfferModal';
 
-// ✅ AJOUT : Import du bouton flottant chatbot
+// Import de la modale de mise à jour navigation
+import { NavigationUpdateModal } from './components/modals/NavigationUpdateModal';
+
+// Import du bouton flottant chatbot
 import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
 // Import du feature flag
@@ -133,6 +143,9 @@ function App() {
               
               {/* Routes légales (publiques - accessibles sans connexion) */}
               <Route path="/legal/*" element={<LegalRoutes />} />
+
+              {/* Route publique de désabonnement */}
+              <Route path="/unsubscribe" element={<UnsubscribePage />} />
               
               {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
               <Route element={<AuthLayout />}>
@@ -186,9 +199,28 @@ function App() {
                     <LessonGeneratorPage />
                   </EmailConfirmationGuard>
                 } />
+                {/* Route Scénario pédagogique */}
+                <Route path="/scenario-pedagogique" element={
+                  <EmailConfirmationGuard>
+                    <ScenarioPedagogiquePage />
+                  </EmailConfirmationGuard>
+                } />
+                {/* Route Banque de scénarios */}
+                <Route path="/scenarios-bank" element={
+                  <EmailConfirmationGuard>
+                    <ScenariosBankPage />
+                  </EmailConfirmationGuard>
+                } />
                 <Route path="/settings" element={
                   <EmailConfirmationGuard>
                     <SettingsPage />
+                  </EmailConfirmationGuard>
+                } />
+
+                {/* Route admin newsletter */}
+                <Route path="/admin/newsletter" element={
+                  <EmailConfirmationGuard>
+                    <AdminNewsletterPage />
                   </EmailConfirmationGuard>
                 } />
                 
@@ -218,10 +250,13 @@ function App() {
         
         <CookieBanner />
         
-        {/* ✅ AJOUT : Modale cadeau spécial - s'affiche uniquement si user connecté */}
+        {/* Modale cadeau spécial - s'affiche uniquement si user connecté */}
         {user && <SpecialOfferModal />}
         
-        {/* ✅ Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
+        {/* Modale de mise à jour navigation - s'affiche uniquement si user connecté */}
+        {user && <NavigationUpdateModal />}
+        
+        {/* Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
         {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
       </BrowserRouter>
     </CookieConsentProvider>
@@ -229,4 +264,6 @@ function App() {
 }
 
 export default App;
+
+
 
