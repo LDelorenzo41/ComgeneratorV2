@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom'; // ✅ AJOUT
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import Textarea from '../components/ui/Textarea';
@@ -43,6 +44,25 @@ interface Signature {
 export function CommunicationPage() {
   const { user } = useAuthStore();
   const tokenBalance = useTokenBalance();
+
+  // ✅ AJOUT : Hooks pour la gestion du focus via URL
+  const [searchParams] = useSearchParams();
+  const createSectionRef = React.useRef<HTMLDivElement>(null);
+  const replySectionRef = React.useRef<HTMLDivElement>(null);
+
+  // ✅ AJOUT : Effet pour scroller vers la bonne section selon le mode
+  React.useEffect(() => {
+    const mode = searchParams.get('mode');
+    
+    // Petit délai pour s'assurer que le DOM est prêt
+    setTimeout(() => {
+      if (mode === 'create' && createSectionRef.current) {
+        createSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (mode === 'reply' && replySectionRef.current) {
+        replySectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  }, [searchParams]);
 
   // Fonction 1
   const [destinataire, setDestinataire] = React.useState("Parents d'élèves");
@@ -280,7 +300,11 @@ export function CommunicationPage() {
         <div className="space-y-12">
 
           {/* Fonction 1 - Générer une communication */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+          {/* ✅ AJOUT: Ref pour le scroll */}
+          <div 
+            ref={createSectionRef}
+            className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
+          >
             <div className="mb-8">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
@@ -526,7 +550,11 @@ export function CommunicationPage() {
           )}
 
           {/* Fonction 2 - Répondre à une communication */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+          {/* ✅ AJOUT: Ref pour le scroll */}
+          <div 
+            ref={replySectionRef}
+            className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
+          >
             <div className="mb-8">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
