@@ -1,13 +1,13 @@
 // src/pages/legal/PolitiqueConfidentialitePage.tsx
 import React from 'react';
 import { LegalLayout } from '../../components/legal/LegalLayout';
-import { Shield, Eye, Lock, Database, Share2, Clock } from 'lucide-react';
+import { Shield, Eye, Lock, Database, Share2, Clock, Bot, FileText } from 'lucide-react';
 
 export function PolitiqueConfidentialitePage() {
   return (
     <LegalLayout 
       title="Politique de confidentialité" 
-      lastUpdated="24 août 2025"
+      lastUpdated="31 décembre 2025"
     >
       <div className="space-y-8">
         
@@ -100,6 +100,7 @@ export function PolitiqueConfidentialitePage() {
                 <li>• Synthèses de bulletins</li>
                 <li>• Communications créées</li>
                 <li>• Séances pédagogiques</li>
+                <li>• Scénarios pédagogiques</li>
               </ul>
               <p className="text-sm text-gray-600 mt-3 bg-purple-50 p-2 rounded">
                 <strong>Propriété :</strong> Vous restez propriétaire
@@ -122,6 +123,40 @@ export function PolitiqueConfidentialitePage() {
                 <strong>Note :</strong> Aucune donnée bancaire stockée
               </p>
             </div>
+
+            {/* Documents Chatbot */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <FileText className="w-4 h-4 mr-2 text-indigo-600" />
+                Documents uploadés (Chatbot)
+              </h3>
+              <ul className="text-gray-700 space-y-2">
+                <li>• Fichiers PDF, DOCX, TXT uploadés</li>
+                <li>• Contenu textuel extrait et indexé</li>
+                <li>• Métadonnées des documents (nom, taille, date)</li>
+                <li>• Embeddings vectoriels pour la recherche</li>
+              </ul>
+              <p className="text-sm text-gray-600 mt-3 bg-indigo-50 p-2 rounded">
+                <strong>Stockage :</strong> Privé et sécurisé par utilisateur
+              </p>
+            </div>
+
+            {/* Conversations Chatbot */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <Bot className="w-4 h-4 mr-2 text-teal-600" />
+                Conversations Chatbot
+              </h3>
+              <ul className="text-gray-700 space-y-2">
+                <li>• Questions posées au chatbot</li>
+                <li>• Réponses générées par l'IA</li>
+                <li>• Sources documentaires utilisées</li>
+                <li>• Réponses sauvegardées en banque</li>
+              </ul>
+              <p className="text-sm text-gray-600 mt-3 bg-teal-50 p-2 rounded">
+                <strong>Finalité :</strong> Amélioration des réponses
+              </p>
+            </div>
           </div>
         </section>
 
@@ -135,8 +170,21 @@ export function PolitiqueConfidentialitePage() {
               <h3 className="font-semibold text-gray-900 mb-3">🎯 Fourniture du service</h3>
               <p className="text-gray-700">
                 Permettre l'utilisation de nos outils d'IA pour la génération d'appréciations, 
-                synthèses, communications et séances pédagogiques.
+                synthèses, communications, séances et scénarios pédagogiques.
               </p>
+            </div>
+
+            <div className="bg-indigo-50 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">🤖 Chatbot personnalisé (RAG)</h3>
+              <p className="text-gray-700 mb-3">
+                Traitement de vos documents pour alimenter votre chatbot personnel :
+              </p>
+              <ul className="text-gray-700 space-y-1 text-sm">
+                <li>• <strong>Indexation :</strong> Extraction du texte et création d'embeddings vectoriels</li>
+                <li>• <strong>Recherche :</strong> Identification des passages pertinents pour répondre à vos questions</li>
+                <li>• <strong>Génération :</strong> Création de réponses basées sur vos documents via OpenAI</li>
+                <li>• <strong>Isolation :</strong> Vos documents ne sont accessibles qu'à vous seul</li>
+              </ul>
             </div>
 
             <div className="bg-green-50 rounded-lg p-6">
@@ -176,6 +224,7 @@ export function PolitiqueConfidentialitePage() {
               <li>• Nous ne vendons pas vos données</li>
               <li>• Nous ne les partageons pas à des fins publicitaires</li>
               <li>• Nous ne créons pas de profils marketing</li>
+              <li>• Vos documents chatbot ne sont jamais partagés avec d'autres utilisateurs</li>
             </ul>
           </div>
 
@@ -183,10 +232,10 @@ export function PolitiqueConfidentialitePage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">🤖 OpenAI</h3>
               <p className="text-gray-700 mb-2">
-                Vos demandes de génération sont transmises à OpenAI pour traitement. 
+                Vos demandes de génération et questions chatbot sont transmises à OpenAI pour traitement. 
               </p>
               <p className="text-gray-600 text-sm">
-                <strong>Garantie :</strong> OpenAI ne stocke pas les données transmises via l'API et ne les utilise pas pour l'entraînement.
+                <strong>Garantie :</strong> OpenAI ne stocke pas les données transmises via l'API et ne les utilise pas pour l'entraînement de ses modèles.
               </p>
             </div>
 
@@ -203,10 +252,10 @@ export function PolitiqueConfidentialitePage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">🏢 Supabase</h3>
               <p className="text-gray-700 mb-2">
-                Hébergement sécurisé de la base de données (serveurs en Europe).
+                Hébergement sécurisé de la base de données et des documents chatbot (serveurs en Europe).
               </p>
               <p className="text-gray-600 text-sm">
-                <strong>Conformité :</strong> Certifié RGPD.
+                <strong>Conformité :</strong> Certifié RGPD. Vos documents sont stockés de manière chiffrée.
               </p>
             </div>
           </div>
@@ -214,7 +263,7 @@ export function PolitiqueConfidentialitePage() {
 
         {/* Durée de conservation */}
         <section>
-          <h2 className="text-xl font-semibent text-gray-900 mb-4 pb-2 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
             5. Durée de conservation
           </h2>
           <div className="bg-gray-50 rounded-lg p-6">
@@ -241,6 +290,18 @@ export function PolitiqueConfidentialitePage() {
                 <h3 className="font-semibold text-gray-900 mb-2">🔐 Données d'authentification</h3>
                 <p className="text-gray-700 text-sm">
                   Supprimées immédiatement lors de la suppression du compte
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">📄 Documents chatbot</h3>
+                <p className="text-gray-700 text-sm">
+                  Conservés tant que votre compte est actif. Supprimés sous 30 jours après suppression du compte.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">💬 Historique chatbot</h3>
+                <p className="text-gray-700 text-sm">
+                  Conversations conservées 12 mois, puis anonymisées ou supprimées.
                 </p>
               </div>
             </div>
@@ -306,7 +367,8 @@ export function PolitiqueConfidentialitePage() {
               avec votre demande. Nous vous répondrons sous 30 jours.
             </p>
             <p className="text-gray-600 text-sm">
-              💡 <strong>Astuce :</strong> Vous pouvez aussi gérer la plupart de vos données directement depuis votre dashboard ProfAssist.
+              💡 <strong>Astuce :</strong> Vous pouvez aussi gérer la plupart de vos données directement depuis votre dashboard ProfAssist, 
+              y compris supprimer vos documents chatbot.
             </p>
           </div>
         </section>
@@ -341,6 +403,16 @@ export function PolitiqueConfidentialitePage() {
                 Sauvegardes automatiques quotidiennes et réplication
               </p>
             </div>
+          </div>
+
+          <div className="bg-indigo-50 rounded-lg p-6 mt-6">
+            <h3 className="font-semibold text-gray-900 mb-3">🔐 Sécurité des documents Chatbot</h3>
+            <ul className="text-gray-700 space-y-2 text-sm">
+              <li>• <strong>Isolation :</strong> Chaque utilisateur a son propre espace de stockage isolé</li>
+              <li>• <strong>Accès :</strong> Vos documents ne sont accessibles qu'à vous via votre session authentifiée</li>
+              <li>• <strong>Chiffrement :</strong> Documents stockés de manière chiffrée sur les serveurs Supabase</li>
+              <li>• <strong>Suppression :</strong> Possibilité de supprimer vos documents à tout moment depuis l'interface</li>
+            </ul>
           </div>
           
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 mt-6">

@@ -1035,7 +1035,7 @@ export function ScenarioPedagogiquePage() {
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <Users className="w-4 h-4 inline mr-2" />Niveau *
                 </label>
-                <Input {...register('niveau')} disabled={tokenCount === 0} error={errors.niveau?.message} placeholder="Ex: CE2, 6ème, Terminale S..." className="border-2 border-gray-200 dark:border-gray-600 rounded-xl" />
+                <Input {...register('niveau')} disabled={tokenCount === 0} error={errors.niveau?.message} placeholder="Ex: CE2, 6ème, Terminale ..." className="border-2 border-gray-200 dark:border-gray-600 rounded-xl" />
               </div>
             </div>
 

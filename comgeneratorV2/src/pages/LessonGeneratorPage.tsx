@@ -959,7 +959,7 @@ export function LessonGeneratorPage() {
                   disabled={tokenCount === 0}
                   error={errors.level?.message}
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Ex: CE2, 6ème, Terminale S..."
+                  placeholder="Ex: CE2, 6ème, Terminale ..."
                 />
               </div>
 
