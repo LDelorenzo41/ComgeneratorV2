@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, Trash2, BookOpen, Sparkles, Zap, Target, Info } from 'lucide-react';
+import { Send, Loader2, Trash2, User, Building2, Sparkles, Zap, Target, Info, AlertTriangle } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { sendChatMessage } from '../../lib/ragApi';
-import type { ChatUIMessage, ChatMode, RagDocument } from '../../lib/rag.types';
+import type { ChatUIMessage, RagDocument, CorpusSelection } from '../../lib/rag.types';
+import { DEFAULT_CORPUS_SELECTION } from '../../lib/rag.types';
 
 type SearchMode = 'fast' | 'precise';
 
@@ -11,11 +12,48 @@ interface ChatInterfaceProps {
   onNeedDocuments?: () => void;
 }
 
+// 🆕 Composant Switch réutilisable
+const ToggleSwitch: React.FC<{
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+  label: string;
+  icon: React.ReactNode;
+  colorClass: string;
+  disabled?: boolean;
+}> = ({ enabled, onChange, label, icon, colorClass, disabled }) => (
+  <button
+    onClick={() => !disabled && onChange(!enabled)}
+    disabled={disabled}
+    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+      disabled 
+        ? 'opacity-50 cursor-not-allowed' 
+        : 'cursor-pointer'
+    } ${
+      enabled
+        ? `${colorClass} ring-1`
+        : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+    }`}
+  >
+    <div className={`relative w-8 h-4 rounded-full transition-colors ${
+      enabled ? 'bg-current opacity-30' : 'bg-gray-300 dark:bg-gray-600'
+    }`}>
+      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${
+        enabled ? 'translate-x-4' : 'translate-x-0.5'
+      }`} />
+    </div>
+    {icon}
+    <span className="hidden sm:inline">{label}</span>
+  </button>
+);
+
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedDocuments }) => {
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<ChatMode>('corpus_only');
+  
+  // 🆕 État pour les 3 switches
+  const [corpusSelection, setCorpusSelection] = useState<CorpusSelection>(DEFAULT_CORPUS_SELECTION);
+  
   const [searchMode, setSearchMode] = useState<SearchMode>('precise');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSearchModeInfo, setShowSearchModeInfo] = useState(false);
@@ -23,8 +61,21 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // 🆕 Filtrer les documents selon les switches
   const readyDocuments = documents.filter((d) => d.status === 'ready');
-  const hasDocuments = readyDocuments.length > 0;
+  const hasPersonalDocs = readyDocuments.some(d => d.scope === 'user');
+  const hasProfAssistDocs = readyDocuments.some(d => d.scope === 'global');
+  
+  // 🆕 Vérifier si au moins une source est sélectionnée
+  const hasActiveSource = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus || corpusSelection.useAI;
+  const hasCorpusSelected = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus;
+  
+  // 🆕 Vérifier si les corpus sélectionnés ont des documents
+  const canSearch = (
+    (corpusSelection.usePersonalCorpus && hasPersonalDocs) ||
+    (corpusSelection.useProfAssistCorpus && hasProfAssistDocs) ||
+    (corpusSelection.useAI && !hasCorpusSelected) // IA seule
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,7 +84,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
-    if (!hasDocuments) {
+    if (!hasActiveSource) {
+      return; // Pas de source active
+    }
+
+    if (hasCorpusSelected && !canSearch) {
       onNeedDocuments?.();
       return;
     }
@@ -60,8 +115,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     try {
       const response = await sendChatMessage({
         message: userMessage.content,
-        mode,
-        searchMode,  // 🆕 Passer le mode de recherche
+        corpusSelection,  // 🆕 Passer les switches
+        searchMode,
         conversationId: conversationId || undefined,
         topK: searchMode === 'precise' ? 8 : 5,
       });
@@ -106,35 +161,48 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     }
   };
 
+  // 🆕 Handlers pour les switches
+  const updateCorpusSelection = (key: keyof CorpusSelection, value: boolean) => {
+    setCorpusSelection(prev => ({ ...prev, [key]: value }));
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
-        {/* Ligne 1 : Mode de réponse */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMode('corpus_only')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                mode === 'corpus_only'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              Corpus seul
-            </button>
-            <button
-              onClick={() => setMode('corpus_plus_ai')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                mode === 'corpus_plus_ai'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              Corpus + IA
-            </button>
+        {/* 🆕 Ligne 1 : Switches de sélection des corpus */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Sources :</span>
+            
+            {/* Switch Corpus Perso */}
+            <ToggleSwitch
+              enabled={corpusSelection.usePersonalCorpus}
+              onChange={(v) => updateCorpusSelection('usePersonalCorpus', v)}
+              label="Corpus perso"
+              icon={<User className="w-4 h-4" />}
+              colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 ring-blue-300 dark:ring-blue-700"
+              disabled={!hasPersonalDocs}
+            />
+            
+            {/* Switch Corpus ProfAssist */}
+            <ToggleSwitch
+              enabled={corpusSelection.useProfAssistCorpus}
+              onChange={(v) => updateCorpusSelection('useProfAssistCorpus', v)}
+              label="Corpus ProfAssist"
+              icon={<Building2 className="w-4 h-4" />}
+              colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 ring-purple-300 dark:ring-purple-700"
+              disabled={!hasProfAssistDocs}
+            />
+            
+            {/* Switch IA */}
+            <ToggleSwitch
+              enabled={corpusSelection.useAI}
+              onChange={(v) => updateCorpusSelection('useAI', v)}
+              label="IA"
+              icon={<Sparkles className="w-4 h-4" />}
+              colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 ring-amber-300 dark:ring-amber-700"
+            />
           </div>
 
           <button
@@ -147,10 +215,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           </button>
         </div>
 
+        {/* 🆕 Message d'explication contextuel */}
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {mode === 'corpus_only'
-            ? 'Réponses basées uniquement sur vos documents.'
-            : 'Réponses basées sur vos documents + compléments IA signalés.'}
+          {!hasActiveSource ? (
+            <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Activez au moins une source pour poser une question.
+            </span>
+          ) : corpusSelection.useAI && !hasCorpusSelected ? (
+            'Réponses basées uniquement sur les connaissances de l\'IA.'
+          ) : corpusSelection.useAI ? (
+            'Réponses basées sur les corpus sélectionnés + compléments IA signalés.'
+          ) : (
+            'Réponses basées uniquement sur les corpus sélectionnés.'
+          )}
         </p>
 
         {/* Ligne 2 : Mode de recherche (Rapide / Précis) */}
@@ -221,15 +299,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-blue-500" />
+              <Sparkles className="w-8 h-8 text-blue-500" />
             </div>
             <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Posez votre question
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
-              Je cherche dans vos documents et les programmes officiels pour vous répondre.
+              {hasCorpusSelected 
+                ? 'Je cherche dans les corpus sélectionnés pour vous répondre.'
+                : corpusSelection.useAI 
+                  ? 'Je répondrai avec mes connaissances générales.'
+                  : 'Sélectionnez au moins une source ci-dessus.'}
             </p>
-            {!hasDocuments && (
+            {hasCorpusSelected && !canSearch && (
               <button
                 onClick={onNeedDocuments}
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
@@ -255,8 +337,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Posez votre question..."
-              disabled={isLoading || !hasDocuments}
+              placeholder={hasActiveSource ? "Posez votre question..." : "Activez une source..."}
+              disabled={isLoading || !hasActiveSource}
               rows={1}
               className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
               style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -264,7 +346,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           </div>
           <button
             onClick={handleSend}
-            disabled={!inputValue.trim() || isLoading || !hasDocuments}
+            disabled={!inputValue.trim() || isLoading || !hasActiveSource}
             className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isLoading ? (
@@ -279,4 +361,5 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   );
 };
 export default ChatInterface;
+
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search
+  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
@@ -69,7 +69,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 <div className="flex items-center gap-2 mb-2">
                   <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   <h4 className="font-semibold text-purple-700 dark:text-purple-400">
-                    Corpus officiel
+                    Corpus ProfAssist
                   </h4>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -81,7 +81,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 <div className="flex items-center gap-2 mb-2">
                   <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   <h4 className="font-semibold text-blue-700 dark:text-blue-400">
-                    Mes documents
+                    Corpus perso
                   </h4>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -111,42 +111,90 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-sm font-bold">3</span>
-                <span><strong>Posez vos questions</strong> - le chatbot cherche dans le corpus officiel ET vos documents</span>
+                <span><strong>Sélectionnez vos sources</strong> via les switches et posez vos questions</span>
               </li>
             </ol>
           </div>
 
-          {/* Modes de chat */}
+          {/* 🆕 NOUVELLE SECTION : Sélection des sources (switches) */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <MessageCircle className="w-5 h-5 text-green-500" />
+              <ToggleLeft className="w-5 h-5 text-green-500" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Deux modes de réponse
+                Sélection des sources
               </h3>
             </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+              Utilisez les <strong>3 switches</strong> pour choisir les sources à interroger. Vous pouvez les combiner librement :
+            </p>
             <div className="grid gap-3">
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">
-                  🎯 Corpus seul
-                </h4>
+              {/* Switch Corpus perso */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <h4 className="font-semibold text-blue-700 dark:text-blue-400">
+                    Corpus perso
+                  </h4>
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Réponses strictement basées sur vos documents. Aucune information externe n'est ajoutée. 
-                  Idéal pour des réponses précises et vérifiables.
+                  Active la recherche dans <strong>vos documents personnels</strong> (progressions, projets, fiches...).
                 </p>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-1">
-                  🧠 Corpus + IA
-                </h4>
+              
+              {/* Switch Corpus ProfAssist */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <h4 className="font-semibold text-purple-700 dark:text-purple-400">
+                    Corpus ProfAssist
+                  </h4>
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  L'IA cite d'abord vos documents, puis complète avec ses connaissances générales 
-                  (clairement identifiées). Idéal pour enrichir les informations.
+                  Active la recherche dans les <strong>documents officiels</strong> (programmes, textes réglementaires, guides...).
                 </p>
+              </div>
+              
+              {/* Switch IA */}
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h4 className="font-semibold text-amber-700 dark:text-amber-400">
+                    IA
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Active l'<strong>enrichissement par l'IA</strong>. Les connaissances générales de l'IA complètent les sources documentaires (clairement identifiées).
+                </p>
+              </div>
+            </div>
+            
+            {/* Exemples de combinaisons */}
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+              <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                💡 Exemples de combinaisons
+              </h5>
+              <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">•</span>
+                  <span><strong>Perso + ProfAssist</strong> : Recherche dans tous vos documents, réponse strictement basée sur les sources</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">•</span>
+                  <span><strong>ProfAssist + IA</strong> : Recherche dans les textes officiels + compléments IA</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">•</span>
+                  <span><strong>Perso seul</strong> : Recherche uniquement dans vos documents personnels</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500 mt-0.5">•</span>
+                  <span><strong>IA seule</strong> : Réponse basée uniquement sur les connaissances générales de l'IA</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 🆕 NOUVELLE SECTION : Modes de recherche */}
+          {/* Modes de recherche */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Search className="w-5 h-5 text-cyan-500" />
@@ -257,7 +305,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
-          {/* Consommation de tokens - Mise à jour */}
+          {/* Consommation de tokens */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-amber-500" />
@@ -290,13 +338,13 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   💡 <strong>Astuce :</strong> Utilisez le mode <strong>Rapide</strong> par défaut pour économiser vos tokens. 
-                  Le mode "Corpus seul" consomme généralement moins que "Corpus + IA".
+                  Désactiver le switch "IA" consomme généralement moins de tokens.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Offre Bêta - MISE À JOUR */}
+          {/* Offre Bêta */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Gift className="w-5 h-5 text-pink-500" />
@@ -319,7 +367,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-pink-500 mt-1">📚</span>
-                  <span>Corpus officiel inclus <strong>gratuitement et sans limite</strong></span>
+                  <span>Corpus ProfAssist inclus <strong>gratuitement et sans limite</strong></span>
                 </li>
               </ul>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-pink-200 dark:border-pink-700">
@@ -372,7 +420,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   );
 };
 
-// Composant encart Bêta - MISE À JOUR avec double quota
+// Composant encart Bêta
 const BetaUsageCard: React.FC<{ betaStats: BetaUsageStats; isLoading: boolean }> = ({ betaStats, isLoading }) => {
   const getProgressColor = (percent: number) => {
     if (percent >= 90) return 'bg-red-500';
@@ -831,6 +879,7 @@ export const ChatbotPage: React.FC = () => {
 };
 
 export default ChatbotPage;
+
 
 
 

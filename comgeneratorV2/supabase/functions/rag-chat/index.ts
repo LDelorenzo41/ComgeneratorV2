@@ -122,7 +122,12 @@ interface ChatRequest {
   conversationId?: string;
   documentId?: string;
   topK?: number;
+  // 🆕 Nouveaux paramètres pour la sélection des corpus
+  usePersonalCorpus?: boolean;
+  useProfAssistCorpus?: boolean;
+  useAI?: boolean;
 }
+
 
 interface DocumentInfo {
   id: string;
@@ -396,13 +401,50 @@ function extractKeyTerms(query: string): string[] {
 // GESTION DOCUMENTS (SÉCURITÉ V2)
 // ============================================================================
 
-async function getAllowedDocuments(supabase: any, userId: string, docId?: string): Promise<Map<string, DocumentInfo>> {
+// 🆕 Fonction mise à jour avec filtrage selon les switches
+async function getAllowedDocuments(
+  supabase: any, 
+  userId: string, 
+  docId?: string,
+  usePersonalCorpus: boolean = true,
+  useProfAssistCorpus: boolean = true
+): Promise<Map<string, DocumentInfo>> {
   const docsMap = new Map<string, DocumentInfo>();
   console.log(`[rag-chat] === SECURITY: Fetching allowed documents ===`);
+  console.log(`[rag-chat] Filters: personal=${usePersonalCorpus}, profassist=${useProfAssistCorpus}`);
+
+  // Si aucun corpus sélectionné, retourner vide
+  if (!usePersonalCorpus && !useProfAssistCorpus) {
+    console.log(`[rag-chat] No corpus selected, returning empty`);
+    return docsMap;
+  }
 
   let query = supabase.from('rag_documents').select('id, title, scope, user_id').eq('status', 'ready');
-  if (docId) query = query.eq('id', docId);
-  else query = query.or(`scope.eq.global,user_id.eq.${userId}`);
+  
+  if (docId) {
+    query = query.eq('id', docId);
+  } else {
+    // 🆕 Construire le filtre selon les switches
+    const filters: string[] = [];
+    if (useProfAssistCorpus) {
+      filters.push('scope.eq.global');
+    }
+    if (usePersonalCorpus) {
+      filters.push(`and(scope.eq.user,user_id.eq.${userId})`);
+    }
+    
+    if (filters.length === 1) {
+      // Un seul filtre
+      if (useProfAssistCorpus) {
+        query = query.eq('scope', 'global');
+      } else {
+        query = query.eq('scope', 'user').eq('user_id', userId);
+      }
+    } else {
+      // Les deux filtres
+      query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    }
+  }
 
   const { data } = await query;
   if (data) {
@@ -411,6 +453,7 @@ async function getAllowedDocuments(supabase: any, userId: string, docId?: string
   }
   return docsMap;
 }
+
 
 // ============================================================================
 // EMBEDDINGS
@@ -734,15 +777,95 @@ async function chatHandler(req: Request): Promise<Response> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User Invalid');
 
-    const { message, mode = 'corpus_plus_ai', searchMode = 'fast', conversationId, documentId } = await req.json();
+    const { 
+  message, 
+  mode = 'corpus_plus_ai', 
+  searchMode = 'fast', 
+  conversationId, 
+  documentId,
+  // 🆕 Nouveaux paramètres avec valeurs par défaut
+  usePersonalCorpus = true,
+  useProfAssistCorpus = true,
+  useAI = false
+} = await req.json() as ChatRequest;
+
+// 🆕 Déterminer le mode effectif basé sur useAI
+const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
+
 
     console.log(`[rag-chat] Handling: "${message}"`);
 
     // 1. SÉCURITÉ: Docs autorisés
-    const allowedDocsMap = await getAllowedDocuments(serviceClient, user.id, documentId);
+    // 🆕 Passer les switches à la fonction
+const allowedDocsMap = await getAllowedDocuments(
+  serviceClient, 
+  user.id, 
+  documentId,
+  usePersonalCorpus,
+  useProfAssistCorpus
+);
+
     const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
     const allowedDocIdsSet = new Set(allowedDocIdsArr);
-    if (allowedDocIdsArr.length === 0) return new Response(JSON.stringify({ answer: "Aucun document.", sources: [] }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    // 🆕 Gestion du cas "IA seule" (aucun corpus mais useAI activé)
+if (allowedDocIdsArr.length === 0) {
+  if (useAI && !usePersonalCorpus && !useProfAssistCorpus) {
+    // Mode IA seule - répondre directement sans recherche de documents
+    console.log(`[rag-chat] AI-only mode, no corpus search`);
+    
+    let convId = conversationId;
+    if (!convId) {
+      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
+      convId = data.id;
+    }
+    
+    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
+    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
+    
+    // Générer une réponse IA sans contexte documentaire
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CONFIG.chatModel,
+        messages: [
+          { role: 'system', content: 'Tu es un assistant pédagogique expert. Réponds de manière claire et structurée.' },
+          ...(hist || []),
+          { role: 'user', content: message }
+        ],
+        temperature: 0.3,
+      }),
+    });
+    
+    const data = await response.json();
+    const answer = data.choices[0]?.message?.content || 'Erreur lors de la génération.';
+    const tokensUsed = data.usage?.total_tokens || 0;
+    
+    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources: []});
+    
+    // Déduire les tokens
+    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
+      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - tokensUsed)}).eq('user_id', user.id); });
+    
+    return new Response(JSON.stringify({
+      answer, 
+      sources: [], 
+      conversationId: convId, 
+      tokensUsed, 
+      mode: 'corpus_plus_ai',
+      searchMode: 'fast'
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+  }
+  
+  return new Response(JSON.stringify({ 
+    answer: "Aucun document disponible dans les corpus sélectionnés.", 
+    sources: [],
+    conversationId: null,
+    tokensUsed: 0,
+    mode: effectiveMode
+  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+}
+
 
     // 2. DÉTECTION
     const activeDomain = detectDomainIntent(message);
@@ -817,7 +940,9 @@ async function chatHandler(req: Request): Promise<Response> {
     const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
     await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
 
-    const { answer, tokens } = await generateResponse(message, candidates, mode, hist || [], activeDomain, OPENAI_API_KEY);
+    // Ligne ~820
+const { answer, tokens } = await generateResponse(message, candidates, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY);
+
     totalTokens += tokens;
 
     const sources = candidates.map(c => ({
@@ -829,9 +954,10 @@ async function chatHandler(req: Request): Promise<Response> {
     serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
       .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - totalTokens)}).eq('user_id', user.id); });
 
-    return new Response(JSON.stringify({
-      answer, sources, conversationId: convId, tokensUsed: totalTokens, mode, searchMode: effectiveSearchMode
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+return new Response(JSON.stringify({
+  answer, sources, conversationId: convId, tokensUsed: totalTokens, mode: effectiveMode, searchMode: effectiveSearchMode
+}), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+
 
   } catch (e: any) {
     console.error(e);

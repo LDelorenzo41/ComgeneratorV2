@@ -4,10 +4,10 @@
 
 export const FEATURES = {
   // Chatbot et banque de réponses - à activer quand prêt
-  CHATBOT_ENABLED: true,
+  CHATBOT_ENABLED: false,
   
   // Scénario pédagogique - à activer quand prêt
-  SCENARIO_ENABLED: true,
+  SCENARIO_ENABLED: false,
   
   // Autres features à venir...
 } as const;
