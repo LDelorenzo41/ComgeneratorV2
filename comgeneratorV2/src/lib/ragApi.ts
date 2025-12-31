@@ -4,7 +4,7 @@
 // + Double quota bêta: stockage permanent + import mensuel
 
 import { supabase } from './supabase';
-import type { RagDocument, ChatResponse, ChatMode } from './rag.types';
+import type { RagDocument, ChatResponse, CorpusSelection } from './rag.types';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -346,15 +346,29 @@ export async function uploadAndIngestGlobalDocument(
 // CHAT
 // ============================================================================
 
+// 🆕 Interface mise à jour avec CorpusSelection
 export async function sendChatMessage(request: {
   message: string;
-  mode: ChatMode;
-  searchMode?: 'fast' | 'precise';  // 🆕 Nouveau paramètre
+  corpusSelection: CorpusSelection;  // 🆕 Remplace 'mode'
+  searchMode?: 'fast' | 'precise';
   conversationId?: string;
   documentId?: string;
   topK?: number;
 }): Promise<ChatResponse> {
-  const response = await callEdgeFunction<ChatResponse | { error: string }>('rag-chat', request);
+  // 🆕 Convertir corpusSelection en paramètres pour le backend
+  const backendRequest = {
+    message: request.message,
+    mode: request.corpusSelection.useAI ? 'corpus_plus_ai' : 'corpus_only',
+    usePersonalCorpus: request.corpusSelection.usePersonalCorpus,
+    useProfAssistCorpus: request.corpusSelection.useProfAssistCorpus,
+    useAI: request.corpusSelection.useAI,
+    searchMode: request.searchMode,
+    conversationId: request.conversationId,
+    documentId: request.documentId,
+    topK: request.topK,
+  };
+
+  const response = await callEdgeFunction<ChatResponse | { error: string }>('rag-chat', backendRequest);
   if ('error' in response) {
     throw new Error(response.error);
   }
@@ -495,6 +509,7 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
     resetDate,
   };
 }
+
 
 
 

@@ -7,7 +7,7 @@ export function CguPage() {
   return (
     <LegalLayout 
       title="Conditions générales d'utilisation" 
-      lastUpdated="24 août 2025"
+      lastUpdated="31 décembre 2025"
     >
       <div className="space-y-8">
         
@@ -56,7 +56,19 @@ export function CguPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">🤖 "Services d'IA"</h3>
                 <p className="text-gray-700 text-sm">
-                  Génération d'appréciations, synthèses, communications et séances pédagogiques.
+                  Génération d'appréciations, synthèses, communications, séances pédagogiques, scénarios pédagogiques et chatbot personnalisé.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">📚 "Corpus documentaire"</h3>
+                <p className="text-gray-700 text-sm">
+                  Ensemble des documents uploadés par l'utilisateur pour alimenter son chatbot personnalisé (technologie RAG).
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">🗺️ "Scénario pédagogique"</h3>
+                <p className="text-gray-700 text-sm">
+                  Vision macro d'une séquence d'apprentissage détaillant les objectifs, attendus et prérequis de chaque séance.
                 </p>
               </div>
             </div>
@@ -79,6 +91,9 @@ export function CguPage() {
                 <li>• <strong>Synthèses de bulletins :</strong> Analyse et résumé automatique des commentaires d'une classe</li>
                 <li>• <strong>Communications professionnelles :</strong> Rédaction d'emails, courriers et messages aux parents</li>
                 <li>• <strong>Séances pédagogiques :</strong> Création de fiches de préparation de cours</li>
+                <li>• <strong>Scénarios pédagogiques :</strong> Planification de séquences complètes avec objectifs, attendus et prérequis par séance</li>
+                <li>• <strong>Chatbot personnalisé :</strong> Assistant IA interrogeable sur vos propres documents pédagogiques (programmes, fiches, cours)</li>
+                <li>• <strong>Banques de données :</strong> Stockage et recherche de vos contenus (appréciations, séances, scénarios, réponses chatbot)</li>
                 <li>• <strong>Gestion des tokens :</strong> Système de crédits pour l'utilisation des services d'IA</li>
               </ul>
             </div>
@@ -165,6 +180,8 @@ export function CguPage() {
                     <li>• Synthèse : ~1800 tokens</li>
                     <li>• Communication : ~1000 tokens</li>
                     <li>• Séance : ~3500 tokens</li>
+                    <li>• Scénario pédagogique : ~4000 tokens</li>
+                    <li>• Question chatbot : ~2000 tokens</li>
                   </ul>
                 </div>
                 
@@ -177,6 +194,19 @@ export function CguPage() {
                   </ul>
                 </div>
               </div>
+            </div>
+            
+            <div className="bg-green-50 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">📤 Upload de documents (Chatbot)</h3>
+              <p className="text-gray-700 mb-3">
+                L'upload de documents pour alimenter votre chatbot personnel est <strong>gratuit et illimité</strong>. 
+                Seules les questions posées au chatbot consomment des tokens.
+              </p>
+              <ul className="text-gray-700 text-sm space-y-1">
+                <li>• Formats acceptés : PDF, DOCX, TXT</li>
+                <li>• Taille maximale par fichier : 10 Mo</li>
+                <li>• Documents stockés de manière sécurisée et privée</li>
+              </ul>
             </div>
             
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
@@ -210,8 +240,11 @@ export function CguPage() {
               <ul className="text-green-700 space-y-2 text-sm">
                 <li>• Création d'appréciations pour vos élèves</li>
                 <li>• Rédaction de communications professionnelles</li>
-                <li>• Préparation de séances pédagogiques</li>
+                <li>• Préparation de séances et scénarios pédagogiques</li>
                 <li>• Synthèses de bulletins de votre classe</li>
+                <li>• Upload de documents pédagogiques officiels ou personnels</li>
+                <li>• Interrogation du chatbot sur vos documents</li>
+                <li>• Sauvegarde de contenus dans vos banques personnelles</li>
                 <li>• Usage dans le cadre professionnel éducatif</li>
                 <li>• Adaptation du contenu généré selon vos besoins</li>
               </ul>
@@ -231,6 +264,8 @@ export function CguPage() {
                 <li>• Automation abusive (bots, scripts)</li>
                 <li>• Violation des droits d'auteur d'autrui</li>
                 <li>• Usage commercial en dehors du cadre éducatif</li>
+                <li>• Upload de documents contenant des données sensibles d'élèves</li>
+                <li>• Upload de contenus illicites ou protégés sans autorisation</li>
               </ul>
             </div>
           </div>
@@ -242,6 +277,7 @@ export function CguPage() {
               <li>• Personnalisez les résultats selon vos élèves</li>
               <li>• Respectez la confidentialité des données de vos élèves</li>
               <li>• Utilisez ProfAssist comme un assistant, pas un remplaçant</li>
+              <li>• Pour le chatbot, privilégiez les documents officiels (programmes, BO) pour des réponses fiables</li>
             </ul>
           </div>
         </section>
@@ -274,16 +310,20 @@ export function CguPage() {
                 <li>• Appréciations créées</li>
                 <li>• Synthèses générées</li>
                 <li>• Communications rédigées</li>
-                <li>• Séances pédagogiques</li>
+                <li>• Séances et scénarios pédagogiques</li>
+                <li>• Réponses du chatbot sauvegardées</li>
               </ul>
             </div>
             
             <div className="bg-purple-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">📝 Données d'entrée</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">📝 Documents uploadés (Chatbot)</h3>
+              <p className="text-gray-700 mb-3">
+                Vous restez propriétaire des documents que vous uploadez dans votre chatbot. 
+                Nous ne revendiquons aucun droit sur ces contenus.
+              </p>
               <p className="text-gray-700">
-                Vous garantissez que les informations que vous saisissez (noms d'élèves, notes, commentaires) 
-                ne violent aucun droit de propriété intellectuelle et que vous disposez de tous les droits nécessaires 
-                pour leur utilisation.
+                Vous garantissez que les documents uploadés ne violent aucun droit de propriété intellectuelle 
+                et que vous disposez de tous les droits nécessaires pour leur utilisation dans le cadre du service.
               </p>
             </div>
           </div>
@@ -305,6 +345,7 @@ export function CguPage() {
                 <li>• Vous devez vérifier la pertinence et l'exactitude avant utilisation</li>
                 <li>• Vous respectez la réglementation applicable à votre profession</li>
                 <li>• Vous protégez la confidentialité des données de vos élèves</li>
+                <li>• Vous êtes responsable des documents que vous uploadez dans le chatbot</li>
               </ul>
             </div>
             
@@ -318,6 +359,7 @@ export function CguPage() {
                 <li>• Notre responsabilité est limitée au montant des tokens consommés</li>
                 <li>• Nous ne sommes pas responsables des décisions pédagogiques prises</li>
                 <li>• Exclusion de responsabilité pour les dommages indirects</li>
+                <li>• Les réponses du chatbot sont basées sur vos documents et peuvent contenir des erreurs</li>
               </ul>
             </div>
             
@@ -328,6 +370,7 @@ export function CguPage() {
               <p className="text-red-700">
                 ProfAssist est un outil d'assistance. L'intelligence artificielle peut commettre des erreurs. 
                 Il relève de votre responsabilité professionnelle de valider et adapter tout contenu avant utilisation.
+                Les réponses du chatbot doivent être vérifiées, notamment pour les informations réglementaires.
               </p>
             </div>
           </div>
@@ -350,6 +393,7 @@ export function CguPage() {
                 <li>• Usage abusif ou frauduleux</li>
                 <li>• Comportement nuisant à la plateforme</li>
                 <li>• Impayés ou chargebacks répétés</li>
+                <li>• Upload de contenus illicites</li>
               </ul>
             </div>
             
@@ -375,6 +419,7 @@ export function CguPage() {
               <li>• Perte d'accès immédiate à votre compte</li>
               <li>• Tokens non utilisés perdus (aucun remboursement)</li>
               <li>• Suppression progressive de vos données personnelles</li>
+              <li>• Suppression de vos documents uploadés et de votre corpus chatbot</li>
               <li>• Conservation des données de facturation selon obligations légales</li>
             </ul>
           </div>

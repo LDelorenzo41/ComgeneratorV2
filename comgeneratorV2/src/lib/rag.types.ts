@@ -4,10 +4,22 @@
 export type DocumentStatus = 'uploaded' | 'processing' | 'ready' | 'error';
 export type ChatMode = 'corpus_only' | 'corpus_plus_ai';
 export type MessageRole = 'user' | 'assistant' | 'system';
-export type DocumentScope = 'global' | 'user';  // AJOUT
-// Ajouter avec les autres types
+export type DocumentScope = 'global' | 'user';
 export type SearchMode = 'fast' | 'precise';
 
+// 🆕 NOUVEAU : Options de sélection des corpus (switches)
+export interface CorpusSelection {
+  usePersonalCorpus: boolean;   // Switch "Corpus perso"
+  useProfAssistCorpus: boolean; // Switch "Corpus ProfAssist"
+  useAI: boolean;               // Switch "Corpus IA"
+}
+
+// 🆕 Valeurs par défaut
+export const DEFAULT_CORPUS_SELECTION: CorpusSelection = {
+  usePersonalCorpus: true,
+  useProfAssistCorpus: true,
+  useAI: false,
+};
 
 export interface RagDocument {
   id: string;
@@ -20,7 +32,7 @@ export interface RagDocument {
   status: DocumentStatus;
   error_message: string | null;
   chunk_count: number;
-  scope: DocumentScope;  // AJOUT
+  scope: DocumentScope;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +44,7 @@ export interface SourceChunk {
   chunkIndex: number;
   excerpt: string;
   score: number;
-  scope?: DocumentScope;  // AJOUT (optionnel pour compatibilité)
+  scope?: DocumentScope;
 }
 
 export interface ChatUIMessage {
@@ -89,7 +101,6 @@ export function getStatusColor(status: DocumentStatus): string {
   return colors[status];
 }
 
-// AJOUT : Helper pour le scope
 export function getScopeLabel(scope: DocumentScope): string {
   return scope === 'global' ? 'Document officiel' : 'Document personnel';
 }
@@ -99,4 +110,5 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
 
