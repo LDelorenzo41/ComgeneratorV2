@@ -89,8 +89,8 @@ const CONFIG = {
   queryRewritingModel: 'gpt-4o-mini',
   hydeModel: 'gpt-4o-mini',
   rerankingModel: 'gpt-4o-mini',
-  rerankingChunkCount: 25,
-  rerankingContextLength: 1000,
+  rerankingChunkCount: 12,
+  rerankingContextLength: 500,
   finalChunkCount: 10,
   maxHistoryMessages: 10,
   excerptLength: 450,
@@ -370,6 +370,97 @@ function extractKeyTerms(query: string): string[] {
   }
 
   return [...new Set(terms)];
+}
+
+// ============================================================================
+// AUTO-EXTRACTION DES FILTRES (LÉGÈRE, NON BLOQUANTE)
+// ============================================================================
+
+function inferFiltersFromQuery(query: string): {
+  levels?: string[];
+  subjects?: string[];
+} {
+  const q = query.toLowerCase();
+
+  const levels = new Set<string>();
+  const subjects = new Set<string>();
+
+  // =========================================================
+  // NIVEAUX / VOIES (générique + robuste)
+  // =========================================================
+
+  // Cycles
+  if (q.match(/\bcycle\s*1\b/)) levels.add('cycle 1');
+  if (q.match(/\bcycle\s*2\b/)) levels.add('cycle 2');
+  if (q.match(/\bcycle\s*3\b/)) levels.add('cycle 3');
+  if (q.match(/\bcycle\s*4\b/)) levels.add('cycle 4');
+
+  // Collège / Lycée
+  if (q.includes('collège')) levels.add('collège');
+  if (q.includes('lycée')) levels.add('lycée');
+
+  // Lycée voies
+  if (q.includes('lycée professionnel') || q.includes('lycée pro')) {
+    levels.add('lycée');
+    levels.add('voie professionnelle');
+  }
+
+  if (q.includes('lycée général')) {
+    levels.add('lycée');
+    levels.add('voie générale');
+  }
+
+  if (q.includes('lycée technologique')) {
+    levels.add('lycée');
+    levels.add('voie technologique');
+  }
+
+  // CAP / BEP / BTS (non exhaustif, mais structurant)
+  if (q.match(/\bcap\b/)) levels.add('CAP');
+  if (q.match(/\bbep\b/)) levels.add('BEP');
+  if (q.match(/\bbts\b/)) levels.add('BTS');
+
+  // =========================================================
+  // DISCIPLINES (ouvertes, pas fermées)
+  // =========================================================
+
+  const disciplineMap: Record<string, string> = {
+    'eps': 'EPS',
+    'éducation physique': 'EPS',
+    'sport': 'EPS',
+
+    'svt': 'SVT',
+    'sciences de la vie': 'SVT',
+
+    'math': 'Mathématiques',
+    'mathématique': 'Mathématiques',
+
+    'physique': 'Physique',
+    'chimie': 'Chimie',
+    'physique-chimie': 'Physique-Chimie',
+
+    'histoire': 'Histoire-Géographie',
+    'géographie': 'Histoire-Géographie',
+
+    'français': 'Français',
+    'lettres': 'Français',
+
+    'anglais': 'Langues',
+    'allemand': 'Langues',
+    'espagnol': 'Langues',
+    'langue': 'Langues'
+  };
+
+  for (const [key, value] of Object.entries(disciplineMap)) {
+    if (q.includes(key)) {
+      subjects.add(value);
+    }
+  }
+
+  return {
+    levels: levels.size ? Array.from(levels) : undefined,
+    subjects: subjects.size ? Array.from(subjects) : undefined,
+  };
 }
 
 // ============================================================================
@@ -668,7 +759,7 @@ async function rerankChunksWithLLM(
       body: JSON.stringify({
         model: CONFIG.rerankingModel,
         messages: [{ role: 'system', content: 'JSON only.' }, { role: 'user', content: prompt }],
-        temperature: 0.1, max_tokens: 800,
+        temperature: 0.1, max_tokens: 350,
       }),
     });
 
@@ -679,22 +770,22 @@ async function rerankChunksWithLLM(
       const parsed = JSON.parse(jsonMatch[0]);
       type RerankScore = { id: number; score: number };
 
-const scoreMap = new Map<number, number>(
-  ((parsed.scores as RerankScore[]) || []).map(s => [s.id, s.score])
-);
+      const scoreMap = new Map<number, number>(
+        ((parsed.scores as RerankScore[]) || []).map(s => [s.id, s.score])
+      );
 
-const reranked: MatchedChunk[] = chunks.map((chunk, index) => {
-  const llmScore: number = scoreMap.get(index) ?? 5;
+      const reranked: MatchedChunk[] = chunks.map((chunk, index) => {
+        const llmScore: number = scoreMap.get(index) ?? 5;
 
-  const hybridScore: number =
-    (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
+        const hybridScore: number =
+          (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
 
-  return {
-    ...chunk,
-    rerankScore: hybridScore,
-    llmRawScore: llmScore,
-  };
-});
+        return {
+          ...chunk,
+          rerankScore: hybridScore,
+          llmRawScore: llmScore,
+        };
+      });
 
       reranked.sort((a, b) => b.rerankScore! - a.rerankScore!);
 
@@ -721,7 +812,16 @@ async function generateResponse(
 ): Promise<{ answer: string; tokens: number }> {
   if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information.", tokens: 0 };
 
-  const context = chunks.map((c, i) => `[Source ${i + 1}] ${c.documentTitle}\n${c.content}`).join('\n\n---\n\n');
+  const MAX_CHUNK_IN_CONTEXT = 1400;
+
+  const context = chunks.map((c, i) => {
+    const clipped =
+      c.content.length > MAX_CHUNK_IN_CONTEXT
+        ? c.content.slice(0, MAX_CHUNK_IN_CONTEXT) + '…'
+        : c.content;
+
+    return `[Source ${i + 1}] ${c.documentTitle}\n${clipped}`;
+  }).join('\n\n---\n\n');
 
   let roleDesc = domain ? domain.promptRole : "assistant pédagogique expert";
   
@@ -794,11 +894,12 @@ async function chatHandler(req: Request): Promise<Response> {
     if (!user) throw new Error('User Invalid');
 
     // 🆕 Extraction des paramètres avec les nouveaux switches et filtres
-    const { 
-      message, 
-      mode = 'corpus_plus_ai', 
-      searchMode = 'fast', 
-      conversationId, 
+    const body = await req.json() as ChatRequest;
+    const {
+      message,
+      mode = 'corpus_plus_ai',
+      searchMode = 'fast',
+      conversationId,
       documentId,
       usePersonalCorpus = true,
       useProfAssistCorpus = true,
@@ -806,7 +907,14 @@ async function chatHandler(req: Request): Promise<Response> {
       levels,
       subjects,
       documentTypes
-    } = await req.json() as ChatRequest;
+    } = body;
+
+    // 🔍 Auto-inférence légère depuis la question
+    const inferred = inferFiltersFromQuery(message);
+
+    // 🧠 Fusion : priorité aux inputs explicites
+    const effectiveLevels = levels?.length ? levels : inferred.levels;
+    const effectiveSubjects = subjects?.length ? subjects : inferred.subjects;
 
     // 🆕 Déterminer le mode effectif basé sur useAI
     const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
@@ -821,8 +929,8 @@ async function chatHandler(req: Request): Promise<Response> {
       usePersonalCorpus,
       useProfAssistCorpus,
       {
-        levels,
-        subjects,
+        levels: effectiveLevels,
+        subjects: effectiveSubjects,
         documentTypes
       }
     );
@@ -891,7 +999,8 @@ async function chatHandler(req: Request): Promise<Response> {
     // 2. DÉTECTION
     const activeDomain = detectDomainIntent(message);
     const isComparative = isComparativeQuestion(message);
-    const effectiveSearchMode = (activeDomain || isComparative || searchMode === 'precise') ? 'precise' : 'fast';
+    const effectiveSearchMode =
+      (searchMode === 'precise' || isComparative) ? 'precise' : 'fast';
     let totalTokens = 0;
 
     // 3. PRÉPARATION (HyDE / Rewrite)
@@ -912,7 +1021,7 @@ async function chatHandler(req: Request): Promise<Response> {
     // Embeddings
     const qEmb = await createEmbedding(message, OPENAI_API_KEY);
     const hEmb = effectiveSearchMode === 'precise' ? await createEmbedding(hypothetical, OPENAI_API_KEY) : [];
-    totalTokens += Math.ceil((message.length + hypothetical.length) / 4);
+    
 
     // 4. RECHERCHE UNIFIÉE
     const allChunks: MatchedChunk[] = [];
@@ -921,12 +1030,31 @@ async function chatHandler(req: Request): Promise<Response> {
 
     // A. Recherche Spécifique Domaine
     if (activeDomain) {
-      add(await searchSpecificDomainDocuments(serviceClient, allowedDocsMap, activeDomain, message));
+      add(await searchSpecificDomainDocuments(
+        serviceClient,
+        allowedDocsMap,
+        activeDomain,
+        message
+      ));
     }
 
     // B. Recherche Mots-clés (Sur variantes)
-    for (const q of queries.slice(0, 3)) {
-      add(await searchByKeywords(serviceClient, allowedDocIdsArr, allowedDocsMap, extractKeyTerms(q)));
+    if (effectiveSearchMode === 'precise') {
+      for (const q of queries.slice(0, 3)) {
+        add(await searchByKeywords(
+          serviceClient,
+          allowedDocIdsArr,
+          allowedDocsMap,
+          extractKeyTerms(q)
+        ));
+      }
+    } else {
+      add(await searchByKeywords(
+        serviceClient,
+        allowedDocIdsArr,
+        allowedDocsMap,
+        extractKeyTerms(message)
+      ));
     }
 
     // C. Vectorielle

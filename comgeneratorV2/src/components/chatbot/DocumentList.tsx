@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Trash2, RefreshCw, AlertCircle, CheckCircle2, 
-  Clock, Loader2, Globe, User, Lock
+  Clock, Loader2, Globe, User, Lock, RotateCcw
 } from 'lucide-react';
 import type { RagDocument } from '../../lib/rag.types';
 import { formatFileSize, getStatusLabel, getStatusColor } from '../../lib/rag.types';
-import { deleteDocument, checkIsAdmin } from '../../lib/ragApi';
+import { deleteDocument, checkIsAdmin, reanalyzeDocument } from '../../lib/ragApi';
 
 interface DocumentListProps {
   documents: RagDocument[];
@@ -16,6 +16,8 @@ interface DocumentListProps {
 
 export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh, isLoading = false }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
+
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Vérifier si l'utilisateur est admin
@@ -49,6 +51,22 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
       setDeletingId(null);
     }
   };
+    // 🆕 Ré-analyser un document (Admin uniquement)
+  const handleReanalyze = async (doc: RagDocument) => {
+    if (!isAdmin) return;
+    
+    try {
+      setReanalyzingId(doc.id);
+      await reanalyzeDocument(doc.id);
+      alert('✅ Analyse IA mise à jour');
+      onRefresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erreur lors de la ré-analyse');
+    } finally {
+      setReanalyzingId(null);
+    }
+  };
+
 
   const getStatusIcon = (status: RagDocument['status']) => {
     switch (status) {
@@ -114,11 +132,27 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(doc.status)}`}>
             {getStatusIcon(doc.status)}
             {getStatusLabel(doc.status)}
           </span>
+
+          {/* 🆕 Bouton Ré-analyser (Admin uniquement) */}
+          {isAdmin && doc.status === 'ready' && (
+            <button
+              onClick={() => handleReanalyze(doc)}
+              disabled={reanalyzingId === doc.id}
+              className="p-1 rounded text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50"
+              title="Ré-analyser le document (IA)"
+            >
+              {reanalyzingId === doc.id ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RotateCcw className="w-4 h-4" />
+              )}
+            </button>
+          )}
 
           {canDelete ? (
             <button
@@ -146,6 +180,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
             </div>
           )}
         </div>
+
       </div>
     );
   };

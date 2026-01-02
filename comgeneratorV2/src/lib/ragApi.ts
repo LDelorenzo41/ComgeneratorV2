@@ -510,6 +510,28 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
   };
 }
 
+// ============================================================================
+// REANALYZE DOCUMENT (Admin only)
+// ============================================================================
+
+/**
+ * Ré-analyse un document existant avec l'IA pour mettre à jour ses métadonnées
+ * (summary, keywords, levels, subjects, document_type)
+ * NE crée PAS de chunks, NE modifie PAS le fichier
+ */
+export async function reanalyzeDocument(documentId: string): Promise<{ success: boolean }> {
+  const response = await callEdgeFunction<{ success: boolean } | { error: string }>('rag-ingest', {
+    reanalyze: true,
+    documentId,
+  });
+  
+  if ('error' in response) {
+    throw new Error(response.error);
+  }
+  
+  return response as { success: boolean };
+}
+
 
 
 
