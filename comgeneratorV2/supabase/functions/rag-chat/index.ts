@@ -1,8 +1,7 @@
 // supabase/functions/rag-chat/index.ts
 // VERSION "MULTI-DOMAINES" (V1 Intelligence + V2 Sécurité + Architecture Générique)
-// - Supporte: LANGUES (CECR), EPS, SCIENCES, HUMANITES (Configurable)
-// - Sécurité: Filtrage strict des documents autorisés
-// - Ranking: Hybride (Ne supprime pas les documents pertinents)
+// + Support switches corpus (perso/ProfAssist/IA)
+// + Support filtres métadonnées (Niveaux/Matières/Types)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -20,11 +19,11 @@ declare const Deno: {
 interface DomainConfig {
   id: string;
   name: string;
-  keywords: RegExp[];       // Regex pour détecter l'intention dans la question
-  docPatterns: string[];    // Mots-clés pour identifier les documents (titre)
-  bonus: number;            // Bonus de score
-  minDocs: number;          // Minimum de documents à garantir (Rescue)
-  promptRole: string;       // Rôle pour le prompt système
+  keywords: RegExp[];
+  docPatterns: string[];
+  bonus: number;
+  minDocs: number;
+  promptRole: string;
 }
 
 const DOMAINS: Record<string, DomainConfig> = {
@@ -80,30 +79,19 @@ const DOMAINS: Record<string, DomainConfig> = {
 };
 
 const CONFIG = {
-  // Recherche
   defaultTopK: 8,
   maxTopK: 15,
   similarityThreshold: 0.28,
-  
-  // Bonus générique (hors domaines)
-  referenceDocBonus: 0.10, // Bonus pour tout document "officiel" (Programme, Guide...)
-  
-  // Modèles
+  referenceDocBonus: 0.10,
   chatModel: 'gpt-4o-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  
-  // LLM Helpers
   queryRewritingModel: 'gpt-4o-mini',
   hydeModel: 'gpt-4o-mini',
   rerankingModel: 'gpt-4o-mini',
-  
-  // Paramètres Re-ranking Hybride
   rerankingChunkCount: 25,
   rerankingContextLength: 1000,
   finalChunkCount: 10,
-  
-  // Historique
   maxHistoryMessages: 10,
   excerptLength: 450,
 };
@@ -126,8 +114,12 @@ interface ChatRequest {
   usePersonalCorpus?: boolean;
   useProfAssistCorpus?: boolean;
   useAI?: boolean;
+  
+  // 🆕 Filtres documentaires (OPTIONNELS)
+  levels?: string[];
+  subjects?: string[];
+  documentTypes?: string[];
 }
-
 
 interface DocumentInfo {
   id: string;
@@ -180,7 +172,6 @@ async function createServiceClient() {
 // INTELLIGENCE MÉTIER & DÉTECTION
 // ============================================================================
 
-// 1. Détection du Domaine
 function detectDomainIntent(query: string): DomainConfig | null {
   for (const domain of Object.values(DOMAINS)) {
     if (domain.keywords.some(regex => regex.test(query))) {
@@ -191,18 +182,15 @@ function detectDomainIntent(query: string): DomainConfig | null {
   return null;
 }
 
-// 2. Identification Document <-> Domaine
 function isDomainDocument(docTitle: string, domain: DomainConfig): boolean {
   const titleLower = docTitle.toLowerCase();
   return domain.docPatterns.some(p => titleLower.includes(p));
 }
 
-// 3. Identification Document "Officiel" (Générique)
 function isReferenceDocument(title: string): boolean {
   return /programme|guide|référentiel|officiel|accompagnement/i.test(title.toLowerCase());
 }
 
-// 4. Détection Comparative (V1 Logic)
 function isComparativeQuestion(query: string): boolean {
   const comparativePatterns = [
     /diff[ée]ren/i, /compar/i, /entre.+et/i, /versus|vs/i, /par rapport/i,
@@ -222,7 +210,6 @@ function extractComparisonTargets(query: string): string[] {
       if (num && !seenNums.has(num)) { seenNums.add(num); targets.push(`cycle_${num}`); }
     });
   }
-  // Extraction spécifique pour le domaine Langues (legacy support)
   const cecrMatches = query.match(/\b[A-Ca-c][1-2]\b/gi);
   if (cecrMatches) {
     const seen = new Set<string>();
@@ -234,14 +221,13 @@ function extractComparisonTargets(query: string): string[] {
   return targets;
 }
 
-// Helper pour Langues (V1)
 function extractCECRLevels(query: string): string[] {
   const matches = query.match(/\b[A-Ca-c][1-2]\b/gi);
   return matches ? [...new Set(matches.map(m => m.toUpperCase()))] : [];
 }
 
 // ============================================================================
-// HyDE: HYPOTHETICAL DOCUMENT EMBEDDINGS (ADAPTATIF)
+// HyDE: HYPOTHETICAL DOCUMENT EMBEDDINGS
 // ============================================================================
 
 async function generateHypotheticalAnswer(
@@ -255,7 +241,6 @@ async function generateHypotheticalAnswer(
   let prompt: string;
   
   if (domain?.id === 'LANGUES') {
-    // Prompt Spécifique Langues (V1)
     const levels = extractCECRLevels(query).join(', ') || 'les niveaux';
     prompt = `Tu es un ${domain.promptRole}. Génère une réponse technique sur "${query}".
     IMPORTANT (${levels}):
@@ -263,19 +248,16 @@ async function generateHypotheticalAnswer(
     - Décris ce que l'élève "peut faire".
     - 200-400 mots.`;
   } else if (domain?.id === 'EPS') {
-    // Prompt Spécifique EPS
     prompt = `Tu es un ${domain.promptRole}. Réponds à "${query}".
     IMPORTANT:
     - Utilise le vocabulaire officiel (Champs d'Apprentissage, AFC, Attendus).
     - Mentionne les conduites motrices et situations d'apprentissage.
     - 200-400 mots.`;
   } else if (isComparative && targets.length >= 2) {
-    // Prompt Comparatif V1
     prompt = `Expert Programmes Scolaires. Compare explicitement ${targets.map(t => t.replace('_', ' ')).join(' et ')} pour "${query}".
     - Structure par différences et similitudes.
     - Spécificités de chaque cycle.`;
   } else {
-    // Prompt Standard
     prompt = `Expert Éducation Nationale. Réponds factuellement à "${query}".
     - Utilise le vocabulaire officiel.
     - Structure claire.`;
@@ -302,7 +284,7 @@ async function generateHypotheticalAnswer(
 }
 
 // ============================================================================
-// QUERY REWRITING (ADAPTATIF)
+// QUERY REWRITING
 // ============================================================================
 
 async function rewriteQueryForSearch(
@@ -356,7 +338,7 @@ async function rewriteQueryForSearch(
 }
 
 // ============================================================================
-// EXTRACTION TERMES-CLÉS (ÉLARGIE)
+// EXTRACTION TERMES-CLÉS
 // ============================================================================
 
 function extractKeyTerms(query: string): string[] {
@@ -364,32 +346,25 @@ function extractKeyTerms(query: string): string[] {
   const terms: string[] = [];
 
   const mappings: Record<string, string[]> = {
-    // Cycles
     'maternelle': ['cycle 1'], 'cycle 1': ['maternelle'],
     'cycle 2': ['CP', 'CE1', 'CE2'],
     'cycle 3': ['CM1', 'CM2', '6e'], 'cycle 4': ['5e', '4e', '3e'],
-    // EPS
     'eps': ['éducation physique', 'sport', 'apsa'],
     'sport': ['eps', 'éducation physique'],
-    // Langues
     'a1': ['A1', 'débutant'], 'a2': ['A2', 'élémentaire'],
     'b1': ['B1', 'indépendant'], 'b2': ['B2', 'avancé'],
     'c1': ['C1', 'autonome'],
     'cecr': ['cadre européen', 'descripteur'],
-    // Maths
     'math': ['mathématiques', 'calcul'], 'géométrie': ['figure', 'espace'],
   };
 
-  // Mots simples
   query.split(/[\s,.?!]+/).forEach(w => {
     if (w.length > 3 && !['pour','avec','dans','quel','comment'].includes(w.toLowerCase())) terms.push(w);
   });
 
-  // Regex Niveaux
   const levelMatch = query.match(/\b([A-Ca-c][1-2])\b/g);
   if (levelMatch) levelMatch.forEach(l => terms.push(l.toUpperCase()));
 
-  // Mapping
   for (const [k, v] of Object.entries(mappings)) {
     if (lowerQuery.includes(k)) terms.push(...v);
   }
@@ -398,20 +373,26 @@ function extractKeyTerms(query: string): string[] {
 }
 
 // ============================================================================
-// GESTION DOCUMENTS (SÉCURITÉ V2)
+// GESTION DOCUMENTS (AVEC FILTRAGE SWITCHES ET METADONNÉES)
 // ============================================================================
 
-// 🆕 Fonction mise à jour avec filtrage selon les switches
 async function getAllowedDocuments(
   supabase: any, 
   userId: string, 
   docId?: string,
   usePersonalCorpus: boolean = true,
-  useProfAssistCorpus: boolean = true
+  useProfAssistCorpus: boolean = true,
+  filters?: {
+    levels?: string[];
+    subjects?: string[];
+    documentTypes?: string[];
+  }
 ): Promise<Map<string, DocumentInfo>> {
   const docsMap = new Map<string, DocumentInfo>();
   console.log(`[rag-chat] === SECURITY: Fetching allowed documents ===`);
   console.log(`[rag-chat] Filters: personal=${usePersonalCorpus}, profassist=${useProfAssistCorpus}`);
+
+  const { levels, subjects, documentTypes } = filters || {};
 
   // Si aucun corpus sélectionné, retourner vide
   if (!usePersonalCorpus && !useProfAssistCorpus) {
@@ -419,31 +400,38 @@ async function getAllowedDocuments(
     return docsMap;
   }
 
-  let query = supabase.from('rag_documents').select('id, title, scope, user_id').eq('status', 'ready');
+  let query = supabase
+    .from('rag_documents')
+    .select('id, title, scope, user_id, levels, subjects, document_type')
+    .eq('status', 'ready');
   
   if (docId) {
     query = query.eq('id', docId);
   } else {
-    // 🆕 Construire le filtre selon les switches
-    const filters: string[] = [];
-    if (useProfAssistCorpus) {
-      filters.push('scope.eq.global');
-    }
-    if (usePersonalCorpus) {
-      filters.push(`and(scope.eq.user,user_id.eq.${userId})`);
-    }
-    
-    if (filters.length === 1) {
-      // Un seul filtre
-      if (useProfAssistCorpus) {
-        query = query.eq('scope', 'global');
-      } else {
-        query = query.eq('scope', 'user').eq('user_id', userId);
-      }
-    } else {
-      // Les deux filtres
+    // Construire le filtre selon les switches
+    if (usePersonalCorpus && useProfAssistCorpus) {
+      // Les deux corpus
       query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    } else if (useProfAssistCorpus) {
+      // Seulement ProfAssist (global)
+      query = query.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      // Seulement personnel
+      query = query.eq('scope', 'user').eq('user_id', userId);
     }
+  }
+
+  // 🆕 Filtrage métier basé sur métadonnées (si fournies)
+  if (levels?.length) {
+    query = query.overlaps('levels', levels);
+  }
+
+  if (subjects?.length) {
+    query = query.overlaps('subjects', subjects);
+  }
+
+  if (documentTypes?.length) {
+    query = query.in('document_type', documentTypes);
   }
 
   const { data } = await query;
@@ -453,7 +441,6 @@ async function getAllowedDocuments(
   }
   return docsMap;
 }
-
 
 // ============================================================================
 // EMBEDDINGS
@@ -480,10 +467,9 @@ async function createEmbedding(text: string, apiKey: string): Promise<number[]> 
 }
 
 // ============================================================================
-// STRATÉGIES DE RECHERCHE (V1 + V2 Unifiées)
+// STRATÉGIES DE RECHERCHE
 // ============================================================================
 
-// 1. Vectorielle
 async function searchByVector(supabase: any, userId: string, embedding: number[], topK: number, allowedDocIds: Set<string>): Promise<MatchedChunk[]> {
   try {
     const { data, error } = await supabase.rpc('match_rag_chunks', {
@@ -505,7 +491,6 @@ async function searchByVector(supabase: any, userId: string, embedding: number[]
   } catch (err) { return []; }
 }
 
-// 2. Mots-clés (Robust V2)
 async function searchByKeywords(
   supabase: any,
   allowedDocIds: string[],
@@ -553,7 +538,6 @@ async function searchByKeywords(
   return Array.from(chunkScores.values()).sort((a, b) => b.score - a.score).map(i => i.chunk);
 }
 
-// 3. Recherche Spécifique Domaine (Généralisation de searchCECRDocuments)
 async function searchSpecificDomainDocuments(
   supabase: any,
   allowedDocs: Map<string, DocumentInfo>,
@@ -562,7 +546,6 @@ async function searchSpecificDomainDocuments(
 ): Promise<MatchedChunk[]> {
   const targetDocIds: string[] = [];
   
-  // Filtrer les documents qui correspondent au pattern du domaine (ex: contient "EPS")
   allowedDocs.forEach((doc, id) => {
     if (isDomainDocument(doc.title, domain)) targetDocIds.push(id);
   });
@@ -581,16 +564,15 @@ async function searchSpecificDomainDocuments(
   if (chunks) {
     for (const chunk of chunks) {
       const contentLower = chunk.content.toLowerCase();
-      let score = 0.85; // Base élevée car doc spécifique
+      let score = 0.85;
 
-      // Bonus si mots-clés de la query présents
       const queryWords = extractKeyTerms(query);
       let matches = 0;
       queryWords.forEach(w => { if (contentLower.includes(w.toLowerCase())) matches++; });
       
       score += (matches * 0.05);
 
-      if (matches > 0 || domain.id === 'LANGUES') { // Pour langues on est plus permissif (niveaux)
+      if (matches > 0 || domain.id === 'LANGUES') {
          results.push({
            id: chunk.id, documentId: chunk.document_id, documentTitle: allowedDocs.get(chunk.document_id)!.title,
            chunkIndex: chunk.chunk_index, content: chunk.content, score, scope: chunk.scope as any
@@ -602,7 +584,7 @@ async function searchSpecificDomainDocuments(
 }
 
 // ============================================================================
-// LOGIQUE MÉTIER & BONUS (V2 GENERALISÉE)
+// LOGIQUE MÉTIER & BONUS
 // ============================================================================
 
 function applyDomainBonus(
@@ -614,10 +596,8 @@ function applyDomainBonus(
   return chunks.map(chunk => {
     let newScore = chunk.score;
     
-    // 1. Bonus Document Officiel (Générique)
     if (isReferenceDocument(chunk.documentTitle)) newScore += CONFIG.referenceDocBonus;
 
-    // 2. Bonus Domaine Spécifique
     if (domain && isDomainDocument(chunk.documentTitle, domain)) {
       newScore += domain.bonus;
     }
@@ -653,7 +633,7 @@ function ensureDomainDocuments(
 }
 
 // ============================================================================
-// RE-RANKING (HYBRIDE & DOUX)
+// RE-RANKING
 // ============================================================================
 
 async function rerankChunksWithLLM(
@@ -697,18 +677,27 @@ async function rerankChunksWithLLM(
     
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      const scoreMap = new Map(parsed.scores?.map((s: any) => [s.id, s.score]) || []);
+      type RerankScore = { id: number; score: number };
 
-      const reranked = chunks.map((chunk, index) => {
-        const llmScore = scoreMap.get(index) ?? 5;
-        // Hybride: 40% initial, 60% LLM
-        const hybridScore = (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
-        return { ...chunk, rerankScore: hybridScore, llmRawScore: llmScore };
-      });
+const scoreMap = new Map<number, number>(
+  ((parsed.scores as RerankScore[]) || []).map(s => [s.id, s.score])
+);
+
+const reranked: MatchedChunk[] = chunks.map((chunk, index) => {
+  const llmScore: number = scoreMap.get(index) ?? 5;
+
+  const hybridScore: number =
+    (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
+
+  return {
+    ...chunk,
+    rerankScore: hybridScore,
+    llmRawScore: llmScore,
+  };
+});
 
       reranked.sort((a, b) => b.rerankScore! - a.rerankScore!);
 
-      // Filtrage doux (on garde si > 0 ou si c'est nécessaire pour le topN)
       const valid = reranked.filter(c => c.llmRawScore! > 0);
       return { chunks: (valid.length >= topN ? valid : reranked).slice(0, topN), tokensUsed: data.usage?.total_tokens || 0 };
     }
@@ -719,7 +708,7 @@ async function rerankChunksWithLLM(
 }
 
 // ============================================================================
-// GÉNÉRATION & HANDLER
+// GÉNÉRATION
 // ============================================================================
 
 async function generateResponse(
@@ -734,7 +723,6 @@ async function generateResponse(
 
   const context = chunks.map((c, i) => `[Source ${i + 1}] ${c.documentTitle}\n${c.content}`).join('\n\n---\n\n');
 
-  // Prompt Système Dynamique
   let roleDesc = domain ? domain.promptRole : "assistant pédagogique expert";
   
   let systemPrompt = `Tu es un ${roleDesc}.
@@ -763,6 +751,34 @@ async function generateResponse(
   return { answer: data.choices[0]?.message?.content || 'Erreur.', tokens: data.usage?.total_tokens || 0 };
 }
 
+// ============================================================================
+// HELPER: Déduction des tokens
+// ============================================================================
+
+async function deductTokens(serviceClient: any, userId: string, tokensUsed: number): Promise<void> {
+  try {
+    const { data } = await serviceClient
+      .from('profiles')
+      .select('tokens')
+      .eq('user_id', userId)
+      .single();
+    
+    if (data) {
+      await serviceClient
+        .from('profiles')
+        .update({ tokens: Math.max(0, data.tokens - tokensUsed) })
+        .eq('user_id', userId);
+      console.log(`[rag-chat] Deducted ${tokensUsed} tokens from user ${userId}`);
+    }
+  } catch (err) {
+    console.error('[rag-chat] Error deducting tokens:', err);
+  }
+}
+
+// ============================================================================
+// HANDLER PRINCIPAL
+// ============================================================================
+
 async function chatHandler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('Err', { status: 405, headers: corsHeaders });
@@ -777,95 +793,100 @@ async function chatHandler(req: Request): Promise<Response> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User Invalid');
 
+    // 🆕 Extraction des paramètres avec les nouveaux switches et filtres
     const { 
-  message, 
-  mode = 'corpus_plus_ai', 
-  searchMode = 'fast', 
-  conversationId, 
-  documentId,
-  // 🆕 Nouveaux paramètres avec valeurs par défaut
-  usePersonalCorpus = true,
-  useProfAssistCorpus = true,
-  useAI = false
-} = await req.json() as ChatRequest;
+      message, 
+      mode = 'corpus_plus_ai', 
+      searchMode = 'fast', 
+      conversationId, 
+      documentId,
+      usePersonalCorpus = true,
+      useProfAssistCorpus = true,
+      useAI = false,
+      levels,
+      subjects,
+      documentTypes
+    } = await req.json() as ChatRequest;
 
-// 🆕 Déterminer le mode effectif basé sur useAI
-const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
+    // 🆕 Déterminer le mode effectif basé sur useAI
+    const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
 
+    console.log(`[rag-chat] Handling: "${message}" | mode=${effectiveMode} | personal=${usePersonalCorpus} | profassist=${useProfAssistCorpus} | ai=${useAI}`);
 
-    console.log(`[rag-chat] Handling: "${message}"`);
-
-    // 1. SÉCURITÉ: Docs autorisés
-    // 🆕 Passer les switches à la fonction
-const allowedDocsMap = await getAllowedDocuments(
-  serviceClient, 
-  user.id, 
-  documentId,
-  usePersonalCorpus,
-  useProfAssistCorpus
-);
-
+    // 1. SÉCURITÉ: Docs autorisés avec filtrage switches et métadonnées
+    const allowedDocsMap = await getAllowedDocuments(
+      serviceClient, 
+      user.id, 
+      documentId,
+      usePersonalCorpus,
+      useProfAssistCorpus,
+      {
+        levels,
+        subjects,
+        documentTypes
+      }
+    );
     const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
     const allowedDocIdsSet = new Set(allowedDocIdsArr);
-    // 🆕 Gestion du cas "IA seule" (aucun corpus mais useAI activé)
-if (allowedDocIdsArr.length === 0) {
-  if (useAI && !usePersonalCorpus && !useProfAssistCorpus) {
-    // Mode IA seule - répondre directement sans recherche de documents
-    console.log(`[rag-chat] AI-only mode, no corpus search`);
-    
-    let convId = conversationId;
-    if (!convId) {
-      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
-      convId = data.id;
-    }
-    
-    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
-    
-    // Générer une réponse IA sans contexte documentaire
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: CONFIG.chatModel,
-        messages: [
-          { role: 'system', content: 'Tu es un assistant pédagogique expert. Réponds de manière claire et structurée.' },
-          ...(hist || []),
-          { role: 'user', content: message }
-        ],
-        temperature: 0.3,
-      }),
-    });
-    
-    const data = await response.json();
-    const answer = data.choices[0]?.message?.content || 'Erreur lors de la génération.';
-    const tokensUsed = data.usage?.total_tokens || 0;
-    
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources: []});
-    
-    // Déduire les tokens
-    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
-      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - tokensUsed)}).eq('user_id', user.id); });
-    
-    return new Response(JSON.stringify({
-      answer, 
-      sources: [], 
-      conversationId: convId, 
-      tokensUsed, 
-      mode: 'corpus_plus_ai',
-      searchMode: 'fast'
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-  }
-  
-  return new Response(JSON.stringify({ 
-    answer: "Aucun document disponible dans les corpus sélectionnés.", 
-    sources: [],
-    conversationId: null,
-    tokensUsed: 0,
-    mode: effectiveMode
-  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-}
 
+    // 🆕 Gestion du cas "IA seule" ou "aucun document"
+    if (allowedDocIdsArr.length === 0) {
+      // Mode IA seule - répondre sans recherche de documents
+      if (useAI && !usePersonalCorpus && !useProfAssistCorpus) {
+        console.log(`[rag-chat] AI-only mode, no corpus search`);
+        
+        let convId = conversationId;
+        if (!convId) {
+          const { data } = await serviceClient.from('rag_conversations').insert({ user_id: user.id }).select('id').single();
+          convId = data?.id;
+        }
+        
+        const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(CONFIG.maxHistoryMessages);
+        await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'user', content: message });
+        
+        // Générer une réponse IA sans contexte documentaire
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: CONFIG.chatModel,
+            messages: [
+              { role: 'system', content: 'Tu es un assistant pédagogique expert. Réponds de manière claire et structurée. Indique clairement que ta réponse provient de tes connaissances générales et non de documents spécifiques.' },
+              ...(hist || []).map((m: any) => ({ role: m.role, content: m.content })),
+              { role: 'user', content: message }
+            ],
+            temperature: 0.3,
+          }),
+        });
+        
+        const data = await response.json();
+        const answer = data.choices[0]?.message?.content || 'Erreur lors de la génération.';
+        const tokensUsed = data.usage?.total_tokens || 0;
+        
+        await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources: [] });
+        
+        // Déduire les tokens
+        await deductTokens(serviceClient, user.id, tokensUsed);
+        
+        return new Response(JSON.stringify({
+          answer, 
+          sources: [], 
+          conversationId: convId, 
+          tokensUsed, 
+          mode: 'corpus_plus_ai',
+          searchMode: 'fast'
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Aucun document et pas d'IA
+      return new Response(JSON.stringify({ 
+        answer: "Aucun document disponible dans les corpus sélectionnés (ou via les filtres actifs).", 
+        sources: [],
+        conversationId: null,
+        tokensUsed: 0,
+        mode: effectiveMode
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // 2. DÉTECTION
     const activeDomain = detectDomainIntent(message);
@@ -911,7 +932,7 @@ if (allowedDocIdsArr.length === 0) {
     // C. Vectorielle
     if (hEmb.length > 0) {
       const hydeRes = await searchByVector(serviceClient, user.id, hEmb, CONFIG.defaultTopK, allowedDocIdsSet);
-      hydeRes.forEach(c => c.score *= 1.1); // Boost HyDE
+      hydeRes.forEach(c => c.score *= 1.1);
       add(hydeRes);
     }
     add(await searchByVector(serviceClient, user.id, qEmb, CONFIG.defaultTopK, allowedDocIdsSet));
@@ -934,34 +955,31 @@ if (allowedDocIdsArr.length === 0) {
     // 6. GÉNÉRATION
     let convId = conversationId;
     if (!convId) {
-      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
-      convId = data.id;
+      const { data } = await serviceClient.from('rag_conversations').insert({ user_id: user.id }).select('id').single();
+      convId = data?.id;
     }
-    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
+    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).order('created_at', { ascending: true }).limit(CONFIG.maxHistoryMessages);
+    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'user', content: message });
 
-    // Ligne ~820
-const { answer, tokens } = await generateResponse(message, candidates, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY);
-
+    const { answer, tokens } = await generateResponse(message, candidates, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY);
     totalTokens += tokens;
 
     const sources = candidates.map(c => ({
       documentId: c.documentId, documentTitle: c.documentTitle, chunkId: c.id, chunkIndex: c.chunkIndex,
       excerpt: c.content.substring(0, CONFIG.excerptLength), score: c.score, scope: c.scope
     }));
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources});
+    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources });
     
-    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
-      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - totalTokens)}).eq('user_id', user.id); });
+    // Déduire les tokens
+    await deductTokens(serviceClient, user.id, totalTokens);
 
-return new Response(JSON.stringify({
-  answer, sources, conversationId: convId, tokensUsed: totalTokens, mode: effectiveMode, searchMode: effectiveSearchMode
-}), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-
+    return new Response(JSON.stringify({
+      answer, sources, conversationId: convId, tokensUsed: totalTokens, mode: effectiveMode, searchMode: effectiveSearchMode
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (e: any) {
     console.error(e);
-    return new Response(JSON.stringify({error: e.message}), {status: 500, headers: {...corsHeaders, 'Content-Type': 'application/json'}});
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 }
 
