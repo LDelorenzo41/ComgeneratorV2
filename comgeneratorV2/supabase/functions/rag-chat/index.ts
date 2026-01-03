@@ -2,6 +2,7 @@
 // VERSION "MULTI-DOMAINES" (V1 Intelligence + V2 Sécurité + Architecture Générique)
 // + Support switches corpus (perso/ProfAssist/IA)
 // + Support filtres métadonnées (Niveaux/Matières/Types)
+// + Fallback si filtres trop restrictifs
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -110,12 +111,9 @@ interface ChatRequest {
   conversationId?: string;
   documentId?: string;
   topK?: number;
-  // 🆕 Nouveaux paramètres pour la sélection des corpus
   usePersonalCorpus?: boolean;
   useProfAssistCorpus?: boolean;
   useAI?: boolean;
-  
-  // 🆕 Filtres documentaires (OPTIONNELS)
   levels?: string[];
   subjects?: string[];
   documentTypes?: string[];
@@ -385,10 +383,6 @@ function inferFiltersFromQuery(query: string): {
   const levels = new Set<string>();
   const subjects = new Set<string>();
 
-  // =========================================================
-  // NIVEAUX / VOIES (générique + robuste)
-  // =========================================================
-
   // Cycles
   if (q.match(/\bcycle\s*1\b/)) levels.add('cycle 1');
   if (q.match(/\bcycle\s*2\b/)) levels.add('cycle 2');
@@ -415,36 +409,27 @@ function inferFiltersFromQuery(query: string): {
     levels.add('voie technologique');
   }
 
-  // CAP / BEP / BTS (non exhaustif, mais structurant)
+  // CAP / BEP / BTS
   if (q.match(/\bcap\b/)) levels.add('CAP');
   if (q.match(/\bbep\b/)) levels.add('BEP');
   if (q.match(/\bbts\b/)) levels.add('BTS');
 
-  // =========================================================
-  // DISCIPLINES (ouvertes, pas fermées)
-  // =========================================================
-
+  // Disciplines
   const disciplineMap: Record<string, string> = {
     'eps': 'EPS',
     'éducation physique': 'EPS',
     'sport': 'EPS',
-
     'svt': 'SVT',
     'sciences de la vie': 'SVT',
-
     'math': 'Mathématiques',
     'mathématique': 'Mathématiques',
-
     'physique': 'Physique',
     'chimie': 'Chimie',
     'physique-chimie': 'Physique-Chimie',
-
     'histoire': 'Histoire-Géographie',
     'géographie': 'Histoire-Géographie',
-
     'français': 'Français',
     'lettres': 'Français',
-
     'anglais': 'Langues',
     'allemand': 'Langues',
     'espagnol': 'Langues',
@@ -464,7 +449,7 @@ function inferFiltersFromQuery(query: string): {
 }
 
 // ============================================================================
-// GESTION DOCUMENTS (AVEC FILTRAGE SWITCHES ET METADONNÉES)
+// GESTION DOCUMENTS (AVEC FILTRAGE SWITCHES ET METADONNÉES + FALLBACK)
 // ============================================================================
 
 async function getAllowedDocuments(
@@ -501,18 +486,15 @@ async function getAllowedDocuments(
   } else {
     // Construire le filtre selon les switches
     if (usePersonalCorpus && useProfAssistCorpus) {
-      // Les deux corpus
       query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
     } else if (useProfAssistCorpus) {
-      // Seulement ProfAssist (global)
       query = query.eq('scope', 'global');
     } else if (usePersonalCorpus) {
-      // Seulement personnel
       query = query.eq('scope', 'user').eq('user_id', userId);
     }
   }
 
-  // 🆕 Filtrage métier basé sur métadonnées (si fournies)
+  // Filtrage métier basé sur métadonnées (si fournies)
   if (levels?.length) {
     query = query.overlaps('levels', levels);
   }
@@ -526,10 +508,44 @@ async function getAllowedDocuments(
   }
 
   const { data } = await query;
-  if (data) {
-    data.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
-    console.log(`[rag-chat] Allowed docs count: ${data.length}`);
+
+  // 🔴 PATCH CHATGPT: Fallback si les filtres sont trop restrictifs
+  if (!data || data.length === 0) {
+    console.warn('[rag-chat] Filters too strict, fallback without metadata filters');
+
+    let fallbackQuery = supabase
+      .from('rag_documents')
+      .select('id, title, scope')
+      .eq('status', 'ready');
+
+    if (docId) {
+      fallbackQuery = fallbackQuery.eq('id', docId);
+    } else if (usePersonalCorpus && useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.or(
+        `scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`
+      );
+    } else if (useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'user').eq('user_id', userId);
+    }
+
+    const { data: fallbackData } = await fallbackQuery;
+
+    if (fallbackData) {
+      fallbackData.forEach((d: any) =>
+        docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope })
+      );
+      console.log(`[rag-chat] Fallback allowed docs count: ${fallbackData.length}`);
+    }
+
+    return docsMap;
   }
+
+  // Cas normal: les filtres ont trouvé des documents
+  data.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
+  console.log(`[rag-chat] Allowed docs count: ${data.length}`);
+  
   return docsMap;
 }
 
@@ -893,7 +909,6 @@ async function chatHandler(req: Request): Promise<Response> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User Invalid');
 
-    // 🆕 Extraction des paramètres avec les nouveaux switches et filtres
     const body = await req.json() as ChatRequest;
     const {
       message,
@@ -909,14 +924,14 @@ async function chatHandler(req: Request): Promise<Response> {
       documentTypes
     } = body;
 
-    // 🔍 Auto-inférence légère depuis la question
+    // Auto-inférence légère depuis la question
     const inferred = inferFiltersFromQuery(message);
 
-    // 🧠 Fusion : priorité aux inputs explicites
+    // Fusion : priorité aux inputs explicites
     const effectiveLevels = levels?.length ? levels : inferred.levels;
     const effectiveSubjects = subjects?.length ? subjects : inferred.subjects;
 
-    // 🆕 Déterminer le mode effectif basé sur useAI
+    // Déterminer le mode effectif basé sur useAI
     const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
 
     console.log(`[rag-chat] Handling: "${message}" | mode=${effectiveMode} | personal=${usePersonalCorpus} | profassist=${useProfAssistCorpus} | ai=${useAI}`);
@@ -937,7 +952,7 @@ async function chatHandler(req: Request): Promise<Response> {
     const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
     const allowedDocIdsSet = new Set(allowedDocIdsArr);
 
-    // 🆕 Gestion du cas "IA seule" ou "aucun document"
+    // Gestion du cas "IA seule" ou "aucun document"
     if (allowedDocIdsArr.length === 0) {
       // Mode IA seule - répondre sans recherche de documents
       if (useAI && !usePersonalCorpus && !useProfAssistCorpus) {
@@ -988,7 +1003,7 @@ async function chatHandler(req: Request): Promise<Response> {
       
       // Aucun document et pas d'IA
       return new Response(JSON.stringify({ 
-        answer: "Aucun document disponible dans les corpus sélectionnés (ou via les filtres actifs).", 
+        answer: "Aucun document disponible dans les corpus sélectionnés.", 
         sources: [],
         conversationId: null,
         tokensUsed: 0,
@@ -1112,5 +1127,6 @@ async function chatHandler(req: Request): Promise<Response> {
 }
 
 Deno.serve(chatHandler);
+
 
 

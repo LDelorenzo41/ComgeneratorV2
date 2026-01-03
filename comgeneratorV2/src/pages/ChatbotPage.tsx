@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft
+  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft, Filter
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
@@ -273,6 +273,41 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 💡 <strong>Conseil :</strong> Commencez en mode <strong>Rapide</strong>. Si la réponse n'est pas satisfaisante 
                 ou pour des questions comme "Quelles différences entre X et Y ?", passez en mode <strong>Précis</strong>.
               </p>
+            </div>
+          </div>
+
+          {/* 🆕 SECTION FILTRES AVANCÉS */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-5 h-5 text-cyan-500" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Filtres avancés
+              </h3>
+            </div>
+            <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-xl p-4 border border-cyan-200 dark:border-cyan-800 space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Affinez votre recherche en filtrant par <strong>niveau scolaire</strong> et/ou <strong>matière</strong> :
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-cyan-200 dark:border-cyan-700">
+                  <h4 className="text-sm font-medium text-cyan-700 dark:text-cyan-400 mb-2">Niveaux</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Cycle 1 à 4, collège, lycée, voies (générale, techno, pro), CAP, BTS...
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-cyan-200 dark:border-cyan-700">
+                  <h4 className="text-sm font-medium text-cyan-700 dark:text-cyan-400 mb-2">Matières</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    EPS, Maths, Français, Histoire-Géo, SVT, Physique-Chimie, Langues...
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-cyan-200 dark:border-cyan-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  💡 <strong>Astuce :</strong> Les filtres sont <strong>optionnels</strong>. Si aucun document ne correspond 
+                  aux filtres, la recherche se fait automatiquement sur tous les documents des corpus sélectionnés.
+                </p>
+              </div>
             </div>
           </div>
 

@@ -1,3 +1,4 @@
+// src/components/chatbot/ChatMessage.tsx
 import React, { useState } from 'react';
 import { User, Bot, ChevronDown, ChevronUp, FileText, BookmarkPlus } from 'lucide-react';
 import type { ChatUIMessage, SourceChunk } from '../../lib/rag.types';
@@ -13,7 +14,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const isLoading = message.isLoading;
 
-  // Ne pas afficher le bouton pour les messages utilisateur ou en cours de chargement
   const canSave = !isUser && !isLoading && message.content && message.content.trim().length > 0;
 
   return (
@@ -56,7 +56,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           {/* Actions pour les messages assistant */}
           {canSave && (
             <div className="mt-2 flex items-center gap-2">
-              {/* Bouton Mettre en banque */}
               <button
                 onClick={() => setShowSaveModal(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
@@ -107,10 +106,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   );
 };
 
-// Composant Source
+// Composant Source - SCORE PLAFONNÉ À 100%
 const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, index }) => {
   const [expanded, setExpanded] = useState(false);
-  const scorePercent = Math.round(source.score * 100);
+  // 🔴 CORRECTION : Plafonner le score à 100%
+  const scorePercent = Math.min(Math.round(source.score * 100), 100);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
@@ -154,4 +154,5 @@ const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, 
 };
 
 export default ChatMessage;
+
 

@@ -7,19 +7,53 @@ export type MessageRole = 'user' | 'assistant' | 'system';
 export type DocumentScope = 'global' | 'user';
 export type SearchMode = 'fast' | 'precise';
 
-// 🆕 NOUVEAU : Options de sélection des corpus (switches)
+// Options de sélection des corpus (switches)
 export interface CorpusSelection {
-  usePersonalCorpus: boolean;   // Switch "Corpus perso"
-  useProfAssistCorpus: boolean; // Switch "Corpus ProfAssist"
-  useAI: boolean;               // Switch "Corpus IA"
+  usePersonalCorpus: boolean;
+  useProfAssistCorpus: boolean;
+  useAI: boolean;
 }
 
-// 🆕 Valeurs par défaut
+// Valeurs par défaut
 export const DEFAULT_CORPUS_SELECTION: CorpusSelection = {
   usePersonalCorpus: true,
-  useProfAssistCorpus: true,
+  useProfAssistCorpus: false,
   useAI: false,
 };
+
+// 🆕 Filtres optionnels pour la recherche RAG
+export interface SearchFilters {
+  levels?: string[];
+  subjects?: string[];
+}
+
+// 🆕 Listes de valeurs suggérées (non exhaustives)
+export const AVAILABLE_LEVELS = [
+  'cycle 1',
+  'cycle 2',
+  'cycle 3',
+  'cycle 4',
+  'collège',
+  'lycée',
+  'voie professionnelle',
+  'voie générale',
+  'CAP',
+  'BTS',
+] as const;
+
+export const AVAILABLE_SUBJECTS = [
+  'EPS',
+  'Mathématiques',
+  'SVT',
+  'Physique-Chimie',
+  'Français',
+  'Langues',
+  'Histoire-Géographie',
+  'Arts plastiques',
+  'Musique',
+  'Technologie',
+  'EMC',
+] as const;
 
 export interface RagDocument {
   id: string;
@@ -110,5 +144,6 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
 
 
