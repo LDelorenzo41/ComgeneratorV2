@@ -55,6 +55,33 @@ export const AVAILABLE_SUBJECTS = [
   'EMC',
 ] as const;
 
+// 🆕 Types de documents
+export const DOCUMENT_TYPES = {
+  programme: { label: 'Programme', icon: '📋', color: 'blue' },
+  ressource: { label: 'Ressource', icon: '📖', color: 'green' },
+  guide: { label: 'Guide', icon: '📝', color: 'amber' },
+  circulaire: { label: 'Circulaire', icon: '📜', color: 'orange' },
+  evaluation: { label: 'Évaluation', icon: '📊', color: 'cyan' },
+  mise_en_oeuvre: { label: 'Mise en œuvre', icon: '🛠️', color: 'indigo' },
+  referentiel: { label: 'Référentiel', icon: '📑', color: 'purple' },
+  autre: { label: 'Autre', icon: '📄', color: 'gray' },
+} as const;
+
+export type DocumentType = keyof typeof DOCUMENT_TYPES;
+
+// 🆕 Labels des niveaux pour affichage
+export const LEVEL_LABELS: Record<string, string> = {
+  maternelle: 'Maternelle',
+  cycle_1: 'Cycle 1',
+  cycle_2: 'Cycle 2',
+  cycle_3: 'Cycle 3',
+  cycle_4: 'Cycle 4',
+  college: 'Collège',
+  lycee_general: 'Lycée général',
+  lycee_technologique: 'Lycée techno.',
+  lycee_professionnel: 'Lycée pro.',
+};
+
 export interface RagDocument {
   id: string;
   user_id: string;
@@ -69,6 +96,13 @@ export interface RagDocument {
   scope: DocumentScope;
   created_at: string;
   updated_at: string;
+  // 🆕 Métadonnées IA
+  summary?: string | null;
+  keywords?: string[] | null;
+  levels?: string[] | null;
+  subjects?: string[] | null;
+  document_type?: DocumentType | null;
+  language?: string | null;
 }
 
 export interface SourceChunk {
@@ -144,6 +178,7 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
 
 
 

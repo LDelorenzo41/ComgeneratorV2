@@ -8,6 +8,174 @@ interface ChatMessageProps {
   message: ChatUIMessage;
 }
 
+// Composant pour rendre le markdown en HTML
+const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+  const parseMarkdown = (text: string): React.ReactNode[] => {
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+    let listItems: string[] = [];
+    let listType: 'ul' | 'ol' | null = null;
+    let keyIndex = 0;
+
+    const flushList = () => {
+      if (listItems.length > 0 && listType) {
+        const ListTag = listType;
+        elements.push(
+          <ListTag key={`list-${keyIndex++}`} className={listType === 'ul' ? 'list-disc list-inside my-2 space-y-1' : 'list-decimal list-inside my-2 space-y-1'}>
+            {listItems.map((item, i) => (
+              <li key={i}>{parseInline(item)}</li>
+            ))}
+          </ListTag>
+        );
+        listItems = [];
+        listType = null;
+      }
+    };
+
+    const parseInline = (text: string): React.ReactNode => {
+      // Parse bold (**text** ou __text__)
+      const parts: React.ReactNode[] = [];
+      let remaining = text;
+      let inlineKey = 0;
+
+      while (remaining.length > 0) {
+        // Bold: **text** ou __text__
+        const boldMatch = remaining.match(/^(.*?)(\*\*|__)(.+?)\2(.*)$/s);
+        if (boldMatch) {
+          if (boldMatch[1]) {
+            parts.push(parseItalic(boldMatch[1], inlineKey++));
+          }
+          parts.push(<strong key={`bold-${inlineKey++}`}>{parseItalic(boldMatch[3], inlineKey++)}</strong>);
+          remaining = boldMatch[4];
+          continue;
+        }
+
+        // Si pas de bold trouvé, parser italic sur le reste
+        parts.push(parseItalic(remaining, inlineKey++));
+        break;
+      }
+
+      return parts.length === 1 ? parts[0] : parts;
+    };
+
+    const parseItalic = (text: string, keyBase: number): React.ReactNode => {
+      // Parse italic (*text* ou _text_) - attention à ne pas confondre avec **
+      const parts: React.ReactNode[] = [];
+      let remaining = text;
+      let italicKey = 0;
+
+      while (remaining.length > 0) {
+        // Italic: *text* ou _text_ (mais pas ** ou __)
+        const italicMatch = remaining.match(/^(.*?)(?<!\*)(\*|_)(?!\1)(.+?)\2(?!\2)(.*)$/s);
+        if (italicMatch) {
+          if (italicMatch[1]) {
+            parts.push(<span key={`text-${keyBase}-${italicKey++}`}>{italicMatch[1]}</span>);
+          }
+          parts.push(<em key={`italic-${keyBase}-${italicKey++}`}>{italicMatch[3]}</em>);
+          remaining = italicMatch[4];
+          continue;
+        }
+
+        parts.push(<span key={`text-${keyBase}-${italicKey++}`}>{remaining}</span>);
+        break;
+      }
+
+      return parts.length === 1 ? parts[0] : parts;
+    };
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      // Headers
+      const h4Match = trimmedLine.match(/^####\s+(.+)$/);
+      if (h4Match) {
+        flushList();
+        elements.push(
+          <h4 key={`h4-${keyIndex++}`} className="font-semibold text-sm mt-3 mb-1">
+            {parseInline(h4Match[1])}
+          </h4>
+        );
+        continue;
+      }
+
+      const h3Match = trimmedLine.match(/^###\s+(.+)$/);
+      if (h3Match) {
+        flushList();
+        elements.push(
+          <h3 key={`h3-${keyIndex++}`} className="font-bold text-base mt-3 mb-2">
+            {parseInline(h3Match[1])}
+          </h3>
+        );
+        continue;
+      }
+
+      const h2Match = trimmedLine.match(/^##\s+(.+)$/);
+      if (h2Match) {
+        flushList();
+        elements.push(
+          <h2 key={`h2-${keyIndex++}`} className="font-bold text-lg mt-3 mb-2">
+            {parseInline(h2Match[1])}
+          </h2>
+        );
+        continue;
+      }
+
+      const h1Match = trimmedLine.match(/^#\s+(.+)$/);
+      if (h1Match) {
+        flushList();
+        elements.push(
+          <h1 key={`h1-${keyIndex++}`} className="font-bold text-xl mt-3 mb-2">
+            {parseInline(h1Match[1])}
+          </h1>
+        );
+        continue;
+      }
+
+      // Ordered list (1. item)
+      const olMatch = trimmedLine.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        if (listType !== 'ol') {
+          flushList();
+          listType = 'ol';
+        }
+        listItems.push(olMatch[1]);
+        continue;
+      }
+
+      // Unordered list (- item ou * item)
+      const ulMatch = trimmedLine.match(/^[-*]\s+(.+)$/);
+      if (ulMatch) {
+        if (listType !== 'ul') {
+          flushList();
+          listType = 'ul';
+        }
+        listItems.push(ulMatch[1]);
+        continue;
+      }
+
+      // Ligne vide
+      if (trimmedLine === '') {
+        flushList();
+        elements.push(<div key={`br-${keyIndex++}`} className="h-2" />);
+        continue;
+      }
+
+      // Paragraphe normal
+      flushList();
+      elements.push(
+        <p key={`p-${keyIndex++}`} className="my-1">
+          {parseInline(trimmedLine)}
+        </p>
+      );
+    }
+
+    flushList();
+    return elements;
+  };
+
+  return <div className="text-sm">{parseMarkdown(content)}</div>;
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const [showSources, setShowSources] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -48,8 +216,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 </div>
                 <span className="text-sm opacity-70">Réflexion...</span>
               </div>
-            ) : (
+            ) : isUser ? (
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            ) : (
+              <MarkdownRenderer content={message.content} />
             )}
           </div>
 
@@ -154,5 +324,6 @@ const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, 
 };
 
 export default ChatMessage;
+
 
 

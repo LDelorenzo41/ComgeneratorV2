@@ -1,8 +1,8 @@
 // supabase/functions/rag-chat/index.ts
-// VERSION V4 "PRODUCTION"
-// - Base solide V2.5 (RRF, Fallback, Corpus, IA Gen)
-// - Patch V3 (Regex tirets "demi-fond", Stopwords stricts)
-// - Boost Lexical (Force la remontée du document contenant le mot-clé exact)
+// VERSION V7 "HYBRID"
+// - Moteur de recherche : V4 (Strictement identique au fichier 1 pour la pertinence)
+// - Filtrage : V6 (Filtrage par citations IA pour nettoyer l'affichage)
+// - UI : Score masqué (null) et sources non citées retirées
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -14,7 +14,7 @@ declare const Deno: {
 };
 
 // ============================================================================
-// 1. CONFIGURATION COMPLETE
+// 1. CONFIGURATION COMPLETE (Basée sur V4)
 // ============================================================================
 
 interface DomainConfig {
@@ -81,13 +81,15 @@ const DOMAINS: Record<string, DomainConfig> = {
 
 const CONFIG = {
   defaultTopK: 15,           
-  similarityThreshold: 0.26, // Seuil légèrement baissé pour attraper plus large avant le tri
+  similarityThreshold: 0.26, // Seuil V4 conservé
   referenceDocBonus: 0.05,
   chatModel: 'gpt-4o-mini',  
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
   queryRewritingModel: 'gpt-4o-mini',
-  finalChunkCount: 8,        
+  // On passe à 10 pour donner du choix à l'IA pour le filtrage par citation, 
+  // tout en gardant l'algorithme de tri V4 qui met les meilleurs en premier.
+  finalChunkCount: 10,        
   maxHistoryMessages: 6,     
   excerptLength: 700,        
 };
@@ -129,6 +131,8 @@ interface MatchedChunk {
   rrfScore?: number;  
   scope?: 'global' | 'user';
   sourceType?: 'vector' | 'keyword' | 'domain';
+  // Ajout pour la logique de citation V6
+  sourceIndex?: number;
 }
 
 // ============================================================================
@@ -155,22 +159,23 @@ function normalizeStr(str: string): string {
 }
 
 // ============================================================================
-// EXTRACTION INTELLIGENTE (LE PATCH "DEMI-FOND")
+// EXTRACTION INTELLIGENTE (RETOUR À LA LOGIQUE V4/V1 QUI FONCTIONNE)
 // ============================================================================
 
 function extractKeyTerms(query: string): string[] {
   // Regex : Garde les lettres, chiffres, accents ET les tirets (-)
+  // C'est crucial pour "demi-fond", "estime-de-soi", etc.
   const words = query.split(/[^a-zA-Z0-9\u00C0-\u017F-]+/).filter(w => w.length > 0);
   
   const terms: string[] = [];
   
-  // LISTE NOIRE STRICTE (Mots vides + mots pédagogiques génériques polluants)
+  // LISTE NOIRE STRICTE (V4) - On garde celle-ci car elle nettoie mieux la requête
   const stopWords = new Set([
     'pour','avec','dans','quel','quelle','quelles','comment','est-ce','que','les','des','une', 'le', 'la', 'un', 'au', 'aux',
     'cycle', 'cycles', 'niveau', 'niveaux', 'classe', 'classes', 
     'evaluer', 'evaluation', 'competence', 'competences', 'situation', 'situations',
     'enseignement', 'enseigner', 'eleve', 'eleves', 'objectifs', 'objectif', 'possible',
-    'activite', 'activites', 'apprendre', 'faire'
+    'activite', 'activites', 'apprendre', 'faire', 'sont', 'sur'
   ]);
 
   const mappings: Record<string, string[]> = {
@@ -370,7 +375,7 @@ async function searchByKeywords(supabase: any, allowedDocIds: string[], keywords
               results.push({
                   id: c.id, documentId: c.document_id, documentTitle: '', chunkIndex: c.chunk_index, 
                   content: c.content, 
-                  score: 1.0, // Score max pour un hit exact
+                  score: 1.0, // Score max pour un hit exact (V4 logic)
                   scope: c.scope, sourceType: 'keyword'
               });
           });
@@ -380,7 +385,7 @@ async function searchByKeywords(supabase: any, allowedDocIds: string[], keywords
 }
 
 // ============================================================================
-// FUSION RRF + BOOST LEXICAL (Le cœur du système)
+// FUSION RRF + BOOST LEXICAL (RETOUR À LA LOGIQUE V4)
 // ============================================================================
 
 function fuseResultsWithBoost(
@@ -420,9 +425,7 @@ function fuseResultsWithBoost(
       return { ...chunk, rrfScore }; 
     });
 
-  // --- LE BOOST LEXICAL ---
-  // Si un chunk contient "demi-fond" ou "apsa", on booste massivement son score RRF
-  // Cela permet de faire remonter le doc pertinent même s'il était mal classé vectoriellement
+  // --- LE BOOST LEXICAL (CRUCIAL POUR LA PERTINENCE) ---
   if (boostTerms.length > 0) {
     candidates = candidates.map(chunk => {
         let boost = 1.0;
@@ -441,32 +444,43 @@ function fuseResultsWithBoost(
     });
   }
 
-  // Tri final par RRF boosté
+  // Tri final par RRF boosté (Logique V4 conservée)
   return candidates.sort((a, b) => (b.rrfScore || 0) - (a.rrfScore || 0));
 }
 
-async function generateResponse(
-  query: string, chunks: MatchedChunk[], mode: ChatMode, history: any[], domain: DomainConfig | null, apiKey: string
-): Promise<{ answer: string; tokens: number }> {
-  
-  if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information pertinente.", tokens: 0 };
+// ============================================================================
+// GÉNÉRATION & FILTRAGE DES SOURCES (LOGIQUE V6 POUR L'AFFICHAGE)
+// ============================================================================
 
-  const context = chunks.map((c, i) => `[Source ${i + 1}] (Titre: ${c.documentTitle})\n${c.content.replace(/\s+/g, ' ')}`).join('\n\n');
+async function generateResponseAndFilterSources(
+  query: string, chunks: MatchedChunk[], mode: ChatMode, history: any[], domain: DomainConfig | null, apiKey: string
+): Promise<{ answer: string; usedSources: MatchedChunk[]; tokens: number }> {
+  
+  if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information pertinente.", usedSources: [], tokens: 0 };
+
+  // ON NUMÉROTE LES SOURCES DE 1 À 10 POUR LE LLM
+  const context = chunks.map((c, i) => {
+    // On stocke l'index temporaire dans l'objet pour pouvoir le récupérer plus tard
+    c.sourceIndex = i + 1;
+    return `[Source ${i + 1}] (Titre: ${c.documentTitle})\n${c.content.replace(/\s+/g, ' ')}`;
+  }).join('\n\n');
+
   let roleDesc = domain ? domain.promptRole : "Assistant Pédagogique Expert";
   const allowAI = mode === 'corpus_plus_ai';
   
   const systemPrompt = `Tu es un ${roleDesc}.
   
-  CONTEXTE DOCUMENTAIRE :
+  CONTEXTE DOCUMENTAIRE (Top ${chunks.length} sources) :
   ${context}
 
-  INSTRUCTIONS :
-  1. Base-toi EN PRIORITÉ sur les "Sources" ci-dessus.
-  2. Cite systématiquement les sources utilisées (ex: [Source 1]).
-  3. Structure la réponse avec des titres et des puces.
+  INSTRUCTIONS OBLIGATOIRES :
+  1. Utilise le contexte pour répondre à : "${query}".
+  2. **CITE TES SOURCES** : Chaque affirmation doit être suivie de la source utilisée, ex: [Source 1], [Source 4].
+  3. Si une source n'est pas utile, **NE L'UTILISE PAS** et ne la cite pas.
+  4. Structure ta réponse clairement (titres, puces).
   ${allowAI 
-    ? "4. Si les sources sont incomplètes, TU PEUX compléter avec tes connaissances générales, mais tu dois PRECISER CLAIREMENT ce qui vient de toi." 
-    : "4. Si la réponse n'est pas dans les sources, dis simplement que tu ne trouves pas l'information."}
+    ? "5. Si le contexte est insuffisant, complète avec tes connaissances générales en précisant clairement ce qui vient de toi." 
+    : "5. Limite-toi strictement aux documents. Si la réponse n'y est pas, dis-le."}
   
   ${domain?.id === 'LANGUES' ? "Utilise la terminologie CECR." : ""}
   ${domain?.id === 'EPS' ? "Utilise le vocabulaire APSA/AFC." : ""}
@@ -483,7 +497,28 @@ async function generateResponse(
   });
 
   const data = await response.json();
-  return { answer: data.choices[0]?.message?.content || 'Erreur.', tokens: data.usage?.total_tokens || 0 };
+  const answer = data.choices[0]?.message?.content || 'Erreur.';
+  const tokens = data.usage?.total_tokens || 0;
+
+  // ANALYSE DE LA RÉPONSE POUR FILTRER LES SOURCES
+  const usedIndices = new Set<number>();
+  // Regex pour trouver [Source 1], [Source 10], etc.
+  const citationRegex = /\[Source\s*(\d+)\]/g;
+  let match;
+  while ((match = citationRegex.exec(answer)) !== null) {
+    usedIndices.add(parseInt(match[1], 10));
+  }
+
+  // On ne renvoie au frontend QUE les sources que l'IA a réellement citées
+  let usedSources = chunks.filter(c => c.sourceIndex && usedIndices.has(c.sourceIndex));
+
+  // FALLBACK : Si l'IA n'a rien cité mais a répondu, on renvoie la meilleure source (Top 1)
+  // pour éviter un tableau de sources vide bizarre si le mode est "corpus_only"
+  if (usedSources.length === 0 && chunks.length > 0 && !allowAI) {
+     usedSources = chunks.slice(0, 1);
+  }
+
+  return { answer, usedSources, tokens };
 }
 
 async function deductTokens(serviceClient: any, userId: string, tokensUsed: number): Promise<void> {
@@ -567,7 +602,7 @@ async function chatHandler(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ answer: "Aucun document accessible. Activez l'IA pour une réponse générique.", sources: [], tokensUsed: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // RECHERCHE
+    // RECHERCHE (LOGIQUE V4)
     let queries = [message];
     let totalTokens = 0;
 
@@ -578,11 +613,11 @@ async function chatHandler(req: Request): Promise<Response> {
     }
 
     const embeddingPromise = createEmbedding(queries[0], OPENAI_API_KEY);
-    const keyTerms = extractKeyTerms(queries.join(' ')); 
+    const keyTerms = extractKeyTerms(queries.join(' ')); // Utilise l'extracteur V4 robuste
 
     const [embedding, keywordResults, domainSpecificResults] = await Promise.all([
         embeddingPromise,
-        searchByKeywords(serviceClient, allowedDocIdsArr, keyTerms),
+        searchByKeywords(serviceClient, allowedDocIdsArr, keyTerms), // Recherche Mots-clés V4
         activeDomain ? 
             serviceClient.from('rag_chunks')
             .select('id, document_id, chunk_index, content, scope')
@@ -597,17 +632,19 @@ async function chatHandler(req: Request): Promise<Response> {
 
     const vectorResults = await searchByVector(serviceClient, user.id, embedding, CONFIG.defaultTopK, allowedDocIdsSet);
 
-    // FUSION + BOOST
+    // FUSION + BOOST (LOGIQUE V4 - CRUCIAL)
     let candidates = fuseResultsWithBoost(vectorResults, keywordResults, domainSpecificResults, allowedDocsMap, keyTerms);
 
-    // Bonus Doc Reference (Optionnel)
+    // Bonus Doc Reference
     candidates = candidates.map(c => {
         let boost = 1;
         if (isReferenceDocument(c.documentTitle)) boost += 0.05;
         if (activeDomain && isDomainDocument(c.documentTitle, activeDomain)) boost += activeDomain.bonus;
         return { ...c, score: Math.min(0.99, c.score * boost) };
-    }); // On ne re-trie pas ici, le Boost RRF a déjà fait le travail
+    }); 
+    // On garde l'ordre défini par le Boost RRF, on ne re-trie pas par score simple.
 
+    // On garde les N meilleurs chunks pour le contexte
     const finalChunks = candidates.slice(0, CONFIG.finalChunkCount);
 
     console.log(`[rag-chat] Top Doc: ${finalChunks[0]?.documentTitle}`);
@@ -624,19 +661,25 @@ async function chatHandler(req: Request): Promise<Response> {
 
     await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'user', content: message });
 
-    const { answer, tokens } = await generateResponse(message, finalChunks, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY);
+    // GÉNÉRATION + FILTRAGE CITATIONS (LOGIQUE V6)
+    const { answer, usedSources, tokens } = await generateResponseAndFilterSources(
+        message, finalChunks, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY
+    );
     totalTokens += tokens;
 
-    const sources = finalChunks.map(c => ({
+    // PREPARATION DES SOURCES POUR L'UI (SCORE MASQUÉ)
+    const sourcesForUI = usedSources.map(c => ({
       documentId: c.documentId, documentTitle: c.documentTitle, chunkId: c.id, chunkIndex: c.chunkIndex,
-      excerpt: c.content.substring(0, CONFIG.excerptLength), score: c.score, scope: c.scope
+      excerpt: c.content.substring(0, CONFIG.excerptLength), 
+      score: null, // ON MASQUE LE SCORE
+      scope: c.scope
     }));
 
-    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources });
+    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources: sourcesForUI });
     await deductTokens(serviceClient, user.id, totalTokens);
 
     return new Response(JSON.stringify({
-      answer, sources, conversationId: convId, tokensUsed: totalTokens
+      answer, sources: sourcesForUI, conversationId: convId, tokensUsed: totalTokens
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (e: any) {
