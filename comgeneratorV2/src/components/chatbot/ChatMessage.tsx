@@ -1,6 +1,6 @@
 // src/components/chatbot/ChatMessage.tsx
-import React, { useState } from 'react';
-import { User, Bot, ChevronDown, ChevronUp, FileText, BookmarkPlus } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { User, Bot, ChevronDown, ChevronUp, FileText, BookmarkPlus, Sparkles, Info } from 'lucide-react';
 import type { ChatUIMessage, SourceChunk } from '../../lib/rag.types';
 import { SaveAnswerModal } from './SaveAnswerModal';
 
@@ -33,50 +33,22 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
     };
 
     const parseInline = (text: string): React.ReactNode => {
-      // Parse bold (**text** ou __text__)
       const parts: React.ReactNode[] = [];
       let remaining = text;
       let inlineKey = 0;
 
       while (remaining.length > 0) {
-        // Bold: **text** ou __text__
         const boldMatch = remaining.match(/^(.*?)(\*\*|__)(.+?)\2(.*)$/s);
         if (boldMatch) {
           if (boldMatch[1]) {
-            parts.push(parseItalic(boldMatch[1], inlineKey++));
+            parts.push(<span key={`text-${inlineKey++}`}>{boldMatch[1]}</span>);
           }
-          parts.push(<strong key={`bold-${inlineKey++}`}>{parseItalic(boldMatch[3], inlineKey++)}</strong>);
+          parts.push(<strong key={`bold-${inlineKey++}`}>{boldMatch[3]}</strong>);
           remaining = boldMatch[4];
           continue;
         }
 
-        // Si pas de bold trouvé, parser italic sur le reste
-        parts.push(parseItalic(remaining, inlineKey++));
-        break;
-      }
-
-      return parts.length === 1 ? parts[0] : parts;
-    };
-
-    const parseItalic = (text: string, keyBase: number): React.ReactNode => {
-      // Parse italic (*text* ou _text_) - attention à ne pas confondre avec **
-      const parts: React.ReactNode[] = [];
-      let remaining = text;
-      let italicKey = 0;
-
-      while (remaining.length > 0) {
-        // Italic: *text* ou _text_ (mais pas ** ou __)
-        const italicMatch = remaining.match(/^(.*?)(?<!\*)(\*|_)(?!\1)(.+?)\2(?!\2)(.*)$/s);
-        if (italicMatch) {
-          if (italicMatch[1]) {
-            parts.push(<span key={`text-${keyBase}-${italicKey++}`}>{italicMatch[1]}</span>);
-          }
-          parts.push(<em key={`italic-${keyBase}-${italicKey++}`}>{italicMatch[3]}</em>);
-          remaining = italicMatch[4];
-          continue;
-        }
-
-        parts.push(<span key={`text-${keyBase}-${italicKey++}`}>{remaining}</span>);
+        parts.push(<span key={`text-${inlineKey++}`}>{remaining}</span>);
         break;
       }
 
@@ -86,7 +58,6 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
     for (const line of lines) {
       const trimmedLine = line.trim();
 
-      // Headers
       const h4Match = trimmedLine.match(/^####\s+(.+)$/);
       if (h4Match) {
         flushList();
@@ -131,7 +102,6 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
         continue;
       }
 
-      // Ordered list (1. item)
       const olMatch = trimmedLine.match(/^\d+\.\s+(.+)$/);
       if (olMatch) {
         if (listType !== 'ol') {
@@ -142,7 +112,6 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
         continue;
       }
 
-      // Unordered list (- item ou * item)
       const ulMatch = trimmedLine.match(/^[-*]\s+(.+)$/);
       if (ulMatch) {
         if (listType !== 'ul') {
@@ -153,14 +122,12 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
         continue;
       }
 
-      // Ligne vide
       if (trimmedLine === '') {
         flushList();
         elements.push(<div key={`br-${keyIndex++}`} className="h-2" />);
         continue;
       }
 
-      // Paragraphe normal
       flushList();
       elements.push(
         <p key={`p-${keyIndex++}`} className="my-1">
@@ -176,6 +143,21 @@ const MarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
   return <div className="text-sm">{parseMarkdown(content)}</div>;
 };
 
+/**
+ * Extrait les numéros de sources citées dans le texte
+ */
+function extractCitedSourceIndices(content: string): number[] {
+  const regex = /\[Source\s*(\d+)\]/gi;
+  const indices = new Set<number>();
+  let match;
+  
+  while ((match = regex.exec(content)) !== null) {
+    indices.add(parseInt(match[1], 10));
+  }
+  
+  return Array.from(indices).sort((a, b) => a - b);
+}
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const [showSources, setShowSources] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -183,6 +165,26 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isLoading = message.isLoading;
 
   const canSave = !isUser && !isLoading && message.content && message.content.trim().length > 0;
+
+  // Vérifier si l'IA a contribué (mode corpus_plus_ai ou ai_only)
+  const aiContributed = message.mode === 'corpus_plus_ai' || message.mode === 'ai_only';
+  const isAiOnly = message.mode === 'ai_only';
+
+  // Filtrer les sources pour n'afficher que celles citées
+  const citedSources = useMemo(() => {
+    if (!message.sources || message.sources.length === 0 || !message.content) {
+      return [];
+    }
+    
+    const citedIndices = extractCitedSourceIndices(message.content);
+    
+    return citedIndices
+      .filter(index => index >= 1 && index <= message.sources!.length)
+      .map(index => ({
+        ...message.sources![index - 1],
+        displayIndex: index,
+      }));
+  }, [message.sources, message.content]);
 
   return (
     <>
@@ -223,6 +225,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             )}
           </div>
 
+          {/* Notice IA - Affichée si l'IA a contribué */}
+          {!isUser && !isLoading && aiContributed && (
+            <div className={`mt-2 flex items-start gap-2 p-2 rounded-lg text-xs ${
+              isAiOnly 
+                ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+            }`}>
+              <Sparkles className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                {isAiOnly 
+                  ? "Cette réponse est basée sur les connaissances générales de l'IA, sans document source."
+                  : "L'IA a contribué à enrichir cette réponse. Certaines informations peuvent compléter les documents sources."
+                }
+              </span>
+            </div>
+          )}
+
           {/* Actions pour les messages assistant */}
           {canSave && (
             <div className="mt-2 flex items-center gap-2">
@@ -237,22 +256,26 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             </div>
           )}
 
-          {/* Sources */}
-          {!isUser && message.sources && message.sources.length > 0 && (
+          {/* Sources citées uniquement */}
+          {!isUser && citedSources.length > 0 && (
             <div className="mt-2 w-full">
               <button
                 onClick={() => setShowSources(!showSources)}
                 className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 <FileText className="w-3 h-3" />
-                {message.sources.length} source{message.sources.length > 1 ? 's' : ''}
+                {citedSources.length} source{citedSources.length > 1 ? 's' : ''} utilisée{citedSources.length > 1 ? 's' : ''}
                 {showSources ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
               {showSources && (
                 <div className="mt-2 space-y-2">
-                  {message.sources.map((source, index) => (
-                    <SourceCard key={`${source.chunkId}-${index}`} source={source} index={index} />
+                  {citedSources.map((source) => (
+                    <SourceCard 
+                      key={source.chunkId} 
+                      source={source} 
+                      displayIndex={source.displayIndex} 
+                    />
                   ))}
                 </div>
               )}
@@ -276,11 +299,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   );
 };
 
-// Composant Source - SCORE PLAFONNÉ À 100%
-const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, index }) => {
+// Composant Source simplifié - sans score
+const SourceCard: React.FC<{ source: SourceChunk & { displayIndex?: number }; displayIndex: number }> = ({ source, displayIndex }) => {
   const [expanded, setExpanded] = useState(false);
-  // 🔴 CORRECTION : Plafonner le score à 100%
-  const scorePercent = Math.min(Math.round(source.score * 100), 100);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
@@ -290,24 +311,13 @@ const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, 
       >
         <div className="flex items-center gap-2">
           <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xs font-medium flex items-center justify-center">
-            {index + 1}
+            {displayIndex}
           </span>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate max-w-[180px]">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate max-w-[220px]">
             {source.documentTitle}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded ${
-              scorePercent >= 80
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                : scorePercent >= 60
-                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-            }`}
-          >
-            {scorePercent}%
-          </span>
           {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </div>
       </div>
@@ -324,6 +334,8 @@ const SourceCard: React.FC<{ source: SourceChunk; index: number }> = ({ source, 
 };
 
 export default ChatMessage;
+
+
 
 
 

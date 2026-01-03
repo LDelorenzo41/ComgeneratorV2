@@ -1,97 +1,48 @@
 // supabase/functions/rag-chat/index.ts
-// VERSION V7 "HYBRID"
-// - Moteur de recherche : V4 (Strictement identique au fichier 1 pour la pertinence)
-// - Filtrage : V6 (Filtrage par citations IA pour nettoyer l'affichage)
-// - UI : Score masqué (null) et sources non citées retirées
+// VERSION V5.1 "PRODUCTION SOTA"
+// - Hybrid Search (Vector + FTS)
+// - Cohere Reranking
+// - HyDE automatique (si query courte)
+// - RRF Fusion
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 declare const Deno: {
-  env: {
-    get(key: string): string | undefined;
-  };
+  env: { get(key: string): string | undefined };
   serve(handler: (req: Request) => Promise<Response>): void;
 };
 
 // ============================================================================
-// 1. CONFIGURATION COMPLETE (Basée sur V4)
+// CONFIGURATION
 // ============================================================================
 
-interface DomainConfig {
-  id: string;
-  name: string;
-  keywords: RegExp[];
-  docPatterns: string[];
-  bonus: number;
-  minDocs: number;
-  promptRole: string;
-}
-
-const DOMAINS: Record<string, DomainConfig> = {
-  LANGUES: {
-    id: 'LANGUES',
-    name: 'Langues Vivantes / CECR',
-    keywords: [
-      /\bcecr\b/i, /\bniveau\s*de\s*langue/i, /\b[a-c][1-2]\b/i, 
-      /\bcompétence\s*linguistique/i, /\blangue\s*vivante/i, /\blv[1-2]\b/i,
-      /\boral\s*(compréhension|production)/i, /\bécrit\s*(compréhension|production)/i
-    ],
-    docPatterns: ['cecr', 'cecrl', 'cadre européen', 'guide-langue', 'reperles'],
-    bonus: 0.15,
-    minDocs: 3,
-    promptRole: "Expert en didactique des langues et CECR"
-  },
-  EPS: {
-    id: 'EPS',
-    name: 'Éducation Physique et Sportive',
-    keywords: [
-      /\beps\b/i, /\béducation\s*physique/i, /\bchamp\s*d'apprentissage/i, 
-      /\bapsa\b/i, /\bmotricité/i, /\bperformance\s*sportive/i, /\bsport\b/i
-    ],
-    docPatterns: ['eps', 'éducation physique', 'sport', 'apsa', 'guide-eps'],
-    bonus: 0.10,
-    minDocs: 2,
-    promptRole: "Expert en pédagogie de l'EPS et motricité"
-  },
-  SCIENCES: {
-    id: 'SCIENCES',
-    name: 'Mathématiques et Sciences',
-    keywords: [
-      /\bmath[s]?\b/i, /\bmathématique/i, /\bgéométrie/i, /\balgèbre/i, 
-      /\bthéorème/i, /\bcalcul\b/i, /\bphysique\b/i, /\bchimie\b/i, /\bsvt\b/i
-    ],
-    docPatterns: ['math', 'science', 'physique', 'chimie'],
-    bonus: 0.10,
-    minDocs: 2,
-    promptRole: "Expert en didactique des sciences"
-  },
-  HUMANITES: {
-    id: 'HUMANITES',
-    name: 'Histoire-Géo et Français',
-    keywords: [
-      /\bhistoire\b/i, /\bgéographie\b/i, /\bemc\b/i, /\bfrançais\b/i, 
-      /\blittérature/i, /\bgrammaire/i, /\bchronologie/i
-    ],
-    docPatterns: ['histoire', 'géographie', 'français', 'littérature'],
-    bonus: 0.10,
-    minDocs: 2,
-    promptRole: "Expert en humanités et culture générale"
-  }
-};
-
 const CONFIG = {
-  defaultTopK: 15,           
-  similarityThreshold: 0.26, // Seuil V4 conservé
-  referenceDocBonus: 0.05,
-  chatModel: 'gpt-4o-mini',  
+  // Retrieval
+  vectorTopK: 30,
+  ftsTopK: 30,
+  rerankTopK: 8,
+  similarityThreshold: 0.25,
+  
+  // Models
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  queryRewritingModel: 'gpt-4o-mini',
-  // On passe à 10 pour donner du choix à l'IA pour le filtrage par citation, 
-  // tout en gardant l'algorithme de tri V4 qui met les meilleurs en premier.
-  finalChunkCount: 10,        
-  maxHistoryMessages: 6,     
-  excerptLength: 700,        
+  chatModel: 'gpt-4o-mini',
+  hydeModel: 'gpt-4o-mini',
+  
+  // Cohere
+  cohereRerankModel: 'rerank-v3.5',
+  
+  // HyDE automatique
+  hydeAutoThreshold: 50, // Active HyDE si query < 50 caractères
+  
+  // Limits
+  maxHistoryMessages: 6,
+  excerptLength: 700,
+};
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // ============================================================================
@@ -99,12 +50,10 @@ const CONFIG = {
 // ============================================================================
 
 type ChatMode = 'corpus_only' | 'corpus_plus_ai';
-type SearchMode = 'fast' | 'precise';
 
 interface ChatRequest {
   message: string;
-  mode: ChatMode;
-  searchMode?: SearchMode;
+  mode?: ChatMode;
   conversationId?: string;
   documentId?: string;
   usePersonalCorpus?: boolean;
@@ -112,7 +61,6 @@ interface ChatRequest {
   useAI?: boolean;
   levels?: string[];
   subjects?: string[];
-  documentTypes?: string[];
 }
 
 interface DocumentInfo {
@@ -121,570 +69,744 @@ interface DocumentInfo {
   scope: string;
 }
 
-interface MatchedChunk {
+interface RetrievedChunk {
   id: string;
   documentId: string;
   documentTitle: string;
   chunkIndex: number;
   content: string;
-  score: number;      
-  rrfScore?: number;  
-  scope?: 'global' | 'user';
-  sourceType?: 'vector' | 'keyword' | 'domain';
-  // Ajout pour la logique de citation V6
-  sourceIndex?: number;
+  score: number;
+  source: 'vector' | 'fts' | 'both';
+}
+
+interface RerankResult {
+  chunk: RetrievedChunk;
+  relevanceScore: number;
 }
 
 // ============================================================================
-// HELPERS
+// CLIENTS
 // ============================================================================
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-async function createSupabaseClient(authHeader: string) {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
+function createSupabaseClient(authHeader: string) {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
 }
 
-async function createServiceClient() {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-}
-
-function normalizeStr(str: string): string {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function createServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 }
 
 // ============================================================================
-// EXTRACTION INTELLIGENTE (RETOUR À LA LOGIQUE V4/V1 QUI FONCTIONNE)
+// STEP 1: QUERY ANALYSIS & HyDE
 // ============================================================================
 
-function extractKeyTerms(query: string): string[] {
-  // Regex : Garde les lettres, chiffres, accents ET les tirets (-)
-  // C'est crucial pour "demi-fond", "estime-de-soi", etc.
-  const words = query.split(/[^a-zA-Z0-9\u00C0-\u017F-]+/).filter(w => w.length > 0);
-  
-  const terms: string[] = [];
-  
-  // LISTE NOIRE STRICTE (V4) - On garde celle-ci car elle nettoie mieux la requête
-  const stopWords = new Set([
-    'pour','avec','dans','quel','quelle','quelles','comment','est-ce','que','les','des','une', 'le', 'la', 'un', 'au', 'aux',
-    'cycle', 'cycles', 'niveau', 'niveaux', 'classe', 'classes', 
-    'evaluer', 'evaluation', 'competence', 'competences', 'situation', 'situations',
-    'enseignement', 'enseigner', 'eleve', 'eleves', 'objectifs', 'objectif', 'possible',
-    'activite', 'activites', 'apprendre', 'faire', 'sont', 'sur'
-  ]);
-
-  const mappings: Record<string, string[]> = {
-    'maternelle': ['cycle_1'], 'cycle 1': ['maternelle'],
-    'cycle 2': ['CP', 'CE1', 'CE2'],
-    'cycle 3': ['CM1', 'CM2', '6e'], 'cycle 4': ['5e', '4e', '3e'],
-    'eps': ['éducation physique', 'sport', 'apsa'],
-    'cecr': ['cadre européen', 'descripteur'],
-  };
-
-  words.forEach(w => {
-    const norm = normalizeStr(w);
-    // On garde si > 3 lettres ET pas dans stopwords
-    // EXCEPTION : Si contient un tiret (demi-fond), on garde TOUJOURS
-    if (w.includes('-') || (w.length > 3 && !stopWords.has(norm))) {
-      terms.push(w);
-    }
-  });
-
-  // Mappings additionnels
-  const queryLower = normalizeStr(query);
-  for (const [k, v] of Object.entries(mappings)) {
-    if (queryLower.includes(k)) terms.push(...v);
-  }
-
-  return [...new Set(terms)];
+/**
+ * Détermine si HyDE doit être activé automatiquement
+ */
+function shouldUseHyDE(query: string): boolean {
+  const trimmedLength = query.trim().length;
+  return trimmedLength > 0 && trimmedLength < CONFIG.hydeAutoThreshold;
 }
 
-// ============================================================================
-// LOGIQUE MÉTIER & FILTRES
-// ============================================================================
-
-function inferFiltersFromQuery(query: string): { levels?: string[]; subjects?: string[]; } {
-  const q = normalizeStr(query);
-  const levels = new Set<string>();
-  const subjects = new Set<string>();
-
-  // Format DB exact (avec underscores)
-  if (q.match(/\bcycle\s*1\b/)) levels.add('cycle_1');
-  if (q.match(/\bcycle\s*2\b/)) levels.add('cycle_2');
-  if (q.match(/\bcycle\s*3\b/)) levels.add('cycle_3');
-  if (q.match(/\bcycle\s*4\b/)) levels.add('cycle_4');
-  
-  if (q.includes('college')) levels.add('collège');
-  if (q.includes('lycee')) levels.add('lycée');
-
-  const disciplineMap: Record<string, string> = {
-    'eps': 'EPS', 'sport': 'EPS', 'math': 'Mathématiques', 'francais': 'Français',
-    'anglais': 'Langues', 'espagnol': 'Langues', 'allemand': 'Langues',
-    'histoire': 'Histoire-Géographie', 'geographie': 'Histoire-Géographie'
-  };
-
-  for (const [key, value] of Object.entries(disciplineMap)) {
-    if (q.includes(key)) subjects.add(value);
-  }
-
-  return { levels: levels.size ? Array.from(levels) : undefined, subjects: subjects.size ? Array.from(subjects) : undefined };
-}
-
-function detectDomainIntent(query: string): DomainConfig | null {
-  for (const domain of Object.values(DOMAINS)) {
-    if (domain.keywords.some(regex => regex.test(query))) return domain;
-  }
-  return null;
-}
-
-function isDomainDocument(docTitle: string, domain: DomainConfig): boolean {
-  return domain.docPatterns.some(p => docTitle.toLowerCase().includes(p));
-}
-
-function isReferenceDocument(title: string): boolean {
-  return /programme|guide|référentiel|officiel|accompagnement/i.test(title.toLowerCase());
-}
-
-// ============================================================================
-// DATA & SEARCH
-// ============================================================================
-
-async function rewriteQueryForSearch(query: string, apiKey: string): Promise<{ queries: string[]; tokensUsed: number }> {
+/**
+ * HyDE: Génère un document hypothétique pour améliorer l'embedding
+ */
+async function generateHyDE(
+  query: string,
+  apiKey: string
+): Promise<{ hydeText: string; tokensUsed: number }> {
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        model: CONFIG.queryRewritingModel,
+        model: CONFIG.hydeModel,
         messages: [
-          { role: 'system', content: 'Génère 2 variantes de recherche optimisées (JSON) avec synonymes.' },
-          { role: 'user', content: `Question: "${query}"\nJSON: {"queries": ["v1", "v2"]}` }
+          {
+            role: 'system',
+            content: `Tu es un expert en éducation française. 
+Génère un court paragraphe (3-4 phrases) qui RÉPOND à la question de l'utilisateur, 
+comme si tu citais un document officiel de l'Éducation Nationale.
+Ne dis pas "je" ou "selon moi". Écris comme un texte de référence factuel.`
+          },
+          {
+            role: 'user',
+            content: query
+          }
         ],
-        temperature: 0.3, max_tokens: 150,
+        temperature: 0.3,
+        max_tokens: 200,
       }),
     });
+
     const data = await response.json();
-    const jsonMatch = data.choices[0]?.message?.content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return { queries: [query, ...(parsed.queries || [])], tokensUsed: data.usage?.total_tokens || 0 };
-    }
-    return { queries: [query], tokensUsed: data.usage?.total_tokens || 0 };
-  } catch {
-    return { queries: [query], tokensUsed: 0 };
+    const hydeText = data.choices?.[0]?.message?.content || query;
+    const tokensUsed = data.usage?.total_tokens || 0;
+
+    console.log(`[HyDE] Generated hypothetical document (${tokensUsed} tokens)`);
+    return { hydeText, tokensUsed };
+  } catch (error) {
+    console.warn('[HyDE] Failed, using original query:', error);
+    return { hydeText: query, tokensUsed: 0 };
   }
 }
 
+/**
+ * Extrait les mots-clés significatifs pour la recherche FTS
+ */
+function extractSearchTerms(query: string): string {
+  const stopWords = new Set([
+    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'au', 'aux',
+    'ce', 'cette', 'ces', 'mon', 'ma', 'mes', 'ton', 'ta', 'tes',
+    'son', 'sa', 'ses', 'notre', 'nos', 'votre', 'vos', 'leur', 'leurs',
+    'qui', 'que', 'quoi', 'dont', 'où', 'quand', 'comment', 'pourquoi',
+    'est', 'sont', 'était', 'être', 'avoir', 'fait', 'faire',
+    'pour', 'dans', 'avec', 'sur', 'sous', 'par', 'entre',
+    'plus', 'moins', 'très', 'bien', 'aussi', 'encore',
+    'tout', 'tous', 'toute', 'toutes', 'autre', 'autres',
+    'quel', 'quelle', 'quels', 'quelles',
+  ]);
+
+  const words = query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9àâäéèêëïîôùûüç-]+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
+
+  return [...new Set(words)].slice(0, 10).join(' ');
+}
+
+// ============================================================================
+// STEP 2: DOCUMENT FILTERING
+// ============================================================================
+
 async function getAllowedDocuments(
-  supabase: any, userId: string, docId?: string,
-  usePersonalCorpus: boolean = true, useProfAssistCorpus: boolean = true,
-  filters?: { levels?: string[]; subjects?: string[]; documentTypes?: string[]; }
+  supabase: any,
+  userId: string,
+  options: {
+    documentId?: string;
+    usePersonalCorpus: boolean;
+    useProfAssistCorpus: boolean;
+    levels?: string[];
+    subjects?: string[];
+  }
 ): Promise<Map<string, DocumentInfo>> {
   const docsMap = new Map<string, DocumentInfo>();
-  const { levels, subjects, documentTypes } = filters || {};
+  const { documentId, usePersonalCorpus, useProfAssistCorpus, levels, subjects } = options;
 
   if (!usePersonalCorpus && !useProfAssistCorpus) return docsMap;
 
-  let query = supabase.from('rag_documents').select('id, title, scope, user_id, levels, subjects, document_type').eq('status', 'ready');
-  
-  // Filtrage Corpus
-  if (docId) query = query.eq('id', docId);
-  else {
-    if (usePersonalCorpus && useProfAssistCorpus) query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
-    else if (useProfAssistCorpus) query = query.eq('scope', 'global');
-    else if (usePersonalCorpus) query = query.eq('scope', 'user').eq('user_id', userId);
+  let query = supabase
+    .from('rag_documents')
+    .select('id, title, scope, user_id, levels, subjects')
+    .eq('status', 'ready');
+
+  if (documentId) {
+    query = query.eq('id', documentId);
+  } else {
+    if (usePersonalCorpus && useProfAssistCorpus) {
+      query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    } else if (useProfAssistCorpus) {
+      query = query.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      query = query.eq('scope', 'user').eq('user_id', userId);
+    }
   }
 
-  // Filtrage Métadonnées Strict
-  if (levels?.length) query = query.overlaps('levels', levels);
-  if (subjects?.length) query = query.overlaps('subjects', subjects);
-  if (documentTypes?.length) query = query.in('document_type', documentTypes);
+  if (levels?.length) {
+    query = query.overlaps('levels', levels);
+  }
+  if (subjects?.length) {
+    query = query.overlaps('subjects', subjects);
+  }
 
-  const { data } = await query;
+  const { data, error } = await query;
 
-  // FALLBACK DE SÉCURITÉ
-  if (!data || data.length === 0) {
-    console.log('[rag-chat] Filters too strict, applying fallback...');
-    let fallbackQuery = supabase.from('rag_documents').select('id, title, scope').eq('status', 'ready');
-    
-    // On garde juste la restriction de corpus
-    if (docId) fallbackQuery = fallbackQuery.eq('id', docId);
-    else if (usePersonalCorpus && useProfAssistCorpus) fallbackQuery = fallbackQuery.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
-    else if (useProfAssistCorpus) fallbackQuery = fallbackQuery.eq('scope', 'global');
-    else if (usePersonalCorpus) fallbackQuery = fallbackQuery.eq('scope', 'user').eq('user_id', userId);
-
-    const { data: fallbackData } = await fallbackQuery;
-    if (fallbackData) fallbackData.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
+  if (error) {
+    console.error('[Documents] Query error:', error);
     return docsMap;
   }
 
-  data.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
+  if (!data || data.length === 0) {
+    console.log('[Documents] Filters too strict, removing metadata filters...');
+    
+    let fallbackQuery = supabase
+      .from('rag_documents')
+      .select('id, title, scope')
+      .eq('status', 'ready');
+
+    if (documentId) {
+      fallbackQuery = fallbackQuery.eq('id', documentId);
+    } else if (usePersonalCorpus && useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    } else if (useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'user').eq('user_id', userId);
+    }
+
+    const { data: fallbackData } = await fallbackQuery;
+    fallbackData?.forEach((d: any) => docsMap.set(d.id, d));
+    return docsMap;
+  }
+
+  data.forEach((d: any) => docsMap.set(d.id, d));
+  console.log(`[Documents] ${docsMap.size} documents allowed`);
   return docsMap;
+}
+
+// ============================================================================
+// STEP 3: HYBRID RETRIEVAL
+// ============================================================================
+
+async function searchByVector(
+  supabase: any,
+  userId: string,
+  embedding: number[],
+  allowedDocIds: string[]
+): Promise<RetrievedChunk[]> {
+  if (allowedDocIds.length === 0) return [];
+
+  const { data, error } = await supabase.rpc('match_rag_chunks', {
+    p_query_embedding: `[${embedding.join(',')}]`,
+    p_similarity_threshold: CONFIG.similarityThreshold,
+    p_match_count: CONFIG.vectorTopK,
+    p_user_id: userId,
+    p_document_id: null,
+  });
+
+  if (error) {
+    console.error('[Vector Search] Error:', error);
+    return [];
+  }
+
+  const allowedSet = new Set(allowedDocIds);
+  return (data || [])
+    .filter((item: any) => allowedSet.has(item.document_id))
+    .map((item: any) => ({
+      id: item.id,
+      documentId: item.document_id,
+      documentTitle: item.document_title || '',
+      chunkIndex: item.chunk_index,
+      content: item.content,
+      score: item.similarity,
+      source: 'vector' as const,
+    }));
+}
+
+async function searchByFTS(
+  supabase: any,
+  searchTerms: string,
+  allowedDocIds: string[]
+): Promise<RetrievedChunk[]> {
+  if (allowedDocIds.length === 0 || !searchTerms.trim()) return [];
+
+  const { data, error } = await supabase.rpc('search_rag_chunks_fts', {
+    p_query: searchTerms,
+    p_document_ids: allowedDocIds,
+    p_limit: CONFIG.ftsTopK,
+  });
+
+  if (error) {
+    console.error('[FTS Search] Error:', error);
+    return [];
+  }
+
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    documentId: item.document_id,
+    documentTitle: '',
+    chunkIndex: item.chunk_index,
+    content: item.content,
+    score: item.rank,
+    source: 'fts' as const,
+  }));
 }
 
 async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
   const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: CONFIG.embeddingModel, input: text.replace(/\n/g, ' '), dimensions: CONFIG.embeddingDimensions }),
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: CONFIG.embeddingModel,
+      input: text.replace(/\n/g, ' ').substring(0, 8000),
+      dimensions: CONFIG.embeddingDimensions,
+    }),
   });
+
   const data = await response.json();
+  if (!data.data?.[0]?.embedding) {
+    throw new Error('Failed to create embedding');
+  }
   return data.data[0].embedding;
 }
 
-async function searchByVector(supabase: any, userId: string, embedding: number[], topK: number, allowedDocIds: Set<string>): Promise<MatchedChunk[]> {
-  const { data, error } = await supabase.rpc('match_rag_chunks', {
-    p_query_embedding: `[${embedding.join(',')}]`,
-    p_similarity_threshold: CONFIG.similarityThreshold,
-    p_match_count: topK,
-    p_user_id: userId,
-    p_document_id: null,
-  });
-  if (error || !data) return [];
-  return data
-    .filter((item: any) => allowedDocIds.has(item.document_id))
-    .map((item: any) => ({
-      id: item.id, documentId: item.document_id, documentTitle: item.document_title,
-      chunkIndex: item.chunk_index, content: item.content, 
-      score: item.similarity, 
-      scope: item.scope, sourceType: 'vector'
-    }));
-}
-
-async function searchByKeywords(supabase: any, allowedDocIds: string[], keywords: string[]): Promise<MatchedChunk[]> {
-  if (keywords.length === 0 || allowedDocIds.length === 0) return [];
-  
-  // On priorise les mots composés et longs
-  const effectiveKeywords = keywords.slice(0, 8);
-  const results: MatchedChunk[] = [];
-  
-  console.log(`[rag-chat] Searching keywords: ${effectiveKeywords.join(', ')}`);
-
-  for (const k of effectiveKeywords) {
-      const { data } = await supabase.from('rag_chunks')
-        .select('id, document_id, chunk_index, content, scope')
-        .in('document_id', allowedDocIds).ilike('content', `%${k}%`).limit(6);
-      
-      if (data) {
-          data.forEach((c: any) => {
-              results.push({
-                  id: c.id, documentId: c.document_id, documentTitle: '', chunkIndex: c.chunk_index, 
-                  content: c.content, 
-                  score: 1.0, // Score max pour un hit exact (V4 logic)
-                  scope: c.scope, sourceType: 'keyword'
-              });
-          });
-      }
-  }
-  return results;
-}
-
 // ============================================================================
-// FUSION RRF + BOOST LEXICAL (RETOUR À LA LOGIQUE V4)
+// STEP 4: RRF FUSION
 // ============================================================================
 
-function fuseResultsWithBoost(
-  vectorResults: MatchedChunk[], keywordResults: MatchedChunk[], domainResults: MatchedChunk[],
-  docsMap: Map<string, DocumentInfo>, 
-  boostTerms: string[],
-  k = 60
-): MatchedChunk[] {
+function fuseWithRRF(
+  vectorResults: RetrievedChunk[],
+  ftsResults: RetrievedChunk[],
+  docsMap: Map<string, DocumentInfo>,
+  k: number = 60
+): RetrievedChunk[] {
   const rrfScores = new Map<string, number>();
-  const chunkMap = new Map<string, MatchedChunk>();
+  const chunkMap = new Map<string, RetrievedChunk>();
 
-  const processList = (list: MatchedChunk[]) => {
+  const processList = (list: RetrievedChunk[], sourceType: 'vector' | 'fts') => {
     list.forEach((item, rank) => {
-      // Hydratation Titre
-      if (!item.documentTitle && docsMap.has(item.documentId)) item.documentTitle = docsMap.get(item.documentId)!.title;
-      
-      // Stockage (garde le meilleur score natif)
-      if (!chunkMap.has(item.id)) chunkMap.set(item.id, item);
-      else {
-        const existing = chunkMap.get(item.id)!;
-        if (item.score > existing.score) chunkMap.set(item.id, { ...existing, score: item.score });
+      if (!item.documentTitle && docsMap.has(item.documentId)) {
+        item.documentTitle = docsMap.get(item.documentId)!.title;
       }
 
-      // RRF
+      const existing = chunkMap.get(item.id);
+      if (!existing) {
+        chunkMap.set(item.id, item);
+      } else if (item.score > existing.score) {
+        chunkMap.set(item.id, { ...existing, score: item.score, source: 'both' });
+      } else if (existing.source !== item.source) {
+        chunkMap.set(item.id, { ...existing, source: 'both' });
+      }
+
       const currentRRF = rrfScores.get(item.id) || 0;
       rrfScores.set(item.id, currentRRF + (1 / (k + rank + 1)));
     });
   };
 
-  processList(vectorResults);
-  processList(keywordResults);
-  processList(domainResults);
+  processList(vectorResults, 'vector');
+  processList(ftsResults, 'fts');
 
-  let candidates = Array.from(rrfScores.entries())
+  return Array.from(rrfScores.entries())
+    .sort((a, b) => b[1] - a[1])
     .map(([id, rrfScore]) => {
       const chunk = chunkMap.get(id)!;
-      return { ...chunk, rrfScore }; 
+      return { ...chunk, score: rrfScore };
     });
-
-  // --- LE BOOST LEXICAL (CRUCIAL POUR LA PERTINENCE) ---
-  if (boostTerms.length > 0) {
-    candidates = candidates.map(chunk => {
-        let boost = 1.0;
-        const contentNorm = normalizeStr(chunk.content);
-        
-        boostTerms.forEach(term => {
-          const termNorm = normalizeStr(term);
-          // Si le terme est un mot composé ou long, gros boost
-          if (contentNorm.includes(termNorm)) {
-            boost += (term.includes('-') ? 2.0 : 0.5); 
-          }
-        });
-        
-        // On booste le RRF (le critère de tri)
-        return { ...chunk, rrfScore: (chunk.rrfScore || 0) * boost };
-    });
-  }
-
-  // Tri final par RRF boosté (Logique V4 conservée)
-  return candidates.sort((a, b) => (b.rrfScore || 0) - (a.rrfScore || 0));
 }
 
 // ============================================================================
-// GÉNÉRATION & FILTRAGE DES SOURCES (LOGIQUE V6 POUR L'AFFICHAGE)
+// STEP 5: COHERE RERANKING
 // ============================================================================
 
-async function generateResponseAndFilterSources(
-  query: string, chunks: MatchedChunk[], mode: ChatMode, history: any[], domain: DomainConfig | null, apiKey: string
-): Promise<{ answer: string; usedSources: MatchedChunk[]; tokens: number }> {
+async function rerankWithCohere(
+  query: string,
+  candidates: RetrievedChunk[],
+  topK: number
+): Promise<RerankResult[]> {
+  const cohereApiKey = Deno.env.get('COHERE_API_KEY');
   
-  if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information pertinente.", usedSources: [], tokens: 0 };
+  if (!cohereApiKey) {
+    console.warn('[Rerank] No COHERE_API_KEY, skipping reranking');
+    return candidates.slice(0, topK).map(chunk => ({
+      chunk,
+      relevanceScore: chunk.score,
+    }));
+  }
 
-  // ON NUMÉROTE LES SOURCES DE 1 À 10 POUR LE LLM
-  const context = chunks.map((c, i) => {
-    // On stocke l'index temporaire dans l'objet pour pouvoir le récupérer plus tard
-    c.sourceIndex = i + 1;
-    return `[Source ${i + 1}] (Titre: ${c.documentTitle})\n${c.content.replace(/\s+/g, ' ')}`;
-  }).join('\n\n');
+  if (candidates.length === 0) {
+    return [];
+  }
 
-  let roleDesc = domain ? domain.promptRole : "Assistant Pédagogique Expert";
+  try {
+    const documents = candidates.map(c => c.content.substring(0, 2000));
+
+    const response = await fetch('https://api.cohere.com/v2/rerank', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cohereApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CONFIG.cohereRerankModel,
+        query: query,
+        documents: documents,
+        top_n: topK,
+        return_documents: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Rerank] Cohere API error:', response.status, errorText);
+      return candidates.slice(0, topK).map(chunk => ({
+        chunk,
+        relevanceScore: chunk.score,
+      }));
+    }
+
+    const data = await response.json();
+    console.log(`[Rerank] Cohere returned ${data.results?.length || 0} results`);
+
+    return (data.results || []).map((result: any) => ({
+      chunk: candidates[result.index],
+      relevanceScore: result.relevance_score,
+    }));
+  } catch (error) {
+    console.error('[Rerank] Error:', error);
+    return candidates.slice(0, topK).map(chunk => ({
+      chunk,
+      relevanceScore: chunk.score,
+    }));
+  }
+}
+
+// ============================================================================
+// STEP 6: RESPONSE GENERATION
+// ============================================================================
+
+async function generateResponse(
+  query: string,
+  rerankResults: RerankResult[],
+  mode: ChatMode,
+  history: any[],
+  apiKey: string
+): Promise<{ answer: string; tokensUsed: number }> {
+  if (rerankResults.length === 0) {
+    return {
+      answer: "Je n'ai pas trouvé d'information pertinente dans les documents disponibles.",
+      tokensUsed: 0,
+    };
+  }
+
+  const context = rerankResults
+    .map((r, i) => `[Source ${i + 1}] (${r.chunk.documentTitle})\n${r.chunk.content}`)
+    .join('\n\n---\n\n');
+
   const allowAI = mode === 'corpus_plus_ai';
-  
-  const systemPrompt = `Tu es un ${roleDesc}.
-  
-  CONTEXTE DOCUMENTAIRE (Top ${chunks.length} sources) :
-  ${context}
 
-  INSTRUCTIONS OBLIGATOIRES :
-  1. Utilise le contexte pour répondre à : "${query}".
-  2. **CITE TES SOURCES** : Chaque affirmation doit être suivie de la source utilisée, ex: [Source 1], [Source 4].
-  3. Si une source n'est pas utile, **NE L'UTILISE PAS** et ne la cite pas.
-  4. Structure ta réponse clairement (titres, puces).
-  ${allowAI 
-    ? "5. Si le contexte est insuffisant, complète avec tes connaissances générales en précisant clairement ce qui vient de toi." 
-    : "5. Limite-toi strictement aux documents. Si la réponse n'y est pas, dis-le."}
-  
-  ${domain?.id === 'LANGUES' ? "Utilise la terminologie CECR." : ""}
-  ${domain?.id === 'EPS' ? "Utilise le vocabulaire APSA/AFC." : ""}
-  `;
+  const systemPrompt = `Tu es un assistant pédagogique expert pour les enseignants français.
+
+SOURCES DOCUMENTAIRES :
+${context}
+
+INSTRUCTIONS :
+1. Base ta réponse PRIORITAIREMENT sur les Sources ci-dessus.
+2. Cite systématiquement les sources utilisées : [Source 1], [Source 2], etc.
+3. Structure ta réponse avec des titres (##) et des puces (-) pour la lisibilité.
+4. Si plusieurs sources se complètent, synthétise-les intelligemment.
+${allowAI 
+  ? `5. Si les sources sont insuffisantes, tu PEUX compléter avec tes connaissances générales, mais SIGNALE-LE clairement avec "💡 Complément IA :".` 
+  : `5. Si l'information n'est pas dans les sources, dis-le clairement. Ne fabrique PAS d'information.`}
+
+Réponds en français, de manière professionnelle et pédagogique.`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       model: CONFIG.chatModel,
-      messages: [{ role: 'system', content: systemPrompt }, ...history, { role: 'user', content: query }],
-      temperature: 0.3, 
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-CONFIG.maxHistoryMessages),
+        { role: 'user', content: query },
+      ],
+      temperature: 0.3,
     }),
   });
 
   const data = await response.json();
-  const answer = data.choices[0]?.message?.content || 'Erreur.';
-  const tokens = data.usage?.total_tokens || 0;
-
-  // ANALYSE DE LA RÉPONSE POUR FILTRER LES SOURCES
-  const usedIndices = new Set<number>();
-  // Regex pour trouver [Source 1], [Source 10], etc.
-  const citationRegex = /\[Source\s*(\d+)\]/g;
-  let match;
-  while ((match = citationRegex.exec(answer)) !== null) {
-    usedIndices.add(parseInt(match[1], 10));
-  }
-
-  // On ne renvoie au frontend QUE les sources que l'IA a réellement citées
-  let usedSources = chunks.filter(c => c.sourceIndex && usedIndices.has(c.sourceIndex));
-
-  // FALLBACK : Si l'IA n'a rien cité mais a répondu, on renvoie la meilleure source (Top 1)
-  // pour éviter un tableau de sources vide bizarre si le mode est "corpus_only"
-  if (usedSources.length === 0 && chunks.length > 0 && !allowAI) {
-     usedSources = chunks.slice(0, 1);
-  }
-
-  return { answer, usedSources, tokens };
-}
-
-async function deductTokens(serviceClient: any, userId: string, tokensUsed: number): Promise<void> {
-  if (tokensUsed <= 0) return;
-  const { data } = await serviceClient.from('profiles').select('tokens').eq('user_id', userId).single();
-  if (data) await serviceClient.from('profiles').update({ tokens: Math.max(0, data.tokens - tokensUsed) }).eq('user_id', userId);
+  return {
+    answer: data.choices?.[0]?.message?.content || 'Erreur lors de la génération de la réponse.',
+    tokensUsed: data.usage?.total_tokens || 0,
+  };
 }
 
 // ============================================================================
-// HANDLER PRINCIPAL
+// STEP 7: TOKEN MANAGEMENT
+// ============================================================================
+
+async function deductTokens(
+  serviceClient: any,
+  userId: string,
+  tokensUsed: number
+): Promise<void> {
+  if (tokensUsed <= 0) return;
+
+  const { data } = await serviceClient
+    .from('profiles')
+    .select('tokens')
+    .eq('user_id', userId)
+    .single();
+
+  if (data) {
+    await serviceClient
+      .from('profiles')
+      .update({ tokens: Math.max(0, data.tokens - tokensUsed) })
+      .eq('user_id', userId);
+  }
+}
+
+// ============================================================================
+// MAIN HANDLER
 // ============================================================================
 
 async function chatHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  
-  try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Auth Missing');
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
 
-    const supabase = await createSupabaseClient(authHeader);
-    const serviceClient = await createServiceClient();
+  const startTime = Date.now();
+
+  try {
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Authorization header missing');
+    }
+
+    const supabase = createSupabaseClient(authHeader);
+    const serviceClient = createServiceClient();
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User Invalid');
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
 
     const body = await req.json() as ChatRequest;
     const {
-      message, searchMode = 'fast', conversationId, documentId,
-      usePersonalCorpus = true, useProfAssistCorpus = true, useAI = false,
-      levels, subjects, documentTypes
+      message,
+      conversationId,
+      documentId,
+      usePersonalCorpus = true,
+      useProfAssistCorpus = true,
+      useAI = false,
+      levels,
+      subjects,
     } = body;
 
     const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
-    const activeDomain = detectDomainIntent(message);
-    const inferred = inferFiltersFromQuery(message);
-    const effectiveLevels = levels?.length ? levels : inferred.levels;
-    const effectiveSubjects = subjects?.length ? subjects : inferred.subjects;
+    let totalTokensUsed = 0;
 
-    const allowedDocsMap = await getAllowedDocuments(
-      serviceClient, user.id, documentId, usePersonalCorpus, useProfAssistCorpus,
-      { levels: effectiveLevels, subjects: effectiveSubjects, documentTypes }
-    );
-    const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
-    const allowedDocIdsSet = new Set(allowedDocIdsArr);
+    // Déterminer automatiquement si HyDE est nécessaire
+    const useHyDE = shouldUseHyDE(message);
+    console.log(`[rag-chat] Query: "${message.substring(0, 50)}..." | HyDE: ${useHyDE} | AI: ${useAI}`);
 
-    // CAS IA SEULE / AUCUN DOC
-    if (allowedDocIdsArr.length === 0) {
+    // ========== STEP 1: Get allowed documents ==========
+    const docsMap = await getAllowedDocuments(serviceClient, user.id, {
+      documentId,
+      usePersonalCorpus,
+      useProfAssistCorpus,
+      levels,
+      subjects,
+    });
+
+    const allowedDocIds = Array.from(docsMap.keys());
+
+    // ========== CAS: Aucun document, IA seule ==========
+    if (allowedDocIds.length === 0) {
       if (useAI) {
         let convId = conversationId;
         if (!convId) {
-          const { data } = await serviceClient.from('rag_conversations').insert({ user_id: user.id }).select('id').single();
+          const { data } = await serviceClient
+            .from('rag_conversations')
+            .insert({ user_id: user.id })
+            .select('id')
+            .single();
           convId = data?.id;
         }
-        const { data: hist } = await serviceClient.from('rag_messages')
+
+        const { data: history } = await serviceClient
+          .from('rag_messages')
           .select('role, content')
-          .eq('conversation_id', convId).order('created_at', { ascending: true }).limit(6);
-        await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'user', content: message });
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: true })
+          .limit(CONFIG.maxHistoryMessages);
+
+        await serviceClient.from('rag_messages').insert({
+          conversation_id: convId,
+          role: 'user',
+          content: message,
+        });
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             model: CONFIG.chatModel,
             messages: [
-              { role: 'system', content: 'Tu es un assistant pédagogique. Réponds selon tes connaissances générales en précisant que cela ne vient pas de documents officiels.' },
-              ...(hist || []).map((m: any) => ({ role: m.role, content: m.content })),
-              { role: 'user', content: message }
+              {
+                role: 'system',
+                content: 'Tu es un assistant pédagogique. Réponds selon tes connaissances générales. Précise que ta réponse ne provient pas de documents officiels.',
+              },
+              ...(history || []).map((m: any) => ({ role: m.role, content: m.content })),
+              { role: 'user', content: message },
             ],
             temperature: 0.4,
           }),
         });
-        
+
         const data = await response.json();
-        const answer = data.choices[0]?.message?.content || 'Erreur IA.';
+        const answer = data.choices?.[0]?.message?.content || 'Erreur.';
         const tokensUsed = data.usage?.total_tokens || 0;
 
-        await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources: [] });
+        await serviceClient.from('rag_messages').insert({
+          conversation_id: convId,
+          role: 'assistant',
+          content: answer,
+          sources: [],
+        });
+
         await deductTokens(serviceClient, user.id, tokensUsed);
-        return new Response(JSON.stringify({ answer, sources: [], conversationId: convId, tokensUsed, mode: 'ai_generalist' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+        return new Response(
+          JSON.stringify({
+            answer,
+            sources: [],
+            conversationId: convId,
+            tokensUsed,
+            mode: 'ai_only',
+          }),
+          { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
       }
-      return new Response(JSON.stringify({ answer: "Aucun document accessible. Activez l'IA pour une réponse générique.", sources: [], tokensUsed: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+      return new Response(
+        JSON.stringify({
+          answer: "Aucun document accessible. Activez un corpus ou l'option IA.",
+          sources: [],
+          tokensUsed: 0,
+        }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // RECHERCHE (LOGIQUE V4)
-    let queries = [message];
-    let totalTokens = 0;
-
-    if (searchMode === 'precise') {
-       const rw = await rewriteQueryForSearch(message, OPENAI_API_KEY);
-       queries = rw.queries; 
-       totalTokens += rw.tokensUsed;
+    // ========== STEP 2: Query Processing (HyDE automatique) ==========
+    let queryForEmbedding = message;
+    
+    if (useHyDE) {
+      const hydeResult = await generateHyDE(message, OPENAI_API_KEY);
+      queryForEmbedding = hydeResult.hydeText;
+      totalTokensUsed += hydeResult.tokensUsed;
     }
 
-    const embeddingPromise = createEmbedding(queries[0], OPENAI_API_KEY);
-    const keyTerms = extractKeyTerms(queries.join(' ')); // Utilise l'extracteur V4 robuste
+    const searchTerms = extractSearchTerms(message);
+    console.log(`[FTS] Search terms: "${searchTerms}"`);
 
-    const [embedding, keywordResults, domainSpecificResults] = await Promise.all([
-        embeddingPromise,
-        searchByKeywords(serviceClient, allowedDocIdsArr, keyTerms), // Recherche Mots-clés V4
-        activeDomain ? 
-            serviceClient.from('rag_chunks')
-            .select('id, document_id, chunk_index, content, scope')
-            .in('document_id', allowedDocIdsArr.filter(id => isDomainDocument(allowedDocsMap.get(id)?.title || '', activeDomain!)))
-            .limit(10)
-            .then((res: any) => (res.data || []).map((c: any) => ({
-                id: c.id, documentId: c.document_id, documentTitle: '', chunkIndex: c.chunk_index,
-                content: c.content, score: 1.0, scope: c.scope, sourceType: 'domain'
-            })))
-            : Promise.resolve([])
+    // ========== STEP 3: Hybrid Retrieval (parallel) ==========
+    const [embedding, ftsResults] = await Promise.all([
+      createEmbedding(queryForEmbedding, OPENAI_API_KEY),
+      searchByFTS(serviceClient, searchTerms, allowedDocIds),
     ]);
 
-    const vectorResults = await searchByVector(serviceClient, user.id, embedding, CONFIG.defaultTopK, allowedDocIdsSet);
+    const vectorResults = await searchByVector(serviceClient, user.id, embedding, allowedDocIds);
 
-    // FUSION + BOOST (LOGIQUE V4 - CRUCIAL)
-    let candidates = fuseResultsWithBoost(vectorResults, keywordResults, domainSpecificResults, allowedDocsMap, keyTerms);
+    console.log(`[Retrieval] Vector: ${vectorResults.length} | FTS: ${ftsResults.length}`);
 
-    // Bonus Doc Reference
-    candidates = candidates.map(c => {
-        let boost = 1;
-        if (isReferenceDocument(c.documentTitle)) boost += 0.05;
-        if (activeDomain && isDomainDocument(c.documentTitle, activeDomain)) boost += activeDomain.bonus;
-        return { ...c, score: Math.min(0.99, c.score * boost) };
-    }); 
-    // On garde l'ordre défini par le Boost RRF, on ne re-trie pas par score simple.
+    // ========== STEP 4: RRF Fusion ==========
+    const fusedResults = fuseWithRRF(vectorResults, ftsResults, docsMap);
+    console.log(`[Fusion] ${fusedResults.length} unique chunks after RRF`);
 
-    // On garde les N meilleurs chunks pour le contexte
-    const finalChunks = candidates.slice(0, CONFIG.finalChunkCount);
+    // ========== STEP 5: Reranking ==========
+    const rerankResults = await rerankWithCohere(
+      message,
+      fusedResults.slice(0, 30),
+      CONFIG.rerankTopK
+    );
 
-    console.log(`[rag-chat] Top Doc: ${finalChunks[0]?.documentTitle}`);
+    console.log(`[Rerank] Top result: "${rerankResults[0]?.chunk.documentTitle}" (score: ${rerankResults[0]?.relevanceScore.toFixed(3)})`);
 
+    // ========== STEP 6: Conversation Management ==========
     let convId = conversationId;
     if (!convId) {
-      const { data } = await serviceClient.from('rag_conversations').insert({ user_id: user.id }).select('id').single();
+      const { data } = await serviceClient
+        .from('rag_conversations')
+        .insert({ user_id: user.id })
+        .select('id')
+        .single();
       convId = data?.id;
     }
 
-    const { data: hist } = await serviceClient.from('rag_messages')
-        .select('role, content')
-        .eq('conversation_id', convId).order('created_at', { ascending: true }).limit(6);
+    const { data: history } = await serviceClient
+      .from('rag_messages')
+      .select('role, content')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: true })
+      .limit(CONFIG.maxHistoryMessages);
 
-    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'user', content: message });
+    await serviceClient.from('rag_messages').insert({
+      conversation_id: convId,
+      role: 'user',
+      content: message,
+    });
 
-    // GÉNÉRATION + FILTRAGE CITATIONS (LOGIQUE V6)
-    const { answer, usedSources, tokens } = await generateResponseAndFilterSources(
-        message, finalChunks, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY
+    // ========== STEP 7: Response Generation ==========
+    const { answer, tokensUsed } = await generateResponse(
+      message,
+      rerankResults,
+      effectiveMode,
+      history || [],
+      OPENAI_API_KEY
     );
-    totalTokens += tokens;
 
-    // PREPARATION DES SOURCES POUR L'UI (SCORE MASQUÉ)
-    const sourcesForUI = usedSources.map(c => ({
-      documentId: c.documentId, documentTitle: c.documentTitle, chunkId: c.id, chunkIndex: c.chunkIndex,
-      excerpt: c.content.substring(0, CONFIG.excerptLength), 
-      score: null, // ON MASQUE LE SCORE
-      scope: c.scope
+    totalTokensUsed += tokensUsed;
+
+    // Format sources for response (index 1-based pour correspondre aux citations)
+    const sources = rerankResults.map((r, index) => ({
+      sourceIndex: index + 1, // [Source 1], [Source 2], etc.
+      documentId: r.chunk.documentId,
+      documentTitle: r.chunk.documentTitle,
+      chunkId: r.chunk.id,
+      chunkIndex: r.chunk.chunkIndex,
+      excerpt: r.chunk.content.substring(0, CONFIG.excerptLength),
     }));
 
-    await serviceClient.from('rag_messages').insert({ conversation_id: convId, role: 'assistant', content: answer, sources: sourcesForUI });
-    await deductTokens(serviceClient, user.id, totalTokens);
+    await serviceClient.from('rag_messages').insert({
+      conversation_id: convId,
+      role: 'assistant',
+      content: answer,
+      sources,
+    });
 
-    return new Response(JSON.stringify({
-      answer, sources: sourcesForUI, conversationId: convId, tokensUsed: totalTokens
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    await deductTokens(serviceClient, user.id, totalTokensUsed);
 
-  } catch (e: any) {
-    console.error(e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const duration = Date.now() - startTime;
+    console.log(`[rag-chat] Completed in ${duration}ms | Tokens: ${totalTokensUsed}`);
+
+    return new Response(
+      JSON.stringify({
+        answer,
+        sources,
+        conversationId: convId,
+        tokensUsed: totalTokensUsed,
+        mode: effectiveMode,
+      }),
+      { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('[rag-chat] Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      }
+    );
   }
 }
 

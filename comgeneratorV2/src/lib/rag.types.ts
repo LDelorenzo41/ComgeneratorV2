@@ -2,10 +2,9 @@
 // Types pour le module RAG Chatbot
 
 export type DocumentStatus = 'uploaded' | 'processing' | 'ready' | 'error';
-export type ChatMode = 'corpus_only' | 'corpus_plus_ai';
+export type ChatMode = 'corpus_only' | 'corpus_plus_ai' | 'ai_only';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type DocumentScope = 'global' | 'user';
-export type SearchMode = 'fast' | 'precise';
 
 // Options de sélection des corpus (switches)
 export interface CorpusSelection {
@@ -21,13 +20,13 @@ export const DEFAULT_CORPUS_SELECTION: CorpusSelection = {
   useAI: false,
 };
 
-// 🆕 Filtres optionnels pour la recherche RAG
+// Filtres optionnels pour la recherche RAG
 export interface SearchFilters {
   levels?: string[];
   subjects?: string[];
 }
 
-// 🆕 Listes de valeurs suggérées (non exhaustives)
+// Listes de valeurs suggérées (non exhaustives)
 export const AVAILABLE_LEVELS = [
   'cycle 1',
   'cycle 2',
@@ -55,7 +54,7 @@ export const AVAILABLE_SUBJECTS = [
   'EMC',
 ] as const;
 
-// 🆕 Types de documents
+// Types de documents
 export const DOCUMENT_TYPES = {
   programme: { label: 'Programme', icon: '📋', color: 'blue' },
   ressource: { label: 'Ressource', icon: '📖', color: 'green' },
@@ -69,7 +68,7 @@ export const DOCUMENT_TYPES = {
 
 export type DocumentType = keyof typeof DOCUMENT_TYPES;
 
-// 🆕 Labels des niveaux pour affichage
+// Labels des niveaux pour affichage
 export const LEVEL_LABELS: Record<string, string> = {
   maternelle: 'Maternelle',
   cycle_1: 'Cycle 1',
@@ -96,7 +95,7 @@ export interface RagDocument {
   scope: DocumentScope;
   created_at: string;
   updated_at: string;
-  // 🆕 Métadonnées IA
+  // Métadonnées IA
   summary?: string | null;
   keywords?: string[] | null;
   levels?: string[] | null;
@@ -106,12 +105,13 @@ export interface RagDocument {
 }
 
 export interface SourceChunk {
+  sourceIndex?: number;
   documentId: string;
   documentTitle: string;
   chunkId: string;
   chunkIndex: number;
   excerpt: string;
-  score: number;
+  score?: number;
   scope?: DocumentScope;
 }
 
@@ -122,6 +122,7 @@ export interface ChatUIMessage {
   sources?: SourceChunk[];
   timestamp: Date;
   isLoading?: boolean;
+  mode?: ChatMode; // 🆕 Pour savoir si l'IA a contribué
 }
 
 export interface ChatResponse {
@@ -178,6 +179,7 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
 
 
 

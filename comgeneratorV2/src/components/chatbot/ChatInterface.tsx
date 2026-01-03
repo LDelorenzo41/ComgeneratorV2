@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Send, Loader2, Trash2, User, Building2, Sparkles, Zap, Target, Info, 
+  Send, Loader2, Trash2, User, Building2, Sparkles, Info, 
   AlertTriangle, ChevronDown, ChevronUp, Filter, X, GraduationCap, BookOpen
 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { sendChatMessage } from '../../lib/ragApi';
 import type { ChatUIMessage, RagDocument, CorpusSelection, SearchFilters } from '../../lib/rag.types';
 import { DEFAULT_CORPUS_SELECTION, AVAILABLE_LEVELS, AVAILABLE_SUBJECTS } from '../../lib/rag.types';
-
-type SearchMode = 'fast' | 'precise';
 
 interface ChatInterfaceProps {
   documents: RagDocument[];
@@ -49,7 +47,7 @@ const ToggleSwitch: React.FC<{
   </button>
 );
 
-// 🆕 Composant Tag cliquable pour les filtres
+// Composant Tag cliquable pour les filtres
 const FilterTag: React.FC<{
   value: string;
   selected: boolean;
@@ -73,14 +71,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // État pour les 3 switches
   const [corpusSelection, setCorpusSelection] = useState<CorpusSelection>(DEFAULT_CORPUS_SELECTION);
-  
-  const [searchMode, setSearchMode] = useState<SearchMode>('precise');
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [showSearchModeInfo, setShowSearchModeInfo] = useState(false);
 
-  // 🆕 État pour les filtres avancés
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
@@ -88,30 +81,25 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Filtrer les documents selon les switches
   const readyDocuments = documents.filter((d) => d.status === 'ready');
   const hasPersonalDocs = readyDocuments.some(d => d.scope === 'user');
   const hasProfAssistDocs = readyDocuments.some(d => d.scope === 'global');
   
-  // Vérifier si au moins une source est sélectionnée
   const hasActiveSource = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus || corpusSelection.useAI;
   const hasCorpusSelected = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus;
   
-  // Vérifier si les corpus sélectionnés ont des documents
   const canSearch = (
     (corpusSelection.usePersonalCorpus && hasPersonalDocs) ||
     (corpusSelection.useProfAssistCorpus && hasProfAssistDocs) ||
     (corpusSelection.useAI && !hasCorpusSelected)
   );
 
-  // 🆕 Compter les filtres actifs
   const activeFiltersCount = selectedLevels.length + selectedSubjects.length;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 🆕 Toggle pour les niveaux
   const toggleLevel = (level: string) => {
     setSelectedLevels(prev => 
       prev.includes(level) 
@@ -120,7 +108,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     );
   };
 
-  // 🆕 Toggle pour les disciplines
   const toggleSubject = (subject: string) => {
     setSelectedSubjects(prev => 
       prev.includes(subject) 
@@ -129,7 +116,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     );
   };
 
-  // 🆕 Réinitialiser les filtres
   const clearFilters = () => {
     setSelectedLevels([]);
     setSelectedSubjects([]);
@@ -167,7 +153,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     setIsLoading(true);
 
     try {
-      // 🆕 Construire les filtres si définis
       const filters: SearchFilters = {};
       if (selectedLevels.length > 0) {
         filters.levels = selectedLevels;
@@ -179,10 +164,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
       const response = await sendChatMessage({
         message: userMessage.content,
         corpusSelection,
-        searchMode,
         conversationId: conversationId || undefined,
-        topK: searchMode === 'precise' ? 8 : 5,
-        // 🆕 Passer les filtres uniquement s'ils existent
         filters: Object.keys(filters).length > 0 ? filters : undefined,
       });
 
@@ -193,7 +175,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === loadingMessage.id
-            ? { ...msg, content: response.answer, sources: response.sources, isLoading: false }
+            ? { 
+                ...msg, 
+                content: response.answer, 
+                sources: response.sources, 
+                isLoading: false,
+                mode: response.mode, // 🆕 Passer le mode
+              }
             : msg
         )
       );
@@ -234,7 +222,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
-        {/* Ligne 1 : Switches de sélection des corpus */}
+        {/* Switches de sélection des corpus */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Sources :</span>
@@ -286,72 +274,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           ) : corpusSelection.useAI && !hasCorpusSelected ? (
             'Réponses basées uniquement sur les connaissances de l\'IA.'
           ) : corpusSelection.useAI ? (
-            'Réponses basées sur les corpus sélectionnés + compléments IA signalés.'
+            'Réponses basées sur les corpus sélectionnés + compléments IA si nécessaire.'
           ) : (
             'Réponses basées uniquement sur les corpus sélectionnés.'
           )}
         </p>
 
-        {/* Ligne 2 : Mode de recherche */}
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Recherche :</span>
-              <button
-                onClick={() => setSearchMode('fast')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  searchMode === 'fast'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 ring-1 ring-green-300 dark:ring-green-700'
-                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                Rapide
-              </button>
-              <button
-                onClick={() => setSearchMode('precise')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  searchMode === 'precise'
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-300 dark:ring-amber-700'
-                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Target className="w-3.5 h-3.5" />
-                Précis
-              </button>
-              <button
-                onClick={() => setShowSearchModeInfo(!showSearchModeInfo)}
-                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
-              >
-                <Info className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {searchMode === 'fast' ? '~1000-2000' : '~3000-5000'} tokens/question
-            </span>
-          </div>
-          
-          {showSearchModeInfo && (
-            <div className="mt-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-xs space-y-1.5">
-              <div className="flex items-start gap-2">
-                <Zap className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium text-green-700 dark:text-green-400">Rapide</span>
-                  <span className="text-gray-600 dark:text-gray-300"> - Recherche directe. Idéal pour questions simples.</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Target className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium text-amber-700 dark:text-amber-400">Précis</span>
-                  <span className="text-gray-600 dark:text-gray-300"> - Recherche approfondie. Recommandé pour questions complexes.</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 🆕 Ligne 3 : Filtres avancés (repliables) */}
+        {/* Filtres avancés */}
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -373,7 +302,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 
           {showFilters && (
             <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
-              {/* Niveaux */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
@@ -392,7 +320,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
                 </div>
               </div>
 
-              {/* Disciplines */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
@@ -411,7 +338,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
                 </div>
               </div>
 
-              {/* Bouton réinitialiser */}
               {activeFiltersCount > 0 && (
                 <button
                   onClick={clearFilters}
@@ -423,7 +349,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               )}
 
               <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                💡 Ces filtres aident à cibler la recherche. Le chatbot fonctionne parfaitement sans.
+                Ces filtres aident à cibler la recherche. Le chatbot fonctionne parfaitement sans.
               </p>
             </div>
           )}
@@ -431,9 +357,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
       </div>
 
       {/* Messages area */}
-    
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
-
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mb-4">
@@ -468,7 +392,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 
       {/* Input area */}
       <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
-        {/* 🆕 Afficher les filtres actifs au-dessus de l'input */}
         {activeFiltersCount > 0 && (
           <div className="mb-2 flex items-center gap-2 flex-wrap">
             <span className="text-xs text-gray-400">Filtres :</span>
@@ -517,6 +440,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 };
 
 export default ChatInterface;
+
+
 
 
 
