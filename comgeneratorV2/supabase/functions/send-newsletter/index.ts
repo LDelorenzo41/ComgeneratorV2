@@ -36,6 +36,57 @@ const getUnsubscribeFooter = (userId: string, baseUrl: string) => `
 </p>
 `;
 
+// Fonction utilitaire pour attendre
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Fonction d'envoi avec retry et backoff exponentiel
+async function sendEmailWithRetry(
+  resend: Resend,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+  maxRetries: number = 3
+): Promise<{ success: boolean; error?: string }> {
+  let lastError: string = '';
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const { error: sendError } = await resend.emails.send({
+        from,
+        to,
+        subject,
+        html,
+      });
+
+      if (sendError) {
+        // Si c'est une erreur de rate limit, on retry avec backoff
+        if (sendError.statusCode === 429 || sendError.name === 'rate_limit_exceeded') {
+          const waitTime = Math.pow(2, attempt + 1) * 500; // 1s, 2s, 4s
+          console.log(`⏳ Rate limit hit for ${to}, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+          await sleep(waitTime);
+          lastError = sendError.message;
+          continue;
+        }
+        // Autre erreur, on ne retry pas
+        return { success: false, error: sendError.message };
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      lastError = err.message;
+      // En cas d'erreur réseau, on retry
+      if (attempt < maxRetries - 1) {
+        const waitTime = Math.pow(2, attempt + 1) * 500;
+        console.log(`⏳ Error for ${to}, waiting ${waitTime}ms before retry ${attempt + 1}/${maxRetries}`);
+        await sleep(waitTime);
+      }
+    }
+  }
+
+  return { success: false, error: lastError };
+}
+
 Deno.serve(async (req: Request) => {
   // Gestion CORS
   if (req.method === 'OPTIONS') {
@@ -186,39 +237,50 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Envoyer les emails via Resend
+    // Envoyer les emails via Resend avec rate limiting respecté
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
+    const fromEmail = 'ProfAssist <contact-profassist@teachtech.fr>';
 
-    for (const recipient of recipients) {
+    console.log(`📧 Starting to send ${recipients.length} emails (with 550ms delay between each)...`);
+
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i];
+      
       try {
         // Construire le HTML avec le footer de désabonnement
         const finalHtml = html + getUnsubscribeFooter(recipient.user_id, appUrl);
 
-        const { error: sendError } = await resend.emails.send({
-          from: 'ProfAssist <contact-profassist@teachtech.fr>',
-          to: recipient.email,
-          subject: subject,
-          html: finalHtml,
-        });
+        // Envoyer avec retry automatique en cas de rate limit
+        const result = await sendEmailWithRetry(
+          resend,
+          fromEmail,
+          recipient.email,
+          subject,
+          finalHtml,
+          3 // max 3 tentatives
+        );
 
-        if (sendError) {
-          console.error(`Failed to send to ${recipient.email}:`, sendError);
-          errorCount++;
-          errors.push(`${recipient.email}: ${sendError.message}`);
-        } else {
+        if (result.success) {
           successCount++;
-          console.log(`✅ Sent to ${recipient.email}`);
+          console.log(`✅ [${i + 1}/${recipients.length}] Sent to ${recipient.email}`);
+        } else {
+          errorCount++;
+          errors.push(`${recipient.email}: ${result.error}`);
+          console.error(`❌ [${i + 1}/${recipients.length}] Failed: ${recipient.email} - ${result.error}`);
         }
 
-        // Pause pour respecter les rate limits de Resend (10/sec en free tier)
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-      } catch (err) {
-        console.error(`Error sending to ${recipient.email}:`, err);
+      } catch (err: any) {
+        console.error(`❌ [${i + 1}/${recipients.length}] Error sending to ${recipient.email}:`, err);
         errorCount++;
         errors.push(`${recipient.email}: ${err.message}`);
+      }
+
+      // Pause de 550ms entre chaque envoi pour respecter le rate limit de 2/sec
+      // (500ms minimum + 50ms de marge de sécurité)
+      if (i < recipients.length - 1) {
+        await sleep(550);
       }
     }
 
@@ -249,13 +311,13 @@ Deno.serve(async (req: Request) => {
         : `Newsletter envoyée à ${successCount} destinataires`,
       recipientCount: successCount,
       errorCount,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Limiter à 10 erreurs
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Newsletter error:', error);
     return new Response(JSON.stringify({ 
       error: error.message || 'Erreur lors de l\'envoi de la newsletter' 
@@ -265,3 +327,4 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+

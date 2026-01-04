@@ -39,6 +39,9 @@ import { ChatbotPage } from './pages/ChatbotPage';
 import { AdminNewsletterPage } from './pages/AdminNewsletterPage';
 import { UnsubscribePage } from './pages/UnsubscribePage';
 
+// Import de la page Admin Campagnes
+import { AdminCampaignsPage } from './pages/AdminCampaignsPage';
+
 // Import des composants cookies
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
@@ -223,6 +226,13 @@ function App() {
                     <AdminNewsletterPage />
                   </EmailConfirmationGuard>
                 } />
+
+                {/* Route admin campagnes promo */}
+                <Route path="/admin/campaigns" element={
+                  <EmailConfirmationGuard>
+                    <AdminCampaignsPage />
+                  </EmailConfirmationGuard>
+                } />
                 
                 {/* Chatbot - uniquement si activé */}
                 {FEATURES.CHATBOT_ENABLED && (
@@ -264,6 +274,7 @@ function App() {
 }
 
 export default App;
+
 
 
 

@@ -375,6 +375,92 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_campaigns: {
+        Row: {
+          id: string
+          code: string
+          description: string
+          tokens_amount: number
+          max_redemptions: number | null
+          current_redemptions: number
+          expires_at: string
+          is_active: boolean
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          code: string
+          description: string
+          tokens_amount: number
+          max_redemptions?: number | null
+          current_redemptions?: number
+          expires_at: string
+          is_active?: boolean
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          code?: string
+          description?: string
+          tokens_amount?: number
+          max_redemptions?: number | null
+          current_redemptions?: number
+          expires_at?: string
+          is_active?: boolean
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      promo_redemptions: {
+        Row: {
+          id: string
+          campaign_id: string
+          user_id: string
+          tokens_received: number
+          redeemed_at: string
+        }
+        Insert: {
+          id?: string
+          campaign_id: string
+          user_id: string
+          tokens_received: number
+          redeemed_at?: string
+        }
+        Update: {
+          id?: string
+          campaign_id?: string
+          user_id?: string
+          tokens_received?: number
+          redeemed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_redemptions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "promo_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promo_redemptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       rss_feeds: {
         Row: {
           category: string | null
@@ -534,6 +620,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      redeem_promo_code: {
+        Args: { p_code: string }
+        Returns: Json
+      }
       unsubscribe_newsletter: {
         Args: { user_token: string }
         Returns: Json
@@ -670,4 +760,5 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
 

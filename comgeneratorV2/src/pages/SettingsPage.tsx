@@ -1,6 +1,6 @@
 // src/pages/SettingsPage.tsx
-import React, { useState } from 'react';
-import { Settings, User, Shield, AlertTriangle, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +10,75 @@ export function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, signOut } = useAuthStore();
+
+  // États pour les préférences newsletter
+  const [newsletterSubscription, setNewsletterSubscription] = useState<boolean | null>(null);
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [preferencesMessage, setPreferencesMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Charger les préférences au montage
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user) return;
+      
+      setIsLoadingPreferences(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('newsletter_subscription')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+        setNewsletterSubscription(data?.newsletter_subscription ?? false);
+      } catch (err) {
+        console.error('Erreur chargement préférences:', err);
+        setNewsletterSubscription(false);
+      } finally {
+        setIsLoadingPreferences(false);
+      }
+    };
+
+    loadPreferences();
+  }, [user]);
+
+  // Sauvegarder les préférences newsletter
+  const handleNewsletterToggle = async () => {
+    if (!user || isSavingPreferences) return;
+
+    const newValue = !newsletterSubscription;
+    setIsSavingPreferences(true);
+    setPreferencesMessage(null);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ newsletter_subscription: newValue })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setNewsletterSubscription(newValue);
+      setPreferencesMessage({
+        type: 'success',
+        text: newValue 
+          ? 'Vous êtes maintenant abonné à la newsletter !' 
+          : 'Vous êtes désabonné de la newsletter.'
+      });
+
+      // Effacer le message après 3 secondes
+      setTimeout(() => setPreferencesMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Erreur sauvegarde préférences:', err);
+      setPreferencesMessage({
+        type: 'error',
+        text: 'Erreur lors de la sauvegarde. Veuillez réessayer.'
+      });
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     if (!user || confirmText !== 'SUPPRIMER') {
@@ -94,6 +163,81 @@ export function SettingsPage() {
             </div>
           </div>
 
+          {/* Préférences de communication */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center mr-4">
+                <Bell className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Préférences de communication</h3>
+                <p className="text-gray-600 dark:text-gray-300">Gérez les emails que vous recevez</p>
+              </div>
+            </div>
+
+            {/* Message de feedback */}
+            {preferencesMessage && (
+              <div className={`mb-6 p-4 rounded-lg flex items-center ${
+                preferencesMessage.type === 'success' 
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+              }`}>
+                <span className={preferencesMessage.type === 'success' 
+                  ? 'text-green-800 dark:text-green-300' 
+                  : 'text-red-800 dark:text-red-300'
+                }>
+                  {preferencesMessage.text}
+                </span>
+              </div>
+            )}
+
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Mail className="w-5 h-5 text-purple-600 dark:text-purple-400 mr-3" />
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Newsletter ProfAssist</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Recevez nos actualités, astuces et offres spéciales
+                    </p>
+                  </div>
+                </div>
+                
+                {isLoadingPreferences ? (
+                  <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+                ) : (
+                  <button
+                    onClick={handleNewsletterToggle}
+                    disabled={isSavingPreferences}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 ${
+                      newsletterSubscription 
+                        ? 'bg-purple-600' 
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                        newsletterSubscription ? 'translate-x-8' : 'translate-x-1'
+                      }`}
+                    />
+                    {isSavingPreferences && (
+                      <Loader2 className="absolute inset-0 m-auto w-4 h-4 text-white animate-spin" />
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {newsletterSubscription 
+                    ? '✅ Vous êtes abonné à la newsletter. Vous pouvez vous désabonner à tout moment.'
+                    : '📭 Vous n\'êtes pas abonné à la newsletter. Activez pour recevoir nos actualités.'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Sécurité et confidentialité */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
             <div className="flex items-center mb-6">
@@ -108,13 +252,13 @@ export function SettingsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <h4 className="font-medium text-green-800 dark:text-green-400 mb-2">🔒 Données protégées</h4>
+                <h4 className="font-medium text-green-800 dark:text-green-400 mb-2">Données protégées</h4>
                 <p className="text-green-700 dark:text-green-300 text-sm">
                   Vos données sont chiffrées et hébergées sur des serveurs sécurisés conformes au RGPD.
                 </p>
               </div>
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">📋 Vos droits</h4>
+                <h4 className="font-medium text-blue-800 dark:text-blue-400 mb-2">Vos droits</h4>
                 <p className="text-blue-700 dark:text-blue-300 text-sm">
                   Accès, rectification, portabilité et suppression de vos données personnelles.
                 </p>
@@ -123,7 +267,7 @@ export function SettingsPage() {
 
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-gray-700 dark:text-gray-300 text-sm">
-                💡 Pour exercer vos droits RGPD ou toute question sur vos données, contactez-nous à{' '}
+                Pour exercer vos droits RGPD ou toute question sur vos données, contactez-nous à{' '}
                 <a href="mailto:contact-profassist@teachtech.fr" className="text-blue-600 dark:text-blue-400 hover:underline">
                   contact-profassist@teachtech.fr
                 </a>
@@ -151,7 +295,7 @@ export function SettingsPage() {
               
               <div className="space-y-4 mb-6">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                  <h5 className="font-medium text-gray-900 dark:text-white mb-2">⚠️ Cette action supprimera :</h5>
+                  <h5 className="font-medium text-gray-900 dark:text-white mb-2">Cette action supprimera :</h5>
                   <ul className="text-gray-700 dark:text-gray-300 space-y-1 text-sm">
                     <li>• Votre compte et toutes vos informations personnelles</li>
                     <li>• Tous vos tokens restants (aucun remboursement)</li>
@@ -163,7 +307,7 @@ export function SettingsPage() {
                 </div>
                 
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                  <h5 className="font-medium text-amber-800 dark:text-amber-400 mb-2">📋 Avant de supprimer :</h5>
+                  <h5 className="font-medium text-amber-800 dark:text-amber-400 mb-2">Avant de supprimer :</h5>
                   <ul className="text-amber-700 dark:text-amber-300 space-y-1 text-sm">
                     <li>• Sauvegardez vos contenus importants</li>
                     <li>• Cette action est définitive et irréversible</li>
@@ -200,7 +344,7 @@ export function SettingsPage() {
               <div className="space-y-4">
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                   <p className="text-red-800 dark:text-red-400 text-sm font-medium mb-2">
-                    ⚠️ Vous êtes sur le point de supprimer définitivement votre compte ProfAssist.
+                    Vous êtes sur le point de supprimer définitivement votre compte ProfAssist.
                   </p>
                   <p className="text-red-700 dark:text-red-300 text-sm">
                     Toutes vos données seront perdues et vous ne pourrez pas les récupérer.
