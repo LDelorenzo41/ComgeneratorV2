@@ -20,12 +20,15 @@ import {
   Mail,
   CheckSquare,
   Send,
-  Reply
+  Reply,
+  Gift,
+  Megaphone
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
 import { FEATURES } from '../../lib/features';
 import { checkIsAdmin } from '../../lib/ragApi';
+import { RedeemCodeModal } from '../modals/RedeemCodeModal';
 
 // Event pour notifier les changements de tokens
 export const tokenUpdateEvent = new EventTarget();
@@ -38,6 +41,7 @@ export function Header() {
   const tokenCount = useTokenBalance();
   const [isSettingsDropdownOpen, setIsSettingsDropdownOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [isRedeemModalOpen, setIsRedeemModalOpen] = React.useState(false);
   const location = useLocation();
 
   // États pour les 4 menus déroulants
@@ -426,11 +430,14 @@ export function Header() {
                     <Settings className="w-4 lg:w-5 h-4 lg:h-5" />
                   </button>
                   {isSettingsDropdownOpen && (
-                    <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-48">
+                    <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-52">
                       <div className="flex flex-col py-2">
-                        {/* Admin Newsletter */}
+                        {/* Admin sections */}
                         {isAdmin && (
                           <>
+                            <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-600">
+                              <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Administration</span>
+                            </div>
                             <Link
                               to="/admin/newsletter"
                               className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -439,9 +446,31 @@ export function Header() {
                               <Mail className="w-4 h-4 mr-2" />
                               Gestion Newsletter
                             </Link>
+                            <Link
+                              to="/admin/campaigns"
+                              className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => setIsSettingsDropdownOpen(false)}
+                            >
+                              <Megaphone className="w-4 h-4 mr-2" />
+                              Campagnes promo
+                            </Link>
                             <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                           </>
                         )}
+                        
+                        {/* J'ai un code - pour tous les users */}
+                        <button
+                          onClick={() => {
+                            setIsRedeemModalOpen(true);
+                            setIsSettingsDropdownOpen(false);
+                          }}
+                          className="flex items-center px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
+                        >
+                          <Gift className="w-4 h-4 mr-2" />
+                          J'ai un code !
+                        </button>
+                        
+                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                         
                         <Link
                           to="/settings"
@@ -701,17 +730,45 @@ export function Header() {
 
             {/* Section paramètres mobile */}
             <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
-              {/* Admin newsletter */}
+              {/* Admin sections - Mobile */}
               {isAdmin && (
-                <Link
-                  to="/admin/newsletter"
-                  className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Mail className="h-5 w-5 mr-2" />
-                  <span>Gestion Newsletter</span>
-                </Link>
+                <>
+                  <div className="px-3 py-2">
+                    <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Administration</span>
+                  </div>
+                  <Link
+                    to="/admin/newsletter"
+                    className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Mail className="h-5 w-5 mr-2" />
+                    <span>Gestion Newsletter</span>
+                  </Link>
+                  <Link
+                    to="/admin/campaigns"
+                    className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Megaphone className="h-5 w-5 mr-2" />
+                    <span>Campagnes promo</span>
+                  </Link>
+                  <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
+                </>
               )}
+              
+              {/* J'ai un code - Mobile */}
+              <button
+                onClick={() => {
+                  setIsRedeemModalOpen(true);
+                  setIsMenuOpen(false);
+                }}
+                className="flex items-center w-full px-3 py-2 text-base font-medium text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+              >
+                <Gift className="h-5 w-5 mr-2" />
+                <span>J'ai un code !</span>
+              </button>
+              
+              <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
               
               <Link
                 to="/settings"
@@ -745,9 +802,16 @@ export function Header() {
           </div>
         </div>
       )}
+
+      {/* Modal de rédemption de code promo */}
+      <RedeemCodeModal 
+        isOpen={isRedeemModalOpen} 
+        onClose={() => setIsRedeemModalOpen(false)} 
+      />
     </header>
   );
 }
+
 
 
 
