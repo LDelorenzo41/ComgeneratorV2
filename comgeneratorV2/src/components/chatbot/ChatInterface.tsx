@@ -1,18 +1,19 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, Trash2, User, Building2, Sparkles, Zap, Target, Info, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Send, Loader2, Trash2, User, Building2, Sparkles, Info, 
+  AlertTriangle, ChevronDown, ChevronUp, Filter, X, GraduationCap, BookOpen
+} from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { sendChatMessage } from '../../lib/ragApi';
-import type { ChatUIMessage, RagDocument, CorpusSelection } from '../../lib/rag.types';
-import { DEFAULT_CORPUS_SELECTION } from '../../lib/rag.types';
-
-type SearchMode = 'fast' | 'precise';
+import type { ChatUIMessage, RagDocument, CorpusSelection, SearchFilters } from '../../lib/rag.types';
+import { DEFAULT_CORPUS_SELECTION, AVAILABLE_LEVELS, AVAILABLE_SUBJECTS } from '../../lib/rag.types';
 
 interface ChatInterfaceProps {
   documents: RagDocument[];
   onNeedDocuments?: () => void;
 }
 
-// 🆕 Composant Switch réutilisable
+// Composant Switch réutilisable
 const ToggleSwitch: React.FC<{
   enabled: boolean;
   onChange: (enabled: boolean) => void;
@@ -46,46 +47,85 @@ const ToggleSwitch: React.FC<{
   </button>
 );
 
+// Composant Tag cliquable pour les filtres
+const FilterTag: React.FC<{
+  value: string;
+  selected: boolean;
+  onClick: () => void;
+}> = ({ value, selected, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`px-2 py-0.5 rounded-full text-xs font-medium transition-all ${
+      selected
+        ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 ring-1 ring-indigo-300 dark:ring-indigo-700'
+        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+    }`}
+  >
+    {value}
+    {selected && <X className="w-3 h-3 ml-1 inline" />}
+  </button>
+);
+
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedDocuments }) => {
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // 🆕 État pour les 3 switches
   const [corpusSelection, setCorpusSelection] = useState<CorpusSelection>(DEFAULT_CORPUS_SELECTION);
-  
-  const [searchMode, setSearchMode] = useState<SearchMode>('precise');
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [showSearchModeInfo, setShowSearchModeInfo] = useState(false);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 🆕 Filtrer les documents selon les switches
   const readyDocuments = documents.filter((d) => d.status === 'ready');
   const hasPersonalDocs = readyDocuments.some(d => d.scope === 'user');
   const hasProfAssistDocs = readyDocuments.some(d => d.scope === 'global');
   
-  // 🆕 Vérifier si au moins une source est sélectionnée
   const hasActiveSource = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus || corpusSelection.useAI;
   const hasCorpusSelected = corpusSelection.usePersonalCorpus || corpusSelection.useProfAssistCorpus;
   
-  // 🆕 Vérifier si les corpus sélectionnés ont des documents
   const canSearch = (
     (corpusSelection.usePersonalCorpus && hasPersonalDocs) ||
     (corpusSelection.useProfAssistCorpus && hasProfAssistDocs) ||
-    (corpusSelection.useAI && !hasCorpusSelected) // IA seule
+    (corpusSelection.useAI && !hasCorpusSelected)
   );
+
+  const activeFiltersCount = selectedLevels.length + selectedSubjects.length;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const toggleLevel = (level: string) => {
+    setSelectedLevels(prev => 
+      prev.includes(level) 
+        ? prev.filter(l => l !== level)
+        : [...prev, level]
+    );
+  };
+
+  const toggleSubject = (subject: string) => {
+    setSelectedSubjects(prev => 
+      prev.includes(subject) 
+        ? prev.filter(s => s !== subject)
+        : [...prev, subject]
+    );
+  };
+
+  const clearFilters = () => {
+    setSelectedLevels([]);
+    setSelectedSubjects([]);
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
     if (!hasActiveSource) {
-      return; // Pas de source active
+      return;
     }
 
     if (hasCorpusSelected && !canSearch) {
@@ -113,12 +153,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     setIsLoading(true);
 
     try {
+      const filters: SearchFilters = {};
+      if (selectedLevels.length > 0) {
+        filters.levels = selectedLevels;
+      }
+      if (selectedSubjects.length > 0) {
+        filters.subjects = selectedSubjects;
+      }
+
       const response = await sendChatMessage({
         message: userMessage.content,
-        corpusSelection,  // 🆕 Passer les switches
-        searchMode,
+        corpusSelection,
         conversationId: conversationId || undefined,
-        topK: searchMode === 'precise' ? 8 : 5,
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
       });
 
       if (!conversationId) {
@@ -128,7 +175,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === loadingMessage.id
-            ? { ...msg, content: response.answer, sources: response.sources, isLoading: false }
+            ? { 
+                ...msg, 
+                content: response.answer, 
+                sources: response.sources, 
+                isLoading: false,
+                mode: response.mode,
+              }
             : msg
         )
       );
@@ -161,7 +214,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     }
   };
 
-  // 🆕 Handlers pour les switches
   const updateCorpusSelection = (key: keyof CorpusSelection, value: boolean) => {
     setCorpusSelection(prev => ({ ...prev, [key]: value }));
   };
@@ -170,12 +222,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 p-3">
-        {/* 🆕 Ligne 1 : Switches de sélection des corpus */}
+        {/* Switches de sélection des corpus */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Sources :</span>
             
-            {/* Switch Corpus Perso */}
             <ToggleSwitch
               enabled={corpusSelection.usePersonalCorpus}
               onChange={(v) => updateCorpusSelection('usePersonalCorpus', v)}
@@ -185,7 +236,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               disabled={!hasPersonalDocs}
             />
             
-            {/* Switch Corpus ProfAssist */}
             <ToggleSwitch
               enabled={corpusSelection.useProfAssistCorpus}
               onChange={(v) => updateCorpusSelection('useProfAssistCorpus', v)}
@@ -195,7 +245,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               disabled={!hasProfAssistDocs}
             />
             
-            {/* Switch IA */}
             <ToggleSwitch
               enabled={corpusSelection.useAI}
               onChange={(v) => updateCorpusSelection('useAI', v)}
@@ -215,7 +264,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           </button>
         </div>
 
-        {/* 🆕 Message d'explication contextuel */}
+        {/* Message d'explication contextuel */}
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {!hasActiveSource ? (
             <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
@@ -225,77 +274,90 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           ) : corpusSelection.useAI && !hasCorpusSelected ? (
             'Réponses basées uniquement sur les connaissances de l\'IA.'
           ) : corpusSelection.useAI ? (
-            'Réponses basées sur les corpus sélectionnés + compléments IA signalés.'
+            'Réponses basées sur les corpus sélectionnés + compléments IA si nécessaire.'
           ) : (
             'Réponses basées uniquement sur les corpus sélectionnés.'
           )}
         </p>
 
-        {/* Ligne 2 : Mode de recherche (Rapide / Précis) */}
+        {/* Filtres avancés */}
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Recherche :</span>
-              <button
-                onClick={() => setSearchMode('fast')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  searchMode === 'fast'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 ring-1 ring-green-300 dark:ring-green-700'
-                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-                title="Moins de tokens, réponses plus rapides"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                Rapide
-              </button>
-              <button
-                onClick={() => setSearchMode('precise')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  searchMode === 'precise'
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-300 dark:ring-amber-700'
-                    : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
-                }`}
-                title="Plus de tokens, meilleure précision pour questions complexes"
-              >
-                <Target className="w-3.5 h-3.5" />
-                Précis
-              </button>
-              <button
-                onClick={() => setShowSearchModeInfo(!showSearchModeInfo)}
-                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
-              >
-                <Info className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {searchMode === 'fast' ? '~1000-2000' : '~3000-5000'} tokens/question
-            </span>
-          </div>
-          
-          {/* Info box pour le mode de recherche */}
-          {showSearchModeInfo && (
-            <div className="mt-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-xs space-y-1.5">
-              <div className="flex items-start gap-2">
-                <Zap className="w-3.5 h-3.5 text-green-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium text-green-700 dark:text-green-400">Rapide</span>
-                  <span className="text-gray-600 dark:text-gray-300"> - Recherche directe. Idéal pour questions simples et économiser vos tokens.</span>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filtres avancés</span>
+            {activeFiltersCount > 0 && (
+              <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 rounded-full text-xs font-medium">
+                {activeFiltersCount}
+              </span>
+            )}
+            {showFilters ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {showFilters && (
+            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Niveau(x)</span>
+                  <span className="text-xs text-gray-400">(optionnel)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {AVAILABLE_LEVELS.map((level) => (
+                    <FilterTag
+                      key={level}
+                      value={level}
+                      selected={selectedLevels.includes(level)}
+                      onClick={() => toggleLevel(level)}
+                    />
+                  ))}
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Target className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="font-medium text-amber-700 dark:text-amber-400">Précis</span>
-                  <span className="text-gray-600 dark:text-gray-300"> - Recherche approfondie avec reformulation et reclassement. Recommandé pour questions complexes ou comparatives.</span>
+
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Discipline(s)</span>
+                  <span className="text-xs text-gray-400">(optionnel)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {AVAILABLE_SUBJECTS.map((subject) => (
+                    <FilterTag
+                      key={subject}
+                      value={subject}
+                      selected={selectedSubjects.includes(subject)}
+                      onClick={() => toggleSubject(subject)}
+                    />
+                  ))}
                 </div>
               </div>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 flex items-center gap-1 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Réinitialiser les filtres
+                </button>
+              )}
+
+              <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                Ces filtres aident à cibler la recherche. Le chatbot fonctionne parfaitement sans.
+              </p>
             </div>
           )}
         </div>
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center mb-4">
@@ -330,6 +392,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 
       {/* Input area */}
       <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
+        {activeFiltersCount > 0 && (
+          <div className="mb-2 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-400">Filtres :</span>
+            {selectedLevels.map(level => (
+              <span key={level} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 rounded-full text-xs">
+                {level}
+              </span>
+            ))}
+            {selectedSubjects.map(subject => (
+              <span key={subject} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 rounded-full text-xs">
+                {subject}
+              </span>
+            ))}
+          </div>
+        )}
+        
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -341,7 +419,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               disabled={isLoading || !hasActiveSource}
               rows={1}
               className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
+              style={{ minHeight: '48px', maxHeight: '160px' }}
             />
           </div>
           <button
@@ -360,6 +438,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     </div>
   );
 };
+
 export default ChatInterface;
+
+
+
+
 
 

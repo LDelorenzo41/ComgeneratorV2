@@ -1,111 +1,48 @@
 // supabase/functions/rag-chat/index.ts
-// VERSION "MULTI-DOMAINES" (V1 Intelligence + V2 Sécurité + Architecture Générique)
-// - Supporte: LANGUES (CECR), EPS, SCIENCES, HUMANITES (Configurable)
-// - Sécurité: Filtrage strict des documents autorisés
-// - Ranking: Hybride (Ne supprime pas les documents pertinents)
+// VERSION V5.1 "PRODUCTION SOTA"
+// - Hybrid Search (Vector + FTS)
+// - Cohere Reranking
+// - HyDE automatique (si query courte)
+// - RRF Fusion
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 declare const Deno: {
-  env: {
-    get(key: string): string | undefined;
-  };
+  env: { get(key: string): string | undefined };
   serve(handler: (req: Request) => Promise<Response>): void;
 };
 
 // ============================================================================
-// 1. CONFIGURATION DES DOMAINES MÉTIER (Le Cœur du Système)
+// CONFIGURATION
 // ============================================================================
 
-interface DomainConfig {
-  id: string;
-  name: string;
-  keywords: RegExp[];       // Regex pour détecter l'intention dans la question
-  docPatterns: string[];    // Mots-clés pour identifier les documents (titre)
-  bonus: number;            // Bonus de score
-  minDocs: number;          // Minimum de documents à garantir (Rescue)
-  promptRole: string;       // Rôle pour le prompt système
-}
-
-const DOMAINS: Record<string, DomainConfig> = {
-  LANGUES: {
-    id: 'LANGUES',
-    name: 'Langues Vivantes / CECR',
-    keywords: [
-      /\bcecr\b/i, /\bniveau\s*de\s*langue/i, /\b[a-c][1-2]\b/i, 
-      /\bcompétence\s*linguistique/i, /\blangue\s*vivante/i, /\blv[1-2]\b/i,
-      /\boral\s*(compréhension|production)/i, /\bécrit\s*(compréhension|production)/i
-    ],
-    docPatterns: ['cecr', 'cecrl', 'cadre européen', 'guide-langue', 'reperles'],
-    bonus: 0.25,
-    minDocs: 3,
-    promptRole: "Expert en didactique des langues et CECR"
-  },
-  EPS: {
-    id: 'EPS',
-    name: 'Éducation Physique et Sportive',
-    keywords: [
-      /\beps\b/i, /\béducation\s*physique/i, /\bchamp\s*d'apprentissage/i, 
-      /\bapsa\b/i, /\bmotricité/i, /\bperformance\s*sportive/i, /\bsport\b/i
-    ],
-    docPatterns: ['eps', 'éducation physique', 'sport', 'apsa', 'guide-eps'],
-    bonus: 0.20,
-    minDocs: 2,
-    promptRole: "Expert en pédagogie de l'EPS et motricité"
-  },
-  SCIENCES: {
-    id: 'SCIENCES',
-    name: 'Mathématiques et Sciences',
-    keywords: [
-      /\bmath[s]?\b/i, /\bmathématique/i, /\bgéométrie/i, /\balgèbre/i, 
-      /\bthéorème/i, /\bcalcul\b/i, /\bphysique\b/i, /\bchimie\b/i, /\bsvt\b/i
-    ],
-    docPatterns: ['math', 'science', 'physique', 'chimie'],
-    bonus: 0.15,
-    minDocs: 2,
-    promptRole: "Expert en didactique des sciences"
-  },
-  HUMANITES: {
-    id: 'HUMANITES',
-    name: 'Histoire-Géo et Français',
-    keywords: [
-      /\bhistoire\b/i, /\bgéographie\b/i, /\bemc\b/i, /\bfrançais\b/i, 
-      /\blittérature/i, /\bgrammaire/i, /\bchronologie/i
-    ],
-    docPatterns: ['histoire', 'géographie', 'français', 'littérature'],
-    bonus: 0.15,
-    minDocs: 2,
-    promptRole: "Expert en humanités et culture générale"
-  }
-};
-
 const CONFIG = {
-  // Recherche
-  defaultTopK: 8,
-  maxTopK: 15,
-  similarityThreshold: 0.28,
+  // Retrieval
+  vectorTopK: 30,
+  ftsTopK: 30,
+  rerankTopK: 8,
+  similarityThreshold: 0.25,
   
-  // Bonus générique (hors domaines)
-  referenceDocBonus: 0.10, // Bonus pour tout document "officiel" (Programme, Guide...)
-  
-  // Modèles
-  chatModel: 'gpt-4o-mini',
+  // Models
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  
-  // LLM Helpers
-  queryRewritingModel: 'gpt-4o-mini',
+  chatModel: 'gpt-4o-mini',
   hydeModel: 'gpt-4o-mini',
-  rerankingModel: 'gpt-4o-mini',
   
-  // Paramètres Re-ranking Hybride
-  rerankingChunkCount: 25,
-  rerankingContextLength: 1000,
-  finalChunkCount: 10,
+  // Cohere
+  cohereRerankModel: 'rerank-v3.5',
   
-  // Historique
-  maxHistoryMessages: 10,
-  excerptLength: 450,
+  // HyDE automatique
+  hydeAutoThreshold: 50, // Active HyDE si query < 50 caractères
+  
+  // Limits
+  maxHistoryMessages: 6,
+  excerptLength: 700,
+};
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 // ============================================================================
@@ -113,21 +50,18 @@ const CONFIG = {
 // ============================================================================
 
 type ChatMode = 'corpus_only' | 'corpus_plus_ai';
-type SearchMode = 'fast' | 'precise';
 
 interface ChatRequest {
   message: string;
-  mode: ChatMode;
-  searchMode?: SearchMode;
+  mode?: ChatMode;
   conversationId?: string;
   documentId?: string;
-  topK?: number;
-  // 🆕 Nouveaux paramètres pour la sélection des corpus
   usePersonalCorpus?: boolean;
   useProfAssistCorpus?: boolean;
   useAI?: boolean;
+  levels?: string[];
+  subjects?: string[];
 }
-
 
 interface DocumentInfo {
   id: string;
@@ -135,836 +69,745 @@ interface DocumentInfo {
   scope: string;
 }
 
-interface MatchedChunk {
+interface RetrievedChunk {
   id: string;
   documentId: string;
   documentTitle: string;
   chunkIndex: number;
   content: string;
   score: number;
-  scope?: 'global' | 'user';
-  rerankScore?: number;
-  llmRawScore?: number;
+  source: 'vector' | 'fts' | 'both';
 }
 
-interface SourceChunk {
-  documentId: string;
-  documentTitle: string;
-  chunkId: string;
-  chunkIndex: number;
-  excerpt: string;
-  score: number;
-  scope?: 'global' | 'user';
+interface RerankResult {
+  chunk: RetrievedChunk;
+  relevanceScore: number;
 }
 
 // ============================================================================
-// HELPERS - CORS & AUTH
+// CLIENTS
 // ============================================================================
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-async function createSupabaseClient(authHeader: string) {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
+function createSupabaseClient(authHeader: string) {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
 }
 
-async function createServiceClient() {
-  return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-}
-
-// ============================================================================
-// INTELLIGENCE MÉTIER & DÉTECTION
-// ============================================================================
-
-// 1. Détection du Domaine
-function detectDomainIntent(query: string): DomainConfig | null {
-  for (const domain of Object.values(DOMAINS)) {
-    if (domain.keywords.some(regex => regex.test(query))) {
-      console.log(`[rag-chat] Domain detected: ${domain.id}`);
-      return domain;
-    }
-  }
-  return null;
-}
-
-// 2. Identification Document <-> Domaine
-function isDomainDocument(docTitle: string, domain: DomainConfig): boolean {
-  const titleLower = docTitle.toLowerCase();
-  return domain.docPatterns.some(p => titleLower.includes(p));
-}
-
-// 3. Identification Document "Officiel" (Générique)
-function isReferenceDocument(title: string): boolean {
-  return /programme|guide|référentiel|officiel|accompagnement/i.test(title.toLowerCase());
-}
-
-// 4. Détection Comparative (V1 Logic)
-function isComparativeQuestion(query: string): boolean {
-  const comparativePatterns = [
-    /diff[ée]ren/i, /compar/i, /entre.+et/i, /versus|vs/i, /par rapport/i,
-    /contrairement/i, /similitude/i, /commun/i, /cycle\s*\d.+cycle\s*\d/i,
-    /niveau\s*[A-C][1-2].+niveau\s*[A-C][1-2]/i,
-  ];
-  return comparativePatterns.some(p => p.test(query));
-}
-
-function extractComparisonTargets(query: string): string[] {
-  const targets: string[] = [];
-  const cycleMatches = query.match(/cycle\s*(\d)/gi);
-  if (cycleMatches) {
-    const seenNums = new Set<string>();
-    cycleMatches.forEach(m => {
-      const num = m.match(/\d/)?.[0];
-      if (num && !seenNums.has(num)) { seenNums.add(num); targets.push(`cycle_${num}`); }
-    });
-  }
-  // Extraction spécifique pour le domaine Langues (legacy support)
-  const cecrMatches = query.match(/\b[A-Ca-c][1-2]\b/gi);
-  if (cecrMatches) {
-    const seen = new Set<string>();
-    cecrMatches.forEach(m => {
-      const l = m.toUpperCase();
-      if (!seen.has(l)) { seen.add(l); targets.push(`cecr_${l}`); }
-    });
-  }
-  return targets;
-}
-
-// Helper pour Langues (V1)
-function extractCECRLevels(query: string): string[] {
-  const matches = query.match(/\b[A-Ca-c][1-2]\b/gi);
-  return matches ? [...new Set(matches.map(m => m.toUpperCase()))] : [];
+function createServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 }
 
 // ============================================================================
-// HyDE: HYPOTHETICAL DOCUMENT EMBEDDINGS (ADAPTATIF)
+// STEP 1: QUERY ANALYSIS & HyDE
 // ============================================================================
 
-async function generateHypotheticalAnswer(
+/**
+ * Détermine si HyDE doit être activé automatiquement
+ */
+function shouldUseHyDE(query: string): boolean {
+  const trimmedLength = query.trim().length;
+  return trimmedLength > 0 && trimmedLength < CONFIG.hydeAutoThreshold;
+}
+
+/**
+ * HyDE: Génère un document hypothétique pour améliorer l'embedding
+ */
+async function generateHyDE(
   query: string,
-  domain: DomainConfig | null,
   apiKey: string
-): Promise<{ hypotheticalAnswer: string; tokensUsed: number }> {
-  const isComparative = isComparativeQuestion(query);
-  const targets = extractComparisonTargets(query);
-
-  let prompt: string;
-  
-  if (domain?.id === 'LANGUES') {
-    // Prompt Spécifique Langues (V1)
-    const levels = extractCECRLevels(query).join(', ') || 'les niveaux';
-    prompt = `Tu es un ${domain.promptRole}. Génère une réponse technique sur "${query}".
-    IMPORTANT (${levels}):
-    - Utilise vocabulaire CECR: descripteurs, production/réception.
-    - Décris ce que l'élève "peut faire".
-    - 200-400 mots.`;
-  } else if (domain?.id === 'EPS') {
-    // Prompt Spécifique EPS
-    prompt = `Tu es un ${domain.promptRole}. Réponds à "${query}".
-    IMPORTANT:
-    - Utilise le vocabulaire officiel (Champs d'Apprentissage, AFC, Attendus).
-    - Mentionne les conduites motrices et situations d'apprentissage.
-    - 200-400 mots.`;
-  } else if (isComparative && targets.length >= 2) {
-    // Prompt Comparatif V1
-    prompt = `Expert Programmes Scolaires. Compare explicitement ${targets.map(t => t.replace('_', ' ')).join(' et ')} pour "${query}".
-    - Structure par différences et similitudes.
-    - Spécificités de chaque cycle.`;
-  } else {
-    // Prompt Standard
-    prompt = `Expert Éducation Nationale. Réponds factuellement à "${query}".
-    - Utilise le vocabulaire officiel.
-    - Structure claire.`;
-  }
-
+): Promise<{ hydeText: string; tokensUsed: number }> {
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         model: CONFIG.hydeModel,
-        messages: [{ role: 'system', content: 'Tu es un expert pédagogique.' }, { role: 'user', content: prompt }],
-        temperature: 0.3, max_tokens: 600,
+        messages: [
+          {
+            role: 'system',
+            content: `Tu es un expert en éducation française. 
+Génère un court paragraphe (3-4 phrases) qui RÉPOND à la question de l'utilisateur, 
+comme si tu citais un document officiel de l'Éducation Nationale.
+Ne dis pas "je" ou "selon moi". Écris comme un texte de référence factuel.`
+          },
+          {
+            role: 'user',
+            content: query
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 200,
       }),
     });
 
-    if (!response.ok) return { hypotheticalAnswer: query, tokensUsed: 0 };
     const data = await response.json();
-    return { hypotheticalAnswer: data.choices[0]?.message?.content || query, tokensUsed: data.usage?.total_tokens || 0 };
+    const hydeText = data.choices?.[0]?.message?.content || query;
+    const tokensUsed = data.usage?.total_tokens || 0;
+
+    console.log(`[HyDE] Generated hypothetical document (${tokensUsed} tokens)`);
+    return { hydeText, tokensUsed };
   } catch (error) {
-    console.warn('[rag-chat] HyDE error:', error);
-    return { hypotheticalAnswer: query, tokensUsed: 0 };
+    console.warn('[HyDE] Failed, using original query:', error);
+    return { hydeText: query, tokensUsed: 0 };
   }
 }
 
-// ============================================================================
-// QUERY REWRITING (ADAPTATIF)
-// ============================================================================
+/**
+ * Extrait les mots-clés significatifs pour la recherche FTS
+ */
+function extractSearchTerms(query: string): string {
+  const stopWords = new Set([
+    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'au', 'aux',
+    'ce', 'cette', 'ces', 'mon', 'ma', 'mes', 'ton', 'ta', 'tes',
+    'son', 'sa', 'ses', 'notre', 'nos', 'votre', 'vos', 'leur', 'leurs',
+    'qui', 'que', 'quoi', 'dont', 'où', 'quand', 'comment', 'pourquoi',
+    'est', 'sont', 'était', 'être', 'avoir', 'fait', 'faire',
+    'pour', 'dans', 'avec', 'sur', 'sous', 'par', 'entre',
+    'plus', 'moins', 'très', 'bien', 'aussi', 'encore',
+    'tout', 'tous', 'toute', 'toutes', 'autre', 'autres',
+    'quel', 'quelle', 'quels', 'quelles',
+  ]);
 
-async function rewriteQueryForSearch(
-  query: string,
-  domain: DomainConfig | null,
-  apiKey: string
-): Promise<{ queries: string[]; tokensUsed: number }> {
-  let prompt: string;
-  
-  if (domain?.id === 'LANGUES') {
-    const levels = extractCECRLevels(query).join(', ');
-    prompt = `Expert Recherche CECR. Question: "${query}"
-    Génère des mots-clés ciblant:
-    1. Termes CECR (descripteurs, compétences)
-    2. Niveaux spécifiques (${levels})
-    JSON: {"queries": ["q1", "q2", ...]}`;
-  } else if (domain?.id === 'EPS') {
-    prompt = `Expert Recherche EPS. Question: "${query}"
-    Génère des mots-clés ciblant:
-    1. Champs d'apprentissage
-    2. Activités physiques (APSA)
-    3. Compétences visées
-    JSON: {"queries": ["q1", "q2", ...]}`;
-  } else {
-    prompt = `Expert Recherche Éducation. Reformule: "${query}" pour moteur documentaire.
-    Utilise synonymes officiels et niveaux scolaires.
-    JSON: {"queries": ["q1", "q2", ...]}`;
-  }
+  const words = query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9àâäéèêëïîôùûüç-]+/)
+    .filter(w => w.length > 2 && !stopWords.has(w));
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: CONFIG.queryRewritingModel,
-        messages: [{ role: 'system', content: 'JSON only.' }, { role: 'user', content: prompt }],
-        temperature: 0.3, max_tokens: 300,
-      }),
-    });
-    if (!response.ok) return { queries: [query], tokensUsed: 0 };
-    const data = await response.json();
-    const jsonMatch = data.choices[0]?.message?.content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return { queries: [query, ...(parsed.queries || [])].slice(0, 6), tokensUsed: data.usage?.total_tokens || 0 };
-    }
-    return { queries: [query], tokensUsed: data.usage?.total_tokens || 0 };
-  } catch (error) {
-    return { queries: [query], tokensUsed: 0 };
-  }
+  return [...new Set(words)].slice(0, 10).join(' ');
 }
 
 // ============================================================================
-// EXTRACTION TERMES-CLÉS (ÉLARGIE)
+// STEP 2: DOCUMENT FILTERING
 // ============================================================================
 
-function extractKeyTerms(query: string): string[] {
-  const lowerQuery = query.toLowerCase();
-  const terms: string[] = [];
-
-  const mappings: Record<string, string[]> = {
-    // Cycles
-    'maternelle': ['cycle 1'], 'cycle 1': ['maternelle'],
-    'cycle 2': ['CP', 'CE1', 'CE2'],
-    'cycle 3': ['CM1', 'CM2', '6e'], 'cycle 4': ['5e', '4e', '3e'],
-    // EPS
-    'eps': ['éducation physique', 'sport', 'apsa'],
-    'sport': ['eps', 'éducation physique'],
-    // Langues
-    'a1': ['A1', 'débutant'], 'a2': ['A2', 'élémentaire'],
-    'b1': ['B1', 'indépendant'], 'b2': ['B2', 'avancé'],
-    'c1': ['C1', 'autonome'],
-    'cecr': ['cadre européen', 'descripteur'],
-    // Maths
-    'math': ['mathématiques', 'calcul'], 'géométrie': ['figure', 'espace'],
-  };
-
-  // Mots simples
-  query.split(/[\s,.?!]+/).forEach(w => {
-    if (w.length > 3 && !['pour','avec','dans','quel','comment'].includes(w.toLowerCase())) terms.push(w);
-  });
-
-  // Regex Niveaux
-  const levelMatch = query.match(/\b([A-Ca-c][1-2])\b/g);
-  if (levelMatch) levelMatch.forEach(l => terms.push(l.toUpperCase()));
-
-  // Mapping
-  for (const [k, v] of Object.entries(mappings)) {
-    if (lowerQuery.includes(k)) terms.push(...v);
-  }
-
-  return [...new Set(terms)];
-}
-
-// ============================================================================
-// GESTION DOCUMENTS (SÉCURITÉ V2)
-// ============================================================================
-
-// 🆕 Fonction mise à jour avec filtrage selon les switches
 async function getAllowedDocuments(
-  supabase: any, 
-  userId: string, 
-  docId?: string,
-  usePersonalCorpus: boolean = true,
-  useProfAssistCorpus: boolean = true
+  supabase: any,
+  userId: string,
+  options: {
+    documentId?: string;
+    usePersonalCorpus: boolean;
+    useProfAssistCorpus: boolean;
+    levels?: string[];
+    subjects?: string[];
+  }
 ): Promise<Map<string, DocumentInfo>> {
   const docsMap = new Map<string, DocumentInfo>();
-  console.log(`[rag-chat] === SECURITY: Fetching allowed documents ===`);
-  console.log(`[rag-chat] Filters: personal=${usePersonalCorpus}, profassist=${useProfAssistCorpus}`);
+  const { documentId, usePersonalCorpus, useProfAssistCorpus, levels, subjects } = options;
 
-  // Si aucun corpus sélectionné, retourner vide
-  if (!usePersonalCorpus && !useProfAssistCorpus) {
-    console.log(`[rag-chat] No corpus selected, returning empty`);
+  if (!usePersonalCorpus && !useProfAssistCorpus) return docsMap;
+
+  let query = supabase
+    .from('rag_documents')
+    .select('id, title, scope, user_id, levels, subjects')
+    .eq('status', 'ready');
+
+  if (documentId) {
+    query = query.eq('id', documentId);
+  } else {
+    if (usePersonalCorpus && useProfAssistCorpus) {
+      query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    } else if (useProfAssistCorpus) {
+      query = query.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      query = query.eq('scope', 'user').eq('user_id', userId);
+    }
+  }
+
+  if (levels?.length) {
+    query = query.overlaps('levels', levels);
+  }
+  if (subjects?.length) {
+    query = query.overlaps('subjects', subjects);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[Documents] Query error:', error);
     return docsMap;
   }
 
-  let query = supabase.from('rag_documents').select('id, title, scope, user_id').eq('status', 'ready');
-  
-  if (docId) {
-    query = query.eq('id', docId);
-  } else {
-    // 🆕 Construire le filtre selon les switches
-    const filters: string[] = [];
-    if (useProfAssistCorpus) {
-      filters.push('scope.eq.global');
-    }
-    if (usePersonalCorpus) {
-      filters.push(`and(scope.eq.user,user_id.eq.${userId})`);
-    }
+  if (!data || data.length === 0) {
+    console.log('[Documents] Filters too strict, removing metadata filters...');
     
-    if (filters.length === 1) {
-      // Un seul filtre
-      if (useProfAssistCorpus) {
-        query = query.eq('scope', 'global');
-      } else {
-        query = query.eq('scope', 'user').eq('user_id', userId);
-      }
-    } else {
-      // Les deux filtres
-      query = query.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    let fallbackQuery = supabase
+      .from('rag_documents')
+      .select('id, title, scope')
+      .eq('status', 'ready');
+
+    if (documentId) {
+      fallbackQuery = fallbackQuery.eq('id', documentId);
+    } else if (usePersonalCorpus && useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.or(`scope.eq.global,and(scope.eq.user,user_id.eq.${userId})`);
+    } else if (useProfAssistCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'global');
+    } else if (usePersonalCorpus) {
+      fallbackQuery = fallbackQuery.eq('scope', 'user').eq('user_id', userId);
     }
+
+    const { data: fallbackData } = await fallbackQuery;
+    fallbackData?.forEach((d: any) => docsMap.set(d.id, d));
+    return docsMap;
   }
 
-  const { data } = await query;
-  if (data) {
-    data.forEach((d: any) => docsMap.set(d.id, { id: d.id, title: d.title, scope: d.scope }));
-    console.log(`[rag-chat] Allowed docs count: ${data.length}`);
-  }
+  data.forEach((d: any) => docsMap.set(d.id, d));
+  console.log(`[Documents] ${docsMap.size} documents allowed`);
   return docsMap;
 }
 
-
 // ============================================================================
-// EMBEDDINGS
-// ============================================================================
-
-async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
-  try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: CONFIG.embeddingModel,
-        input: text.replace(/\n/g, ' '),
-        dimensions: CONFIG.embeddingDimensions,
-      }),
-    });
-    if (!response.ok) throw new Error(`Embedding API Error: ${response.statusText}`);
-    const data = await response.json();
-    return data.data[0].embedding;
-  } catch (err) {
-    console.error('[rag-chat] Embedding Error:', err);
-    throw err;
-  }
-}
-
-// ============================================================================
-// STRATÉGIES DE RECHERCHE (V1 + V2 Unifiées)
+// STEP 3: HYBRID RETRIEVAL
 // ============================================================================
 
-// 1. Vectorielle
-async function searchByVector(supabase: any, userId: string, embedding: number[], topK: number, allowedDocIds: Set<string>): Promise<MatchedChunk[]> {
-  try {
-    const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
-      p_similarity_threshold: CONFIG.similarityThreshold,
-      p_match_count: topK * 3,
-      p_user_id: userId,
-      p_document_id: null,
-    });
-
-    if (error) return [];
-
-    return (data || [])
-      .filter((item: any) => allowedDocIds.has(item.document_id))
-      .map((item: any) => ({
-        id: item.id, documentId: item.document_id, documentTitle: item.document_title,
-        chunkIndex: item.chunk_index, content: item.content, score: item.similarity, scope: item.scope,
-      }));
-  } catch (err) { return []; }
-}
-
-// 2. Mots-clés (Robust V2)
-async function searchByKeywords(
+async function searchByVector(
   supabase: any,
-  allowedDocIds: string[],
-  allowedDocs: Map<string, DocumentInfo>,
-  keywords: string[]
-): Promise<MatchedChunk[]> {
-  if (keywords.length === 0 || allowedDocIds.length === 0) return [];
-  
-  const chunkScores = new Map<string, { chunk: MatchedChunk; score: number }>();
-  const effectiveKeywords = keywords.slice(0, 5);
+  userId: string,
+  embedding: number[],
+  allowedDocIds: string[]
+): Promise<RetrievedChunk[]> {
+  if (allowedDocIds.length === 0) return [];
 
-  for (const keyword of effectiveKeywords) {
-    if (keyword.length < 3) continue;
-    const { data: chunks } = await supabase
-      .from('rag_chunks')
-      .select('id, document_id, chunk_index, content, scope')
-      .in('document_id', allowedDocIds)
-      .ilike('content', `%${keyword}%`)
-      .limit(8);
-
-    if (chunks) {
-      for (const chunk of chunks) {
-        const doc = allowedDocs.get(chunk.document_id);
-        if (!doc) continue;
-        
-        const key = chunk.id;
-        const existing = chunkScores.get(key);
-        const titleBonus = doc.title.toLowerCase().includes(keyword.toLowerCase()) ? 0.2 : 0;
-
-        if (existing) {
-          existing.score += 0.3 + titleBonus;
-        } else {
-          chunkScores.set(key, {
-            chunk: {
-              id: chunk.id, documentId: doc.id, documentTitle: doc.title,
-              chunkIndex: chunk.chunk_index, content: chunk.content,
-              score: 0.70 + titleBonus, scope: chunk.scope as any || doc.scope,
-            },
-            score: 0.70 + titleBonus,
-          });
-        }
-      }
-    }
-  }
-  return Array.from(chunkScores.values()).sort((a, b) => b.score - a.score).map(i => i.chunk);
-}
-
-// 3. Recherche Spécifique Domaine (Généralisation de searchCECRDocuments)
-async function searchSpecificDomainDocuments(
-  supabase: any,
-  allowedDocs: Map<string, DocumentInfo>,
-  domain: DomainConfig,
-  query: string
-): Promise<MatchedChunk[]> {
-  const targetDocIds: string[] = [];
-  
-  // Filtrer les documents qui correspondent au pattern du domaine (ex: contient "EPS")
-  allowedDocs.forEach((doc, id) => {
-    if (isDomainDocument(doc.title, domain)) targetDocIds.push(id);
+  const { data, error } = await supabase.rpc('match_rag_chunks', {
+    p_query_embedding: `[${embedding.join(',')}]`,
+    p_similarity_threshold: CONFIG.similarityThreshold,
+    p_match_count: CONFIG.vectorTopK,
+    p_user_id: userId,
+    p_document_id: null,
   });
 
-  if (targetDocIds.length === 0) return [];
-  console.log(`[rag-chat] Searching specific ${domain.id} docs (${targetDocIds.length} found)...`);
-
-  const { data: chunks } = await supabase
-    .from('rag_chunks')
-    .select('id, document_id, chunk_index, content, scope')
-    .in('document_id', targetDocIds)
-    .limit(30);
-
-  const results: MatchedChunk[] = [];
-  
-  if (chunks) {
-    for (const chunk of chunks) {
-      const contentLower = chunk.content.toLowerCase();
-      let score = 0.85; // Base élevée car doc spécifique
-
-      // Bonus si mots-clés de la query présents
-      const queryWords = extractKeyTerms(query);
-      let matches = 0;
-      queryWords.forEach(w => { if (contentLower.includes(w.toLowerCase())) matches++; });
-      
-      score += (matches * 0.05);
-
-      if (matches > 0 || domain.id === 'LANGUES') { // Pour langues on est plus permissif (niveaux)
-         results.push({
-           id: chunk.id, documentId: chunk.document_id, documentTitle: allowedDocs.get(chunk.document_id)!.title,
-           chunkIndex: chunk.chunk_index, content: chunk.content, score, scope: chunk.scope as any
-         });
-      }
-    }
+  if (error) {
+    console.error('[Vector Search] Error:', error);
+    return [];
   }
-  return results.sort((a, b) => b.score - a.score).slice(0, 15);
+
+  const allowedSet = new Set(allowedDocIds);
+  return (data || [])
+    .filter((item: any) => allowedSet.has(item.document_id))
+    .map((item: any) => ({
+      id: item.id,
+      documentId: item.document_id,
+      documentTitle: item.document_title || '',
+      chunkIndex: item.chunk_index,
+      content: item.content,
+      score: item.similarity,
+      source: 'vector' as const,
+    }));
 }
 
-// ============================================================================
-// LOGIQUE MÉTIER & BONUS (V2 GENERALISÉE)
-// ============================================================================
+async function searchByFTS(
+  supabase: any,
+  searchTerms: string,
+  allowedDocIds: string[]
+): Promise<RetrievedChunk[]> {
+  if (allowedDocIds.length === 0 || !searchTerms.trim()) return [];
 
-function applyDomainBonus(
-  chunks: MatchedChunk[],
-  domain: DomainConfig | null
-): MatchedChunk[] {
-  console.log(`[rag-chat] Applying Domain Bonuses (${domain?.id || 'None'})...`);
-  
-  return chunks.map(chunk => {
-    let newScore = chunk.score;
-    
-    // 1. Bonus Document Officiel (Générique)
-    if (isReferenceDocument(chunk.documentTitle)) newScore += CONFIG.referenceDocBonus;
+  const { data, error } = await supabase.rpc('search_rag_chunks_fts', {
+    p_query: searchTerms,
+    p_document_ids: allowedDocIds,
+    p_limit: CONFIG.ftsTopK,
+  });
 
-    // 2. Bonus Domaine Spécifique
-    if (domain && isDomainDocument(chunk.documentTitle, domain)) {
-      newScore += domain.bonus;
-    }
-    
-    return { ...chunk, score: newScore };
-  }).sort((a, b) => b.score - a.score);
-}
+  if (error) {
+    console.error('[FTS Search] Error:', error);
+    return [];
+  }
 
-function ensureDomainDocuments(
-  chunks: MatchedChunk[],
-  allAvailableChunks: MatchedChunk[],
-  domain: DomainConfig | null,
-  topK: number
-): MatchedChunk[] {
-  if (!domain) return chunks.slice(0, topK);
-
-  const domainChunks = chunks.filter(c => isDomainDocument(c.documentTitle, domain));
-  
-  if (domainChunks.length >= domain.minDocs) return chunks.slice(0, topK);
-
-  console.log(`[rag-chat] Rescue: Injecting missing ${domain.id} documents...`);
-  
-  const existingIds = new Set(chunks.map(c => c.id));
-  const missingCount = domain.minDocs - domainChunks.length;
-  
-  const rescueChunks = allAvailableChunks
-    .filter(c => isDomainDocument(c.documentTitle, domain) && !existingIds.has(c.id))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, missingCount);
-    
-  const merged = [...chunks, ...rescueChunks].sort((a, b) => b.score - a.score);
-  return merged.slice(0, topK);
-}
-
-// ============================================================================
-// RE-RANKING (HYBRIDE & DOUX)
-// ============================================================================
-
-async function rerankChunksWithLLM(
-  query: string,
-  chunks: MatchedChunk[],
-  topN: number,
-  apiKey: string
-): Promise<{ chunks: MatchedChunk[]; tokensUsed: number }> {
-  if (chunks.length <= 5) return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
-
-  console.log(`[rag-chat] Re-ranking ${chunks.length} chunks...`);
-
-  const excerpts = chunks.slice(0, CONFIG.rerankingChunkCount).map((chunk, index) => ({
-    id: index, title: chunk.documentTitle, 
-    text: chunk.content.substring(0, CONFIG.rerankingContextLength),
+  return (data || []).map((item: any) => ({
+    id: item.id,
+    documentId: item.document_id,
+    documentTitle: '',
+    chunkIndex: item.chunk_index,
+    content: item.content,
+    score: item.rank,
+    source: 'fts' as const,
   }));
+}
 
-  const prompt = `Évalue la pertinence (0-10) pour: "${query}"
-  - 10: Réponse directe.
-  - 5: Pertinent.
-  - 0: Hors sujet.
+async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: CONFIG.embeddingModel,
+      input: text.replace(/\n/g, ' ').substring(0, 8000),
+      dimensions: CONFIG.embeddingDimensions,
+    }),
+  });
+
+  const data = await response.json();
+  if (!data.data?.[0]?.embedding) {
+    throw new Error('Failed to create embedding');
+  }
+  return data.data[0].embedding;
+}
+
+// ============================================================================
+// STEP 4: RRF FUSION
+// ============================================================================
+
+function fuseWithRRF(
+  vectorResults: RetrievedChunk[],
+  ftsResults: RetrievedChunk[],
+  docsMap: Map<string, DocumentInfo>,
+  k: number = 60
+): RetrievedChunk[] {
+  const rrfScores = new Map<string, number>();
+  const chunkMap = new Map<string, RetrievedChunk>();
+
+  const processList = (list: RetrievedChunk[], sourceType: 'vector' | 'fts') => {
+    list.forEach((item, rank) => {
+      if (!item.documentTitle && docsMap.has(item.documentId)) {
+        item.documentTitle = docsMap.get(item.documentId)!.title;
+      }
+
+      const existing = chunkMap.get(item.id);
+      if (!existing) {
+        chunkMap.set(item.id, item);
+      } else if (item.score > existing.score) {
+        chunkMap.set(item.id, { ...existing, score: item.score, source: 'both' });
+      } else if (existing.source !== item.source) {
+        chunkMap.set(item.id, { ...existing, source: 'both' });
+      }
+
+      const currentRRF = rrfScores.get(item.id) || 0;
+      rrfScores.set(item.id, currentRRF + (1 / (k + rank + 1)));
+    });
+  };
+
+  processList(vectorResults, 'vector');
+  processList(ftsResults, 'fts');
+
+  return Array.from(rrfScores.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, rrfScore]) => {
+      const chunk = chunkMap.get(id)!;
+      return { ...chunk, score: rrfScore };
+    });
+}
+
+// ============================================================================
+// STEP 5: COHERE RERANKING
+// ============================================================================
+
+async function rerankWithCohere(
+  query: string,
+  candidates: RetrievedChunk[],
+  topK: number
+): Promise<RerankResult[]> {
+  const cohereApiKey = Deno.env.get('COHERE_API_KEY');
   
-  Extraits:
-  ${excerpts.map(e => `[${e.id}] (${e.title})\n${e.text}`).join('\n\n')}
-  
-  JSON: {"scores": [{"id": 0, "score": 8}, ...]}`;
+  if (!cohereApiKey) {
+    console.warn('[Rerank] No COHERE_API_KEY, skipping reranking');
+    return candidates.slice(0, topK).map(chunk => ({
+      chunk,
+      relevanceScore: chunk.score,
+    }));
+  }
+
+  if (candidates.length === 0) {
+    return [];
+  }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const documents = candidates.map(c => c.content.substring(0, 2000));
+
+    const response = await fetch('https://api.cohere.com/v2/rerank', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${cohereApiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        model: CONFIG.rerankingModel,
-        messages: [{ role: 'system', content: 'JSON only.' }, { role: 'user', content: prompt }],
-        temperature: 0.1, max_tokens: 800,
+        model: CONFIG.cohereRerankModel,
+        query: query,
+        documents: documents,
+        top_n: topK,
+        return_documents: false,
       }),
     });
 
-    const data = await response.json();
-    const jsonMatch = data.choices[0]?.message?.content.match(/\{[\s\S]*\}/);
-    
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const scoreMap = new Map(parsed.scores?.map((s: any) => [s.id, s.score]) || []);
-
-      const reranked = chunks.map((chunk, index) => {
-        const llmScore = scoreMap.get(index) ?? 5;
-        // Hybride: 40% initial, 60% LLM
-        const hybridScore = (chunk.score * 0.4) + ((llmScore / 10) * 0.6);
-        return { ...chunk, rerankScore: hybridScore, llmRawScore: llmScore };
-      });
-
-      reranked.sort((a, b) => b.rerankScore! - a.rerankScore!);
-
-      // Filtrage doux (on garde si > 0 ou si c'est nécessaire pour le topN)
-      const valid = reranked.filter(c => c.llmRawScore! > 0);
-      return { chunks: (valid.length >= topN ? valid : reranked).slice(0, topN), tokensUsed: data.usage?.total_tokens || 0 };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Rerank] Cohere API error:', response.status, errorText);
+      return candidates.slice(0, topK).map(chunk => ({
+        chunk,
+        relevanceScore: chunk.score,
+      }));
     }
-  } catch (err) {
-    console.warn('[rag-chat] Rerank fail', err);
+
+    const data = await response.json();
+    console.log(`[Rerank] Cohere returned ${data.results?.length || 0} results`);
+
+    return (data.results || []).map((result: any) => ({
+      chunk: candidates[result.index],
+      relevanceScore: result.relevance_score,
+    }));
+  } catch (error) {
+    console.error('[Rerank] Error:', error);
+    return candidates.slice(0, topK).map(chunk => ({
+      chunk,
+      relevanceScore: chunk.score,
+    }));
   }
-  return { chunks: chunks.slice(0, topN), tokensUsed: 0 };
 }
 
 // ============================================================================
-// GÉNÉRATION & HANDLER
+// STEP 6: RESPONSE GENERATION
 // ============================================================================
 
 async function generateResponse(
   query: string,
-  chunks: MatchedChunk[],
+  rerankResults: RerankResult[],
   mode: ChatMode,
   history: any[],
-  domain: DomainConfig | null,
   apiKey: string
-): Promise<{ answer: string; tokens: number }> {
-  if (chunks.length === 0) return { answer: "Je n'ai pas trouvé d'information.", tokens: 0 };
+): Promise<{ answer: string; tokensUsed: number }> {
+  if (rerankResults.length === 0) {
+    return {
+      answer: "Je n'ai pas trouvé d'information pertinente dans les documents disponibles.",
+      tokensUsed: 0,
+    };
+  }
 
-  const context = chunks.map((c, i) => `[Source ${i + 1}] ${c.documentTitle}\n${c.content}`).join('\n\n---\n\n');
+  const context = rerankResults
+    .map((r, i) => `[Source ${i + 1}] (${r.chunk.documentTitle})\n${r.chunk.content}`)
+    .join('\n\n---\n\n');
 
-  // Prompt Système Dynamique
-  let roleDesc = domain ? domain.promptRole : "assistant pédagogique expert";
-  
-  let systemPrompt = `Tu es un ${roleDesc}.
-  ${mode === 'corpus_only' ? "Utilise UNIQUEMENT les sources." : "Utilise les sources en priorité."}
-  RÈGLES:
-  1. Cite les sources [Source X].
-  2. Structure ta réponse.
-  3. ${domain?.id === 'LANGUES' ? "Utilise terminologie CECR." : ""}
-  4. ${domain?.id === 'EPS' ? "Utilise terminologie APSA/Champs d'apprentissage." : ""}`;
+  const allowAI = mode === 'corpus_plus_ai';
+
+  const systemPrompt = `Tu es un assistant pédagogique expert pour les enseignants français.
+
+SOURCES DOCUMENTAIRES :
+${context}
+
+INSTRUCTIONS :
+1. Base ta réponse PRIORITAIREMENT sur les Sources ci-dessus.
+2. Cite systématiquement les sources utilisées : [Source 1], [Source 2], etc.
+3. Structure ta réponse avec des titres (##) et des puces (-) pour la lisibilité.
+4. Si plusieurs sources se complètent, synthétise-les intelligemment.
+${allowAI 
+  ? `5. Si les sources sont insuffisantes, tu PEUX compléter avec tes connaissances générales, mais SIGNALE-LE clairement avec "💡 Complément IA :".` 
+  : `5. Si l'information n'est pas dans les sources, dis-le clairement. Ne fabrique PAS d'information.`}
+
+Réponds en français, de manière professionnelle et pédagogique.`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       model: CONFIG.chatModel,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...history,
-        { role: 'user', content: `SOURCES:\n${context}\n\nQUESTION: ${query}\n\nRéponse:` }
+        ...history.slice(-CONFIG.maxHistoryMessages),
+        { role: 'user', content: query },
       ],
       temperature: 0.3,
     }),
   });
 
   const data = await response.json();
-  return { answer: data.choices[0]?.message?.content || 'Erreur.', tokens: data.usage?.total_tokens || 0 };
+  return {
+    answer: data.choices?.[0]?.message?.content || 'Erreur lors de la génération de la réponse.',
+    tokensUsed: data.usage?.total_tokens || 0,
+  };
 }
+
+// ============================================================================
+// STEP 7: TOKEN MANAGEMENT
+// ============================================================================
+
+async function deductTokens(
+  serviceClient: any,
+  userId: string,
+  tokensUsed: number
+): Promise<void> {
+  if (tokensUsed <= 0) return;
+
+  const { data } = await serviceClient
+    .from('profiles')
+    .select('tokens')
+    .eq('user_id', userId)
+    .single();
+
+  if (data) {
+    await serviceClient
+      .from('profiles')
+      .update({ tokens: Math.max(0, data.tokens - tokensUsed) })
+      .eq('user_id', userId);
+  }
+}
+
+// ============================================================================
+// MAIN HANDLER
+// ============================================================================
 
 async function chatHandler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return new Response('Err', { status: 405, headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
+
+  const startTime = Date.now();
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
+    }
+
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Auth Missing');
+    if (!authHeader) {
+      throw new Error('Authorization header missing');
+    }
 
-    const supabase = await createSupabaseClient(authHeader);
-    const serviceClient = await createServiceClient();
+    const supabase = createSupabaseClient(authHeader);
+    const serviceClient = createServiceClient();
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User Invalid');
-
-    const { 
-  message, 
-  mode = 'corpus_plus_ai', 
-  searchMode = 'fast', 
-  conversationId, 
-  documentId,
-  // 🆕 Nouveaux paramètres avec valeurs par défaut
-  usePersonalCorpus = true,
-  useProfAssistCorpus = true,
-  useAI = false
-} = await req.json() as ChatRequest;
-
-// 🆕 Déterminer le mode effectif basé sur useAI
-const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
-
-
-    console.log(`[rag-chat] Handling: "${message}"`);
-
-    // 1. SÉCURITÉ: Docs autorisés
-    // 🆕 Passer les switches à la fonction
-const allowedDocsMap = await getAllowedDocuments(
-  serviceClient, 
-  user.id, 
-  documentId,
-  usePersonalCorpus,
-  useProfAssistCorpus
-);
-
-    const allowedDocIdsArr = Array.from(allowedDocsMap.keys());
-    const allowedDocIdsSet = new Set(allowedDocIdsArr);
-    // 🆕 Gestion du cas "IA seule" (aucun corpus mais useAI activé)
-if (allowedDocIdsArr.length === 0) {
-  if (useAI && !usePersonalCorpus && !useProfAssistCorpus) {
-    // Mode IA seule - répondre directement sans recherche de documents
-    console.log(`[rag-chat] AI-only mode, no corpus search`);
-    
-    let convId = conversationId;
-    if (!convId) {
-      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
-      convId = data.id;
+    if (!user) {
+      throw new Error('User not authenticated');
     }
-    
-    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
-    
-    // Générer une réponse IA sans contexte documentaire
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: CONFIG.chatModel,
-        messages: [
-          { role: 'system', content: 'Tu es un assistant pédagogique expert. Réponds de manière claire et structurée.' },
-          ...(hist || []),
-          { role: 'user', content: message }
-        ],
-        temperature: 0.3,
-      }),
+
+    const body = await req.json() as ChatRequest;
+    const {
+      message,
+      conversationId,
+      documentId,
+      usePersonalCorpus = true,
+      useProfAssistCorpus = true,
+      useAI = false,
+      levels,
+      subjects,
+    } = body;
+
+    const effectiveMode: ChatMode = useAI ? 'corpus_plus_ai' : 'corpus_only';
+    let totalTokensUsed = 0;
+
+    // Déterminer automatiquement si HyDE est nécessaire
+    const useHyDE = shouldUseHyDE(message);
+    console.log(`[rag-chat] Query: "${message.substring(0, 50)}..." | HyDE: ${useHyDE} | AI: ${useAI}`);
+
+    // ========== STEP 1: Get allowed documents ==========
+    const docsMap = await getAllowedDocuments(serviceClient, user.id, {
+      documentId,
+      usePersonalCorpus,
+      useProfAssistCorpus,
+      levels,
+      subjects,
     });
+
+    const allowedDocIds = Array.from(docsMap.keys());
+
+    // ========== CAS: Aucun document, IA seule ==========
+    if (allowedDocIds.length === 0) {
+      if (useAI) {
+        let convId = conversationId;
+        if (!convId) {
+          const { data } = await serviceClient
+            .from('rag_conversations')
+            .insert({ user_id: user.id })
+            .select('id')
+            .single();
+          convId = data?.id;
+        }
+
+        const { data: history } = await serviceClient
+          .from('rag_messages')
+          .select('role, content')
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: true })
+          .limit(CONFIG.maxHistoryMessages);
+
+        await serviceClient.from('rag_messages').insert({
+          conversation_id: convId,
+          role: 'user',
+          content: message,
+        });
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: CONFIG.chatModel,
+            messages: [
+              {
+                role: 'system',
+                content: 'Tu es un assistant pédagogique. Réponds selon tes connaissances générales. Précise que ta réponse ne provient pas de documents officiels.',
+              },
+              ...(history || []).map((m: any) => ({ role: m.role, content: m.content })),
+              { role: 'user', content: message },
+            ],
+            temperature: 0.4,
+          }),
+        });
+
+        const data = await response.json();
+        const answer = data.choices?.[0]?.message?.content || 'Erreur.';
+        const tokensUsed = data.usage?.total_tokens || 0;
+
+        await serviceClient.from('rag_messages').insert({
+          conversation_id: convId,
+          role: 'assistant',
+          content: answer,
+          sources: [],
+        });
+
+        await deductTokens(serviceClient, user.id, tokensUsed);
+
+        return new Response(
+          JSON.stringify({
+            answer,
+            sources: [],
+            conversationId: convId,
+            tokensUsed,
+            mode: 'ai_only',
+          }),
+          { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          answer: "Aucun document accessible. Activez un corpus ou l'option IA.",
+          sources: [],
+          tokensUsed: 0,
+        }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ========== STEP 2: Query Processing (HyDE automatique) ==========
+    let queryForEmbedding = message;
     
-    const data = await response.json();
-    const answer = data.choices[0]?.message?.content || 'Erreur lors de la génération.';
-    const tokensUsed = data.usage?.total_tokens || 0;
-    
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources: []});
-    
-    // Déduire les tokens
-    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
-      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - tokensUsed)}).eq('user_id', user.id); });
-    
-    return new Response(JSON.stringify({
-      answer, 
-      sources: [], 
-      conversationId: convId, 
-      tokensUsed, 
-      mode: 'corpus_plus_ai',
-      searchMode: 'fast'
-    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-  }
-  
-  return new Response(JSON.stringify({ 
-    answer: "Aucun document disponible dans les corpus sélectionnés.", 
-    sources: [],
-    conversationId: null,
-    tokensUsed: 0,
-    mode: effectiveMode
-  }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-}
-
-
-    // 2. DÉTECTION
-    const activeDomain = detectDomainIntent(message);
-    const isComparative = isComparativeQuestion(message);
-    const effectiveSearchMode = (activeDomain || isComparative || searchMode === 'precise') ? 'precise' : 'fast';
-    let totalTokens = 0;
-
-    // 3. PRÉPARATION (HyDE / Rewrite)
-    let hypothetical = message;
-    if (effectiveSearchMode === 'precise') {
-      const h = await generateHypotheticalAnswer(message, activeDomain, OPENAI_API_KEY);
-      hypothetical = h.hypotheticalAnswer;
-      totalTokens += h.tokensUsed;
+    if (useHyDE) {
+      const hydeResult = await generateHyDE(message, OPENAI_API_KEY);
+      queryForEmbedding = hydeResult.hydeText;
+      totalTokensUsed += hydeResult.tokensUsed;
     }
 
-    let queries = [message];
-    if (effectiveSearchMode === 'precise') {
-      const rw = await rewriteQueryForSearch(message, activeDomain, OPENAI_API_KEY);
-      queries = rw.queries;
-      totalTokens += rw.tokensUsed;
-    }
+    const searchTerms = extractSearchTerms(message);
+    console.log(`[FTS] Search terms: "${searchTerms}"`);
 
-    // Embeddings
-    const qEmb = await createEmbedding(message, OPENAI_API_KEY);
-    const hEmb = effectiveSearchMode === 'precise' ? await createEmbedding(hypothetical, OPENAI_API_KEY) : [];
-    totalTokens += Math.ceil((message.length + hypothetical.length) / 4);
+    // ========== STEP 3: Hybrid Retrieval (parallel) ==========
+    const [embedding, ftsResults] = await Promise.all([
+      createEmbedding(queryForEmbedding, OPENAI_API_KEY),
+      searchByFTS(serviceClient, searchTerms, allowedDocIds),
+    ]);
 
-    // 4. RECHERCHE UNIFIÉE
-    const allChunks: MatchedChunk[] = [];
-    const seenIds = new Set<string>();
-    const add = (arr: MatchedChunk[]) => arr.forEach(c => { if(!seenIds.has(c.id)) { seenIds.add(c.id); allChunks.push(c); }});
+    const vectorResults = await searchByVector(serviceClient, user.id, embedding, allowedDocIds);
 
-    // A. Recherche Spécifique Domaine
-    if (activeDomain) {
-      add(await searchSpecificDomainDocuments(serviceClient, allowedDocsMap, activeDomain, message));
-    }
+    console.log(`[Retrieval] Vector: ${vectorResults.length} | FTS: ${ftsResults.length}`);
 
-    // B. Recherche Mots-clés (Sur variantes)
-    for (const q of queries.slice(0, 3)) {
-      add(await searchByKeywords(serviceClient, allowedDocIdsArr, allowedDocsMap, extractKeyTerms(q)));
-    }
+    // ========== STEP 4: RRF Fusion ==========
+    const fusedResults = fuseWithRRF(vectorResults, ftsResults, docsMap);
+    console.log(`[Fusion] ${fusedResults.length} unique chunks after RRF`);
 
-    // C. Vectorielle
-    if (hEmb.length > 0) {
-      const hydeRes = await searchByVector(serviceClient, user.id, hEmb, CONFIG.defaultTopK, allowedDocIdsSet);
-      hydeRes.forEach(c => c.score *= 1.1); // Boost HyDE
-      add(hydeRes);
-    }
-    add(await searchByVector(serviceClient, user.id, qEmb, CONFIG.defaultTopK, allowedDocIdsSet));
+    // ========== STEP 5: Reranking ==========
+    const rerankResults = await rerankWithCohere(
+      message,
+      fusedResults.slice(0, 30),
+      CONFIG.rerankTopK
+    );
 
-    // 5. CLASSEMENT & LOGIQUE MÉTIER
-    let candidates = applyDomainBonus(allChunks, activeDomain);
+    console.log(`[Rerank] Top result: "${rerankResults[0]?.chunk.documentTitle}" (score: ${rerankResults[0]?.relevanceScore.toFixed(3)})`);
 
-    if (effectiveSearchMode === 'precise') {
-      const rr = await rerankChunksWithLLM(message, candidates, CONFIG.finalChunkCount, OPENAI_API_KEY);
-      candidates = rr.chunks;
-      totalTokens += rr.tokensUsed;
-    } else {
-      candidates = candidates.slice(0, CONFIG.finalChunkCount);
-    }
-
-    // Sauvetage (Rescue)
-    candidates = ensureDomainDocuments(candidates, allChunks, activeDomain, CONFIG.finalChunkCount);
-    console.log(`[rag-chat] Final count: ${candidates.length}`);
-
-    // 6. GÉNÉRATION
+    // ========== STEP 6: Conversation Management ==========
     let convId = conversationId;
     if (!convId) {
-      const {data} = await serviceClient.from('rag_conversations').insert({user_id: user.id}).select('id').single();
-      convId = data.id;
+      const { data } = await serviceClient
+        .from('rag_conversations')
+        .insert({ user_id: user.id })
+        .select('id')
+        .single();
+      convId = data?.id;
     }
-    const { data: hist } = await serviceClient.from('rag_messages').select('role, content').eq('conversation_id', convId).limit(CONFIG.maxHistoryMessages);
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'user', content: message});
 
-    // Ligne ~820
-const { answer, tokens } = await generateResponse(message, candidates, effectiveMode, hist || [], activeDomain, OPENAI_API_KEY);
+    const { data: history } = await serviceClient
+      .from('rag_messages')
+      .select('role, content')
+      .eq('conversation_id', convId)
+      .order('created_at', { ascending: true })
+      .limit(CONFIG.maxHistoryMessages);
 
-    totalTokens += tokens;
+    await serviceClient.from('rag_messages').insert({
+      conversation_id: convId,
+      role: 'user',
+      content: message,
+    });
 
-    const sources = candidates.map(c => ({
-      documentId: c.documentId, documentTitle: c.documentTitle, chunkId: c.id, chunkIndex: c.chunkIndex,
-      excerpt: c.content.substring(0, CONFIG.excerptLength), score: c.score, scope: c.scope
+    // ========== STEP 7: Response Generation ==========
+    const { answer, tokensUsed } = await generateResponse(
+      message,
+      rerankResults,
+      effectiveMode,
+      history || [],
+      OPENAI_API_KEY
+    );
+
+    totalTokensUsed += tokensUsed;
+
+    // Format sources for response (index 1-based pour correspondre aux citations)
+    const sources = rerankResults.map((r, index) => ({
+      sourceIndex: index + 1, // [Source 1], [Source 2], etc.
+      documentId: r.chunk.documentId,
+      documentTitle: r.chunk.documentTitle,
+      chunkId: r.chunk.id,
+      chunkIndex: r.chunk.chunkIndex,
+      excerpt: r.chunk.content.substring(0, CONFIG.excerptLength),
     }));
-    await serviceClient.from('rag_messages').insert({conversation_id: convId, role: 'assistant', content: answer, sources});
-    
-    serviceClient.from('profiles').select('tokens').eq('user_id', user.id).single()
-      .then(({data}) => { if(data) serviceClient.from('profiles').update({tokens: Math.max(0, data.tokens - totalTokens)}).eq('user_id', user.id); });
 
-return new Response(JSON.stringify({
-  answer, sources, conversationId: convId, tokensUsed: totalTokens, mode: effectiveMode, searchMode: effectiveSearchMode
-}), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    await serviceClient.from('rag_messages').insert({
+      conversation_id: convId,
+      role: 'assistant',
+      content: answer,
+      sources,
+    });
 
+    await deductTokens(serviceClient, user.id, totalTokensUsed);
 
-  } catch (e: any) {
-    console.error(e);
-    return new Response(JSON.stringify({error: e.message}), {status: 500, headers: {...corsHeaders, 'Content-Type': 'application/json'}});
+    const duration = Date.now() - startTime;
+    console.log(`[rag-chat] Completed in ${duration}ms | Tokens: ${totalTokensUsed}`);
+
+    return new Response(
+      JSON.stringify({
+        answer,
+        sources,
+        conversationId: convId,
+        tokensUsed: totalTokensUsed,
+        mode: effectiveMode,
+      }),
+      { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('[rag-chat] Error:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      {
+        status: 500,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      }
+    );
   }
 }
 
 Deno.serve(chatHandler);
-
-

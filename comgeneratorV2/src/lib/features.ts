@@ -4,7 +4,7 @@
 
 export const FEATURES = {
   // Chatbot et banque de réponses - à activer quand prêt
-  CHATBOT_ENABLED: false,
+  CHATBOT_ENABLED: true,
   
   // Scénario pédagogique - à activer quand prêt
   SCENARIO_ENABLED: false,

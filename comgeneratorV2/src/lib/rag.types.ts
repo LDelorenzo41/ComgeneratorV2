@@ -2,23 +2,83 @@
 // Types pour le module RAG Chatbot
 
 export type DocumentStatus = 'uploaded' | 'processing' | 'ready' | 'error';
-export type ChatMode = 'corpus_only' | 'corpus_plus_ai';
+export type ChatMode = 'corpus_only' | 'corpus_plus_ai' | 'ai_only';
 export type MessageRole = 'user' | 'assistant' | 'system';
 export type DocumentScope = 'global' | 'user';
-export type SearchMode = 'fast' | 'precise';
 
-// 🆕 NOUVEAU : Options de sélection des corpus (switches)
+// Options de sélection des corpus (switches)
 export interface CorpusSelection {
-  usePersonalCorpus: boolean;   // Switch "Corpus perso"
-  useProfAssistCorpus: boolean; // Switch "Corpus ProfAssist"
-  useAI: boolean;               // Switch "Corpus IA"
+  usePersonalCorpus: boolean;
+  useProfAssistCorpus: boolean;
+  useAI: boolean;
 }
 
-// 🆕 Valeurs par défaut
+// Valeurs par défaut
 export const DEFAULT_CORPUS_SELECTION: CorpusSelection = {
   usePersonalCorpus: true,
-  useProfAssistCorpus: true,
+  useProfAssistCorpus: false,
   useAI: false,
+};
+
+// Filtres optionnels pour la recherche RAG
+export interface SearchFilters {
+  levels?: string[];
+  subjects?: string[];
+}
+
+// Listes de valeurs suggérées (non exhaustives)
+export const AVAILABLE_LEVELS = [
+  'cycle 1',
+  'cycle 2',
+  'cycle 3',
+  'cycle 4',
+  'collège',
+  'lycée',
+  'voie professionnelle',
+  'voie générale',
+  'CAP',
+  'BTS',
+] as const;
+
+export const AVAILABLE_SUBJECTS = [
+  'EPS',
+  'Mathématiques',
+  'SVT',
+  'Physique-Chimie',
+  'Français',
+  'Langues',
+  'Histoire-Géographie',
+  'Arts plastiques',
+  'Musique',
+  'Technologie',
+  'EMC',
+] as const;
+
+// Types de documents
+export const DOCUMENT_TYPES = {
+  programme: { label: 'Programme', icon: '📋', color: 'blue' },
+  ressource: { label: 'Ressource', icon: '📖', color: 'green' },
+  guide: { label: 'Guide', icon: '📝', color: 'amber' },
+  circulaire: { label: 'Circulaire', icon: '📜', color: 'orange' },
+  evaluation: { label: 'Évaluation', icon: '📊', color: 'cyan' },
+  mise_en_oeuvre: { label: 'Mise en œuvre', icon: '🛠️', color: 'indigo' },
+  referentiel: { label: 'Référentiel', icon: '📑', color: 'purple' },
+  autre: { label: 'Autre', icon: '📄', color: 'gray' },
+} as const;
+
+export type DocumentType = keyof typeof DOCUMENT_TYPES;
+
+// Labels des niveaux pour affichage
+export const LEVEL_LABELS: Record<string, string> = {
+  maternelle: 'Maternelle',
+  cycle_1: 'Cycle 1',
+  cycle_2: 'Cycle 2',
+  cycle_3: 'Cycle 3',
+  cycle_4: 'Cycle 4',
+  college: 'Collège',
+  lycee_general: 'Lycée général',
+  lycee_technologique: 'Lycée techno.',
+  lycee_professionnel: 'Lycée pro.',
 };
 
 export interface RagDocument {
@@ -35,15 +95,23 @@ export interface RagDocument {
   scope: DocumentScope;
   created_at: string;
   updated_at: string;
+  // Métadonnées IA
+  summary?: string | null;
+  keywords?: string[] | null;
+  levels?: string[] | null;
+  subjects?: string[] | null;
+  document_type?: DocumentType | null;
+  language?: string | null;
 }
 
 export interface SourceChunk {
+  sourceIndex?: number;
   documentId: string;
   documentTitle: string;
   chunkId: string;
   chunkIndex: number;
   excerpt: string;
-  score: number;
+  score?: number;
   scope?: DocumentScope;
 }
 
@@ -54,6 +122,7 @@ export interface ChatUIMessage {
   sources?: SourceChunk[];
   timestamp: Date;
   isLoading?: boolean;
+  mode?: ChatMode; // 🆕 Pour savoir si l'IA a contribué
 }
 
 export interface ChatResponse {
@@ -110,5 +179,8 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
+
+
 
 

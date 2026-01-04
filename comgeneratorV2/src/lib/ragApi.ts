@@ -4,7 +4,7 @@
 // + Double quota bêta: stockage permanent + import mensuel
 
 import { supabase } from './supabase';
-import type { RagDocument, ChatResponse, CorpusSelection } from './rag.types';
+import type { RagDocument, ChatResponse, CorpusSelection, SearchFilters } from './rag.types';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -63,6 +63,23 @@ async function callEdgeFunction<T>(
 }
 
 // ============================================================================
+// BETA RESET CHECK
+// ============================================================================
+
+/**
+ * Vérifie et réinitialise le quota mensuel si nécessaire
+ * Appelé automatiquement avant de récupérer les stats
+ */
+async function checkAndResetBetaQuota(): Promise<void> {
+  try {
+    await callEdgeFunction<{ wasReset: boolean }>('rag-beta-check', {});
+  } catch (error) {
+    // Silencieux en cas d'erreur - on continue quand même
+    console.warn('Beta check failed (non-blocking):', error);
+  }
+}
+
+// ============================================================================
 // DOCUMENTS - LECTURE
 // ============================================================================
 
@@ -75,8 +92,6 @@ export async function getAllDocuments(): Promise<DocumentsResult> {
     return { globalDocuments: [], userDocuments: [], totalGlobal: 0, totalUser: 0 };
   }
 
-  // Les documents globaux sont accessibles via RLS (scope = 'global')
-  // Les documents user sont filtrés par user_id
   const { data, error } = await (supabase as any)
     .from('rag_documents')
     .select('*')
@@ -161,14 +176,12 @@ export async function deleteDocument(documentId: string): Promise<void> {
     throw new Error('Document non trouvé');
   }
 
-  // Pour les documents globaux, vérifier si l'utilisateur est admin
   if (doc.scope === 'global') {
     const isAdmin = await checkIsAdmin(user.id);
     if (!isAdmin) {
       throw new Error('Les documents PROFASSIST ne peuvent pas être supprimés');
     }
   } else {
-    // Pour les documents user, vérifier que c'est le propriétaire
     if (doc.user_id !== user.id) {
       throw new Error('Non autorisé');
     }
@@ -194,7 +207,6 @@ export async function checkIsAdmin(userId?: string): Promise<boolean> {
       uid = user.id;
     }
 
-    // Vérifier via profiles.is_admin
     const { data: profile } = await (supabase as any)
       .from('profiles')
       .select('is_admin')
@@ -205,7 +217,6 @@ export async function checkIsAdmin(userId?: string): Promise<boolean> {
       return true;
     }
 
-    // Vérifier via VITE_ADMIN_EMAILS
     const { data: { user } } = await supabase.auth.getUser();
     const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(',').map((e: string) => e.trim()) || [];
     if (user?.email && adminEmails.includes(user.email)) {
@@ -242,7 +253,6 @@ export async function uploadAndIngestDocument(
   file: File,
   onProgress?: (status: string, progress: number) => void
 ): Promise<{ documentId: string; chunksCreated: number; betaTokensUsed?: number }> {
-  // Étape 1: Obtenir l'URL signée
   onProgress?.('Préparation...', 0);
 
   const signResponse = await callEdgeFunction<UploadSignResponse>('rag-upload-sign', {
@@ -251,7 +261,6 @@ export async function uploadAndIngestDocument(
     fileSize: file.size,
   });
 
-  // Étape 2: Uploader le fichier
   onProgress?.('Upload en cours...', 20);
 
   const uploadResponse = await fetch(signResponse.uploadUrl, {
@@ -264,12 +273,11 @@ export async function uploadAndIngestDocument(
     throw new Error('Erreur lors de l\'upload');
   }
 
-  // Étape 3: Lancer l'ingestion (scope = 'user' par défaut)
   onProgress?.('Traitement du document...', 50);
 
   const ingestResponse = await callEdgeFunction<IngestResponse>('rag-ingest', {
     documentId: signResponse.documentId,
-    scope: 'user',  // Documents utilisateur
+    scope: 'user',
   });
 
   onProgress?.('Terminé', 100);
@@ -283,14 +291,12 @@ export async function uploadAndIngestDocument(
 
 /**
  * Upload et ingestion d'un document GLOBAL (admin uniquement)
- * Nécessite ADMIN_SECRET ou être dans ADMIN_USER_IDS
  */
 export async function uploadAndIngestGlobalDocument(
   file: File,
   adminSecret?: string,
   onProgress?: (status: string, progress: number) => void
 ): Promise<{ documentId: string; chunksCreated: number }> {
-  // Étape 1: Obtenir l'URL signée
   onProgress?.('Préparation document global...', 0);
 
   const extraHeaders: Record<string, string> = {};
@@ -304,12 +310,11 @@ export async function uploadAndIngestGlobalDocument(
       fileName: file.name,
       mimeType: file.type,
       fileSize: file.size,
-      scope: 'global',  // Indiquer que c'est un doc global
+      scope: 'global',
     },
     extraHeaders
   );
 
-  // Étape 2: Uploader le fichier
   onProgress?.('Upload en cours...', 20);
 
   const uploadResponse = await fetch(signResponse.uploadUrl, {
@@ -322,7 +327,6 @@ export async function uploadAndIngestGlobalDocument(
     throw new Error('Erreur lors de l\'upload');
   }
 
-  // Étape 3: Lancer l'ingestion avec scope global
   onProgress?.('Indexation du document global...', 50);
 
   const ingestResponse = await callEdgeFunction<IngestResponse>(
@@ -346,17 +350,19 @@ export async function uploadAndIngestGlobalDocument(
 // CHAT
 // ============================================================================
 
-// 🆕 Interface mise à jour avec CorpusSelection
+// 🆕 Interface mise à jour avec filtres optionnels
 export async function sendChatMessage(request: {
   message: string;
-  corpusSelection: CorpusSelection;  // 🆕 Remplace 'mode'
+  corpusSelection: CorpusSelection;
   searchMode?: 'fast' | 'precise';
   conversationId?: string;
   documentId?: string;
   topK?: number;
+  // 🆕 Filtres optionnels
+  filters?: SearchFilters;
 }): Promise<ChatResponse> {
-  // 🆕 Convertir corpusSelection en paramètres pour le backend
-  const backendRequest = {
+  // Construire le payload pour le backend
+  const backendRequest: Record<string, unknown> = {
     message: request.message,
     mode: request.corpusSelection.useAI ? 'corpus_plus_ai' : 'corpus_only',
     usePersonalCorpus: request.corpusSelection.usePersonalCorpus,
@@ -368,17 +374,43 @@ export async function sendChatMessage(request: {
     topK: request.topK,
   };
 
+  // 🆕 Ajouter les filtres uniquement s'ils sont définis et non vides
+  if (request.filters?.levels && request.filters.levels.length > 0) {
+    backendRequest.levels = request.filters.levels;
+  }
+  if (request.filters?.subjects && request.filters.subjects.length > 0) {
+    backendRequest.subjects = request.filters.subjects;
+  }
+
   const response = await callEdgeFunction<ChatResponse | { error: string }>('rag-chat', backendRequest);
   if ('error' in response) {
     throw new Error(response.error);
   }
   
-  // Déclencher la mise à jour du compteur de tokens dans le header
   tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
   
   return response;
 }
 
+// ============================================================================
+// REANALYZE DOCUMENT (Admin only)
+// ============================================================================
+
+/**
+ * Ré-analyse un document existant avec l'IA pour mettre à jour ses métadonnées
+ */
+export async function reanalyzeDocument(documentId: string): Promise<{ success: boolean }> {
+  const response = await callEdgeFunction<{ success: boolean } | { error: string }>('rag-ingest', {
+    reanalyze: true,
+    documentId,
+  });
+  
+  if ('error' in response) {
+    throw new Error(response.error);
+  }
+  
+  return response;
+}
 
 // ============================================================================
 // STATS
@@ -402,7 +434,6 @@ export async function getRagStats(): Promise<RagStats> {
     (supabase as any).from('rag_documents').select('*', { count: 'exact', head: true }).eq('scope', 'global').eq('status', 'ready'),
   ];
 
-  // Ajouter le comptage des docs user si connecté
   if (user) {
     queries.push(
       (supabase as any).from('rag_documents').select('*', { count: 'exact', head: true }).eq('scope', 'user').eq('user_id', user.id).eq('status', 'ready')
@@ -422,6 +453,7 @@ export async function getRagStats(): Promise<RagStats> {
 
 // ============================================================================
 // BETA USAGE - DOUBLE QUOTA (stockage + import mensuel)
+// MODIFIÉ: appelle checkAndResetBetaQuota() avant de lire les stats
 // ============================================================================
 
 export interface BetaUsageStats {
@@ -441,6 +473,8 @@ export interface BetaUsageStats {
  * Récupère les statistiques d'utilisation bêta avec double quota:
  * - Stockage permanent: tokens actuellement stockés (max 100k)
  * - Import mensuel: tokens importés ce mois (max 100k/mois)
+ * 
+ * IMPORTANT: Vérifie et réinitialise automatiquement le quota mensuel si nécessaire
  */
 export async function getBetaUsageStats(): Promise<BetaUsageStats> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -456,6 +490,9 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
       resetDate: null,
     };
   }
+
+  // 🆕 AJOUT: Vérifier et réinitialiser le quota mensuel si nécessaire
+  await checkAndResetBetaQuota();
 
   // 1. Calculer le stockage actuel (somme des tokens des chunks personnels)
   const { data: chunksData, error: chunksError } = await (supabase as any)
@@ -473,7 +510,7 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
     0
   );
 
-  // 2. Récupérer le quota mensuel d'import depuis le profil
+  // 2. Récupérer le quota mensuel d'import depuis le profil (APRÈS le reset éventuel)
   const { data: profile, error: profileError } = await (supabase as any)
     .from('profiles')
     .select('rag_beta_tokens_used, rag_beta_tokens_limit, rag_beta_reset_date')
@@ -509,6 +546,7 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
     resetDate,
   };
 }
+
 
 
 
