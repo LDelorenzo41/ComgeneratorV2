@@ -180,7 +180,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
                 content: response.answer, 
                 sources: response.sources, 
                 isLoading: false,
-                mode: response.mode, // 🆕 Passer le mode
+                mode: response.mode,
               }
             : msg
         )
@@ -419,7 +419,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               disabled={isLoading || !hasActiveSource}
               rows={1}
               className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
+              style={{ minHeight: '48px', maxHeight: '160px' }}
             />
           </div>
           <button
@@ -440,6 +440,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 };
 
 export default ChatInterface;
+
 
 
 

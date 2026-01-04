@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft, Filter
+  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft, Filter,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
@@ -116,7 +117,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </ol>
           </div>
 
-          {/* 🆕 NOUVELLE SECTION : Sélection des sources (switches) */}
+          {/* Sélection des sources (switches) */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <ToggleLeft className="w-5 h-5 text-green-500" />
@@ -194,89 +195,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
-          {/* Modes de recherche */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Search className="w-5 h-5 text-cyan-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Deux modes de recherche
-              </h3>
-            </div>
-            <div className="grid gap-3">
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">
-                      Rapide
-                    </h4>
-                  </div>
-                  <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50 px-2 py-0.5 rounded-full">
-                    ~1000-2000 tokens
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                  Recherche directe dans vos documents sans traitement supplémentaire.
-                </p>
-                <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Réponse rapide et économique</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Idéal pour les questions simples et directes</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Recommandé pour économiser vos tokens</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    <h4 className="font-semibold text-amber-700 dark:text-amber-400">
-                      Précis
-                    </h4>
-                  </div>
-                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">
-                    ~3000-5000 tokens
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                  Recherche approfondie avec techniques avancées d'IA pour de meilleurs résultats.
-                </p>
-                <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-amber-500 mt-0.5">✓</span>
-                    <span><strong>Reformulation automatique</strong> de votre question pour mieux chercher</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-amber-500 mt-0.5">✓</span>
-                    <span><strong>Recherche hypothétique</strong> (HyDE) pour trouver des passages pertinents</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-amber-500 mt-0.5">✓</span>
-                    <span><strong>Reclassement intelligent</strong> des résultats par pertinence</span>
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <span className="text-amber-500 mt-0.5">✓</span>
-                    <span>Idéal pour les <strong>questions complexes</strong> ou <strong>comparatives</strong></span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                💡 <strong>Conseil :</strong> Commencez en mode <strong>Rapide</strong>. Si la réponse n'est pas satisfaisante 
-                ou pour des questions comme "Quelles différences entre X et Y ?", passez en mode <strong>Précis</strong>.
-              </p>
-            </div>
-          </div>
-
-          {/* 🆕 SECTION FILTRES AVANCÉS */}
+          {/* Filtres avancés */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Filter className="w-5 h-5 text-cyan-500" />
@@ -311,36 +230,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
           </div>
 
-          {/* Sources et scores de pertinence */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="w-5 h-5 text-orange-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Sources et scores de pertinence
-              </h3>
-            </div>
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-4 border border-orange-200 dark:border-orange-800 space-y-3">
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Chaque réponse affiche les <strong>sources</strong> utilisées avec un <strong>score de pertinence (%)</strong> :
-              </p>
-              <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-1">•</span>
-                  <span><strong>70-100%</strong> : Très pertinent - l'information recherchée est probablement présente</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-1">•</span>
-                  <span><strong>50-70%</strong> : Moyennement pertinent - lien indirect avec votre question</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-orange-500 mt-1">•</span>
-                  <span><strong>&lt;50%</strong> : Peu pertinent - le sujet n'est peut-être pas dans vos documents</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Consommation de tokens */}
+          {/* Consommation de tokens - SIMPLIFIÉ */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-amber-500" />
@@ -350,30 +240,20 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </div>
             <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800 space-y-3">
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                Chaque question au chatbot consomme des tokens. Le coût dépend du <strong>mode de recherche</strong> choisi :
+                Chaque question au chatbot consomme des tokens. Le coût varie en fonction des corpus sélectionnés :
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="w-4 h-4 text-green-500" />
-                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Rapide</span>
-                  </div>
-                  <p className="text-lg font-bold text-green-600 dark:text-green-400">~1000-2000</p>
-                  <p className="text-xs text-gray-500">tokens/question</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Target className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Précis</span>
-                  </div>
-                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400">~3000-5000</p>
-                  <p className="text-xs text-gray-500">tokens/question</p>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center justify-center gap-3">
+                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                    1 000 à 4 000 tokens
+                  </p>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">/ question</span>
                 </div>
               </div>
-              <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
+              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  💡 <strong>Astuce :</strong> Utilisez le mode <strong>Rapide</strong> par défaut pour économiser vos tokens. 
-                  Désactiver le switch "IA" consomme généralement moins de tokens.
+                  💡 <strong>Astuce :</strong> Désactiver le switch "IA" consomme généralement moins de tokens.
                 </p>
               </div>
             </div>
@@ -454,6 +334,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
     </div>
   );
 };
+
 
 // Composant encart Bêta
 const BetaUsageCard: React.FC<{ betaStats: BetaUsageStats; isLoading: boolean }> = ({ betaStats, isLoading }) => {
@@ -585,6 +466,7 @@ export const ChatbotPage: React.FC = () => {
     resetDate: null 
   });
   const [isLoadingBeta, setIsLoadingBeta] = useState(true);
+  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
 
   useEffect(() => {
     if (!user) navigate('/login');
@@ -707,26 +589,66 @@ export const ChatbotPage: React.FC = () => {
           </div>
         </div>
       </div>
-            {/* Avertissement version en cours d'amélioration */}
+
+      {/* Encart "À propos de ce chatbot" - VIGNETTE EXTENSIBLE */}
       <div className="mb-6 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-8 h-8 bg-amber-100 dark:bg-amber-900/50 rounded-lg flex items-center justify-center">
             <span className="text-lg">🛠️</span>
           </div>
-          <div>
+          <div className="flex-1">
             <h3 className="font-semibold text-amber-800 dark:text-amber-300 mb-1">
               À propos de ce chatbot
             </h3>
+            
+            {/* Partie toujours visible */}
             <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
-              Ce chatbot est une version en cours d'amélioration. Les documents officiels intégrés seront ajoutés progressivement, 
-              et les techniques de recherche et de restitution des réponses seront affinées au fur et à mesure de son utilisation.
+              Ce chatbot est proposé dans une phase de test ouverte, afin de vous permettre d'explorer pleinement son fonctionnement, en particulier avec votre propre corpus documentaire (documents personnels, supports de travail, ressources locales).
             </p>
-            <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
-              Vos retours de terrain sont les bienvenus : demande d'ajout de textes officiels, signalement d'erreurs ou remarques d'usage.
-            </p>
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-2">
-              Ensemble, nous construisons un outil au plus proche de vos besoins.
-            </p>
+            
+            {/* Partie extensible */}
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isAboutExpanded ? 'max-h-[1000px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+              <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
+                En parallèle, ProfAssist met à disposition un corpus de documents de référence commun à tous les utilisateurs.
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
+                Vous pouvez consulter à tout moment la liste des documents actuellement intégrés dans l'onglet « Documents », pour garder une vision claire de la base utilisée par le chatbot.
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
+                Les contenus officiels seront enrichis progressivement, et les mécanismes de recherche et de restitution des réponses continueront d'évoluer au fil des usages et des retours terrain.
+              </p>
+              <div className="text-sm text-amber-700 dark:text-amber-400 mt-3 leading-relaxed">
+                <p>👉 Un document vous semble indispensable ?</p>
+                <p>👉 Un texte officiel volumineux que vous préférez ne pas importer dans votre espace personnel ?</p>
+              </div>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
+                N'hésitez pas à nous contacter : les documents jugés prioritaires par les utilisateurs pourront être ajoutés en priorité au corpus ProfAssist, afin d'optimiser votre espace de stockage personnel.
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
+                Vos retours sont précieux : demandes d'ajout de documents, remarques d'usage, signalement d'incohérences ou suggestions d'amélioration.
+              </p>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-3">
+                ProfAssist se construit avec vous, pour coller au plus près de vos pratiques professionnelles.
+              </p>
+            </div>
+            
+            {/* Bouton Lire la suite / Réduire */}
+            <button
+              onClick={() => setIsAboutExpanded(!isAboutExpanded)}
+              className="mt-2 text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 flex items-center gap-1 transition-colors"
+            >
+              {isAboutExpanded ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  Réduire
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  Lire la suite
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -758,6 +680,26 @@ export const ChatbotPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Avertissement important */}
+      <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center">
+            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-1">
+              Information importante
+            </h3>
+            <p className="text-sm text-blue-700 dark:text-blue-400 leading-relaxed">
+              Les réponses fournies par ce chatbot sont générées automatiquement à partir des documents disponibles et de modèles d'IA.
+              Elles constituent une aide à la réflexion et ne se substituent pas à une vérification humaine.
+              Il appartient à l'utilisateur de contrôler, interpréter et valider les informations avant tout usage professionnel.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -824,7 +766,7 @@ export const ChatbotPage: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                                    <div className="space-y-4 max-h-64 overflow-y-auto">
+                  <div className="space-y-4 max-h-64 overflow-y-auto">
                     {/* Documents personnels - EN PREMIER */}
                     {userDocs.length > 0 && (
                       <div>
@@ -889,16 +831,18 @@ export const ChatbotPage: React.FC = () => {
                       Gérer mes documents →
                     </button>
                   </div>
-
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Chat area */}
+        {/* Chat area - REDIMENSIONNABLE */}
         <div className="lg:col-span-2">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 h-[600px] flex flex-col">
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 min-h-[400px] h-[600px] flex flex-col resize-y overflow-hidden"
+            style={{ maxHeight: '90vh' }}
+          >
             <ChatInterface
               documents={documents}
               onNeedDocuments={() => setActiveTab('documents')}
@@ -914,6 +858,7 @@ export const ChatbotPage: React.FC = () => {
 };
 
 export default ChatbotPage;
+
 
 
 
