@@ -279,6 +279,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
             'Réponses basées uniquement sur les corpus sélectionnés.'
           )}
         </p>
+                {/* Message pour le Corpus ProfAssist en construction */}
+        {corpusSelection.useProfAssistCorpus && (
+          <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
+            Corpus en cours de construction. Consultez la liste des documents actuellement disponibles.
+          </p>
+        )}
+
 
         {/* Filtres avancés */}
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
