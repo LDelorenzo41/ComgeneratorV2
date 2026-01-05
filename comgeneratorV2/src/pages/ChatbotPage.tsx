@@ -570,7 +570,7 @@ export const ChatbotPage: React.FC = () => {
           <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
             <Globe className="w-4 h-4 text-purple-500" />
             <span className="text-sm text-purple-700 dark:text-purple-300">
-              {stats.globalDocuments} officiel{stats.globalDocuments > 1 ? 's' : ''}
+              {stats.globalDocuments} ProfAssist{stats.globalDocuments > 1 ? 's' : ''}
             </span>
           </div>
           {/* Documents utilisateur */}
