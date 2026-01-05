@@ -7,7 +7,7 @@ export const FEATURES = {
   CHATBOT_ENABLED: true,
   
   // Scénario pédagogique - à activer quand prêt
-  SCENARIO_ENABLED: false,
+  SCENARIO_ENABLED: true,
   
   // Autres features à venir...
 } as const;

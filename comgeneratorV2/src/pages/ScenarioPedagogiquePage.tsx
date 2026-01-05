@@ -38,7 +38,8 @@ import {
   FileText,
   Trash2,
   BookMarked,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 
 // ============================================================================
@@ -82,10 +83,10 @@ type ScenarioFormData = z.infer<typeof scenarioSchema>;
 
 interface SeanceRow {
   numero: string;
-  objectifs: string;
-  attendus: string;
-  prerequis: string;
-  exemples: string;
+  phaseObjectif: string;
+  obstaclesDiff: string;
+  activitesDispositifs: string;
+  evaluationCriteres: string;
 }
 
 interface RagSource {
@@ -115,27 +116,20 @@ export function ScenarioPedagogiquePage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [lastFormData, setLastFormData] = React.useState<ScenarioFormData | null>(null);
   
-  // État pour les notes complémentaires (contenu après le tableau)
   const [additionalNotes, setAdditionalNotes] = React.useState<string>('');
-  
-  // États pour les sources RAG
   const [ragSources, setRagSources] = React.useState<RagSource[]>([]);
   
-  // États pour les fichiers uploadés
   const [uploadedFiles, setUploadedFiles] = React.useState<File[]>([]);
   const [extractedTexts, setExtractedTexts] = React.useState<string[]>([]);
   const [isExtracting, setIsExtracting] = React.useState(false);
   const [extractionError, setExtractionError] = React.useState<string | null>(null);
   
-  // États pour vérifier l'accès banque
   const [hasBankAccess, setHasBankAccess] = React.useState<boolean | null>(null);
   const [bankAccessLoading, setBankAccessLoading] = React.useState(true);
   
-  // États pour les Select
   const [selectedNombreSeances, setSelectedNombreSeances] = React.useState<string>('6');
   const [selectedDureeSeance, setSelectedDureeSeance] = React.useState<string>('55');
 
-  // Vérification de l'accès banque au chargement
   React.useEffect(() => {
     const checkBankAccess = async () => {
       if (!user) {
@@ -168,7 +162,6 @@ export function ScenarioPedagogiquePage() {
     checkBankAccess();
   }, [user]);
 
-  // Formulaire
   const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<ScenarioFormData>({
     resolver: zodResolver(scenarioSchema),
     defaultValues: {
@@ -198,7 +191,6 @@ export function ScenarioPedagogiquePage() {
     const newTexts: string[] = [];
 
     for (const file of Array.from(files)) {
-      // Vérifier la taille (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         setExtractionError(`Le fichier ${file.name} dépasse 10MB`);
         continue;
@@ -216,8 +208,6 @@ export function ScenarioPedagogiquePage() {
     setUploadedFiles(prev => [...prev, ...newFiles]);
     setExtractedTexts(prev => [...prev, ...newTexts]);
     setIsExtracting(false);
-    
-    // Reset input
     e.target.value = '';
   };
 
@@ -227,7 +217,7 @@ export function ScenarioPedagogiquePage() {
   };
 
   // ============================================================================
-  // PARSING DU TABLEAU MARKDOWN (VERSION ROBUSTE)
+  // PARSING DU TABLEAU MARKDOWN
   // ============================================================================
 
   const parseMarkdownTable = (content: string): SeanceRow[] => {
@@ -240,7 +230,6 @@ export function ScenarioPedagogiquePage() {
       const line = lines[i];
       const trimmed = line.trim();
       
-      // Détecter l'en-tête du tableau
       if (!headerFound && trimmed.startsWith('|') && 
           (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
         headerFound = true;
@@ -248,20 +237,15 @@ export function ScenarioPedagogiquePage() {
         continue;
       }
       
-      // Ignorer la ligne de séparation (|---|---|...)
       if (trimmed.match(/^\|[\s\-:|\s]+\|$/)) {
         continue;
       }
       
-      // Parser les lignes de données
       if (inTable && trimmed.startsWith('|') && trimmed.endsWith('|')) {
-        // Extraire le contenu entre les premiers et derniers |
         const innerContent = trimmed.slice(1, -1);
-        
-        // Découper en utilisant | mais en préservant les | échappés ou dans du texte
         const cells: string[] = [];
         let currentCell = '';
-        let depth = 0; // Pour gérer les parenthèses, crochets, etc.
+        let depth = 0;
         
         for (let j = 0; j < innerContent.length; j++) {
           const char = innerContent[j];
@@ -276,32 +260,26 @@ export function ScenarioPedagogiquePage() {
             currentCell += char;
           }
         }
-        // Ajouter la dernière cellule
         if (currentCell.trim()) {
           cells.push(currentCell.trim());
         }
         
-        // Vérifier si c'est une ligne de données valide (au moins 5 colonnes)
         if (cells.length >= 5) {
           const firstCell = cells[0].trim();
           
-          // Accepter : "1", "Séance 1", "S1", ou tout ce qui contient un chiffre
           if (firstCell.match(/\d+/) || firstCell.toLowerCase().includes('séance') || firstCell.toLowerCase().includes('seance')) {
             rows.push({
               numero: firstCell,
-              objectifs: cells[1] || '',
-              attendus: cells[2] || '',
-              prerequis: cells[3] || '',
-              exemples: cells.slice(4).join(' | '), // Joindre les colonnes excédentaires
+              phaseObjectif: cells[1] || '',
+              obstaclesDiff: cells[2] || '',
+              activitesDispositifs: cells[3] || '',
+              evaluationCriteres: cells.slice(4).join(' | '),
             });
           }
         }
       }
       
-      // Sortir du tableau si on rencontre une ligne vide ou du texte hors tableau
-      // MAIS seulement si on a déjà trouvé des lignes
       if (inTable && rows.length > 0 && !trimmed.startsWith('|') && trimmed !== '' && !trimmed.startsWith('#')) {
-        // Vérifier si c'est vraiment la fin du tableau ou juste une ligne de commentaire
         const nextLine = lines[i + 1]?.trim() || '';
         if (!nextLine.startsWith('|')) {
           inTable = false;
@@ -314,7 +292,7 @@ export function ScenarioPedagogiquePage() {
   };
 
   // ============================================================================
-  // EXTRACTION DES NOTES COMPLÉMENTAIRES (APRÈS LE TABLEAU)
+  // EXTRACTION DES NOTES COMPLÉMENTAIRES
   // ============================================================================
 
   const extractAdditionalNotes = (content: string): string => {
@@ -326,12 +304,10 @@ export function ScenarioPedagogiquePage() {
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim();
       
-      // Détecter le début du tableau
       if (trimmed.startsWith('|') && trimmed.toLowerCase().includes('séance')) {
         inTable = true;
       }
       
-      // Détecter la fin du tableau
       if (inTable && !trimmed.startsWith('|') && trimmed !== '') {
         tableEnded = true;
         notesStartIndex = i;
@@ -341,7 +317,6 @@ export function ScenarioPedagogiquePage() {
     
     if (tableEnded && notesStartIndex > 0) {
       const notes = lines.slice(notesStartIndex).join('\n').trim();
-      // Nettoyer les notes (enlever les lignes vides multiples)
       return notes.replace(/\n{3,}/g, '\n\n');
     }
     
@@ -353,80 +328,55 @@ export function ScenarioPedagogiquePage() {
   // ============================================================================
 
   const rowsToMarkdown = (rows: SeanceRow[]): string => {
-    let md = '| Séance | Objectifs d\'apprentissage | Attendus / critères de réussite | Prérequis pour la suite | Exemples de situations |\n';
-    md += '|--------|---------------------------|--------------------------------|------------------------|------------------------|\n';
+    let md = '| Séance | Phase et objectif opérationnel | Obstacles et différenciation | Activités et dispositifs | Évaluation et critères de réussite |\n';
+    md += '|--------|-------------------------------|------------------------------|--------------------------|------------------------------------|\n';
     
     rows.forEach(row => {
-      md += `| ${row.numero} | ${row.objectifs} | ${row.attendus} | ${row.prerequis} | ${row.exemples} |\n`;
+      md += `| ${row.numero} | ${row.phaseObjectif} | ${row.obstaclesDiff} | ${row.activitesDispositifs} | ${row.evaluationCriteres} |\n`;
     });
     
     return md;
   };
 
   // ============================================================================
-  // RENDU MARKDOWN POUR L'AFFICHAGE À L'ÉCRAN
+  // RENDU MARKDOWN
   // ============================================================================
 
   const renderMarkdown = (text: string): React.ReactNode => {
     if (!text) return null;
     
-    // Convertir le markdown en éléments React
-    let processedText = text
-      // Convertir <br> en marqueur temporaire
-      .replace(/<br\s*\/?>/gi, '{{BR}}');
-    
-    // Découper par les sauts de ligne
+    let processedText = text.replace(/<br\s*\/?>/gi, '{{BR}}');
     const parts = processedText.split('{{BR}}');
     
     return parts.map((part, index) => {
-      // Traiter le gras et l'italique
       const elements: React.ReactNode[] = [];
-      let remaining = part;
-      let keyCounter = 0;
-      
-      // Regex pour trouver les patterns markdown
       const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
       let lastIndex = 0;
       let match;
+      let keyCounter = 0;
       
       while ((match = regex.exec(part)) !== null) {
-        // Ajouter le texte avant le match
         if (match.index > lastIndex) {
           elements.push(part.substring(lastIndex, match.index));
         }
         
-        // Ajouter l'élément formaté
         if (match[2]) {
-          // ***text*** = gras + italique
-          elements.push(
-            <strong key={`bi-${index}-${keyCounter++}`}>
-              <em>{match[2]}</em>
-            </strong>
-          );
+          elements.push(<strong key={`bi-${index}-${keyCounter++}`}><em>{match[2]}</em></strong>);
         } else if (match[3]) {
-          // **text** = gras
           elements.push(<strong key={`b-${index}-${keyCounter++}`}>{match[3]}</strong>);
         } else if (match[4]) {
-          // *text* = italique
           elements.push(<em key={`i-${index}-${keyCounter++}`}>{match[4]}</em>);
         } else if (match[5]) {
-          // `code` = code inline
-          elements.push(
-            <code key={`c-${index}-${keyCounter++}`} className="bg-gray-100 dark:bg-gray-700 px-1 rounded text-sm">
-              {match[5]}
-            </code>
-          );
+          elements.push(<code key={`c-${index}-${keyCounter++}`} className="bg-gray-100 dark:bg-gray-700 px-1 rounded text-sm">{match[5]}</code>);
         }
         
         lastIndex = regex.lastIndex;
       }
       
-      // Ajouter le reste du texte
       if (lastIndex < part.length) {
         elements.push(part.substring(lastIndex));
       }
       
-      // Retourner avec ou sans <br>
       return (
         <React.Fragment key={index}>
           {elements.length > 0 ? elements : part}
@@ -435,6 +385,82 @@ export function ScenarioPedagogiquePage() {
       );
     });
   };
+  // ============================================================================
+  // RENDU MARKDOWN POUR LES NOTES PÉDAGOGIQUES
+  // ============================================================================
+
+  const renderNotesMarkdown = (text: string): React.ReactNode => {
+    if (!text) return null;
+
+    const lines = text.split('\n');
+    
+    return lines.map((line, lineIndex) => {
+      const trimmedLine = line.trim();
+      
+      // Ligne vide = saut de paragraphe
+      if (trimmedLine === '') {
+        return <div key={lineIndex} className="h-2" />;
+      }
+      
+      // Ignorer les séparateurs --- 
+      if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') {
+        return null;
+      }
+      
+      // Ignorer le titre "Notes pédagogiques" redondant (déjà affiché en header)
+      if (trimmedLine.toLowerCase().includes('notes pédagogiques') && 
+          (trimmedLine.startsWith('#') || (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')))) {
+        return null;
+      }
+      
+      // Titres ### (h3)
+      if (trimmedLine.startsWith('### ')) {
+        return (
+          <h3 key={lineIndex} className="text-base font-bold text-gray-900 dark:text-white mt-4 mb-2">
+            {trimmedLine.replace('### ', '')}
+          </h3>
+        );
+      }
+      
+      // Titres ## (h2)
+      if (trimmedLine.startsWith('## ')) {
+        return (
+          <h3 key={lineIndex} className="text-base font-bold text-gray-900 dark:text-white mt-4 mb-2">
+            {trimmedLine.replace('## ', '')}
+          </h3>
+        );
+      }
+      
+      // Titres en gras seuls **Titre** ou **Titre :**
+      if (trimmedLine.startsWith('**') && (trimmedLine.endsWith('**') || trimmedLine.endsWith(':**'))) {
+        const titleText = trimmedLine.replace(/\*\*/g, '');
+        return (
+          <h4 key={lineIndex} className="text-sm font-bold text-gray-800 dark:text-gray-100 mt-4 mb-2">
+            {titleText}
+          </h4>
+        );
+      }
+      
+      // Listes à puces (-, •, *)
+      if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ') || trimmedLine.startsWith('* ')) {
+        const content = trimmedLine.replace(/^[-•*]\s/, '');
+        return (
+          <div key={lineIndex} className="flex items-start ml-2 my-1">
+            <span className="text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0">•</span>
+            <span className="flex-1">{renderMarkdown(content)}</span>
+          </div>
+        );
+      }
+      
+      // Paragraphe normal
+      return (
+        <p key={lineIndex} className="my-1">
+          {renderMarkdown(trimmedLine)}
+        </p>
+      );
+    });
+  };
+
 
   // ============================================================================
   // NETTOYAGE DU MARKDOWN POUR LE PDF
@@ -444,23 +470,14 @@ export function ScenarioPedagogiquePage() {
     if (!text) return '';
     
     return text
-      // Remplacer <br> et variantes par des sauts de ligne
       .replace(/<br\s*\/?>/gi, '\n')
-      // Supprimer le gras markdown **text** → text
       .replace(/\*\*([^*]+)\*\*/g, '$1')
-      // Supprimer l'italique markdown *text* → text
       .replace(/\*([^*]+)\*/g, '$1')
-      // Supprimer le gras/italique ***text*** → text
       .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
-      // Supprimer les backticks `code` → code
       .replace(/`([^`]+)`/g, '$1')
-      // Supprimer les liens markdown [text](url) → text
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      // Supprimer les titres markdown ## text → text
       .replace(/^#{1,6}\s+/gm, '')
-      // Nettoyer les doubles espaces
       .replace(/  +/g, ' ')
-      // Nettoyer les doubles sauts de ligne
       .replace(/\n{3,}/g, '\n\n')
       .trim();
   };
@@ -486,7 +503,6 @@ export function ScenarioPedagogiquePage() {
     setIsEditing(false);
 
     try {
-      // Combiner les textes extraits des documents
       const documentsContent = extractedTexts.length > 0 
         ? extractedTexts.join('\n\n---\n\n') 
         : undefined;
@@ -518,16 +534,13 @@ export function ScenarioPedagogiquePage() {
       setEditableRows(rows);
       setLastFormData(data);
 
-      // Extraire les notes complémentaires
       const notes = extractAdditionalNotes(content);
       setAdditionalNotes(notes);
 
-      // Capturer les sources RAG si disponibles
       if (result.sources && result.sources.length > 0) {
         setRagSources(result.sources);
       }
 
-      // Mise à jour des tokens
       const usedTokens: number = result.usage?.total_tokens ?? 0;
 
       if (usedTokens > 0 && user) {
@@ -563,7 +576,6 @@ export function ScenarioPedagogiquePage() {
       setLoading(false);
     }
   };
-
   // ============================================================================
   // ACTIONS
   // ============================================================================
@@ -622,24 +634,22 @@ export function ScenarioPedagogiquePage() {
   };
 
   // ============================================================================
-  // EXPORT PDF (FORMAT PAYSAGE) - VERSION COMPLÈTE SANS TRONCATURE
+  // EXPORT PDF
   // ============================================================================
 
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape
+      const pdf = new jsPDF('l', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 10;
       const contentWidth = pageWidth - 2 * margin;
       
-      // Titre
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(16);
       pdf.text('Scénario pédagogique', margin, 15);
       
-      // Sous-titre avec infos
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       if (lastFormData) {
@@ -648,14 +658,12 @@ export function ScenarioPedagogiquePage() {
       }
       pdf.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} avec ProfAssist`, margin, 32);
       
-      // Ligne séparatrice
       pdf.setLineWidth(0.3);
       pdf.line(margin, 35, pageWidth - margin, 35);
       
-      // Configuration du tableau
       const rowsData = isEditing ? editableRows : parsedRows;
-      const colWidths = [18, 50, 50, 45, 104]; // Total = 267 (A4 paysage = 297 - 2*15 marges)
-      const headers = ['Séance', 'Objectifs', 'Attendus', 'Prérequis', 'Exemples d\'activités'];
+      const colWidths = [22, 55, 55, 70, 65];
+      const headers = ['Séance', 'Phase & Objectif', 'Obstacles & Diff.', 'Activités & Dispositifs', 'Évaluation & Critères'];
       const minRowHeight = 8;
       const cellPadding = 2;
       const fontSize = 7;
@@ -663,10 +671,9 @@ export function ScenarioPedagogiquePage() {
       
       let yPos = 40;
       
-      // Fonction pour calculer la hauteur d'une ligne en fonction du contenu
       const calculateRowHeight = (row: SeanceRow): number => {
         pdf.setFontSize(fontSize);
-        const cellData = [row.numero, row.objectifs, row.attendus, row.prerequis, row.exemples];
+        const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
         let maxLines = 1;
         
         cellData.forEach((text, i) => {
@@ -679,9 +686,8 @@ export function ScenarioPedagogiquePage() {
         return Math.max(minRowHeight, maxLines * lineHeightFactor + 2 * cellPadding);
       };
       
-      // Fonction pour dessiner l'en-tête du tableau
       const drawTableHeader = () => {
-        pdf.setFillColor(99, 102, 241); // Indigo
+        pdf.setFillColor(99, 102, 241);
         pdf.rect(margin, yPos, contentWidth, 8, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(8);
@@ -698,31 +704,25 @@ export function ScenarioPedagogiquePage() {
         pdf.setFont('helvetica', 'normal');
       };
       
-      // Dessiner l'en-tête initial
       drawTableHeader();
       
-      // Dessiner chaque ligne du tableau
       rowsData.forEach((row, index) => {
         const rowHeight = calculateRowHeight(row);
         
-        // Vérifier si on doit changer de page
         if (yPos + rowHeight > pageHeight - 15) {
           pdf.addPage();
           yPos = 15;
           drawTableHeader();
         }
         
-        // Fond alterné
         if (index % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
           pdf.rect(margin, yPos, contentWidth, rowHeight, 'F');
         }
         
-        // Bordures de la ligne
         pdf.setDrawColor(220, 220, 220);
         pdf.rect(margin, yPos, contentWidth, rowHeight, 'S');
         
-        // Bordures verticales des colonnes
         let xBorder = margin;
         colWidths.forEach((width, i) => {
           if (i < colWidths.length - 1) {
@@ -731,17 +731,15 @@ export function ScenarioPedagogiquePage() {
           }
         });
         
-        // Contenu des cellules
         pdf.setFontSize(fontSize);
         let xPos = margin + cellPadding;
-        const cellData = [row.numero, row.objectifs, row.attendus, row.prerequis, row.exemples];
+        const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
         
         cellData.forEach((text, i) => {
           const maxWidth = colWidths[i] - 2 * cellPadding;
           const cleanedText = cleanMarkdownForPDF(text || '');
           const lines = pdf.splitTextToSize(cleanedText, maxWidth);
           
-          // Dessiner toutes les lignes (pas de limite)
           lines.forEach((line: string, lineIndex: number) => {
             const textY = yPos + cellPadding + 2.5 + (lineIndex * lineHeightFactor);
             if (textY < yPos + rowHeight - cellPadding) {
@@ -755,19 +753,14 @@ export function ScenarioPedagogiquePage() {
         yPos += rowHeight;
       });
 
-      // ========================================================================
-      // NOTES COMPLÉMENTAIRES (si présentes)
-      // ========================================================================
-      
       if (additionalNotes) {
-        // Nouvelle page pour les notes
         pdf.addPage();
         yPos = 15;
         
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(14);
         pdf.setTextColor(99, 102, 241);
-        pdf.text('Notes complémentaires', margin, yPos);
+        pdf.text('Notes pédagogiques', margin, yPos);
         yPos += 10;
         
         pdf.setFont('helvetica', 'normal');
@@ -786,10 +779,6 @@ export function ScenarioPedagogiquePage() {
         });
       }
 
-      // ========================================================================
-      // PAGE DES SOURCES RAG (si disponibles)
-      // ========================================================================
-      
       if (ragSources.length > 0) {
         pdf.addPage();
         yPos = 15;
@@ -814,18 +803,15 @@ export function ScenarioPedagogiquePage() {
             yPos = 15;
           }
           
-          // Nom du document
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(9);
           pdf.text(`${index + 1}. ${source.document_name}`, margin, yPos);
           
-          // Score
           pdf.setFont('helvetica', 'italic');
           pdf.setFontSize(7);
           pdf.setTextColor(100, 100, 100);
           pdf.text(`Pertinence: ${(source.similarity * 100).toFixed(0)}%`, margin, yPos + 4);
           
-          // Contenu
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(8);
           pdf.setTextColor(60, 60, 60);
@@ -840,7 +826,6 @@ export function ScenarioPedagogiquePage() {
         });
       }
       
-      // Pied de page sur toutes les pages
       const totalPages = pdf.internal.pages.length - 1;
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
@@ -849,7 +834,6 @@ export function ScenarioPedagogiquePage() {
         pdf.text(`Page ${i} / ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
       }
       
-      // Téléchargement
       const now = new Date();
       const dateStr = now.toLocaleDateString('fr-FR').replace(/\//g, '-');
       pdf.save(`Scenario-${lastFormData?.matiere || 'pedagogique'}-${dateStr}.pdf`);
@@ -905,7 +889,6 @@ export function ScenarioPedagogiquePage() {
 
       if (error) throw error;
 
-      // Notification de succès
       const successDiv = document.createElement('div');
       successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300';
       successDiv.innerHTML = '✅ Scénario ajouté à votre banque !';
@@ -1051,20 +1034,21 @@ export function ScenarioPedagogiquePage() {
             {/* Point de départ */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                <Layers className="w-4 h-4 inline mr-2" />Point de départ *
+                <Layers className="w-4 h-4 inline mr-2" />Point de départ / Diagnostic initial *
               </label>
-              <textarea {...register('pointDepart')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: Les élèves ont déjà étudié... Classe hétérogène avec..." />
+              <textarea {...register('pointDepart')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: Les élèves ont déjà étudié... Classe hétérogène avec... Représentations initiales observées..." />
               {errors.pointDepart && <p className="text-sm text-red-600 mt-1">⚠️ {errors.pointDepart.message}</p>}
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Diagnostic, vécu des élèves, contraintes de contexte...</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Acquis antérieurs, profil de classe, représentations initiales, contraintes...</p>
             </div>
 
             {/* Attendus */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                <Target className="w-4 h-4 inline mr-2" />Attendus et/ou objectifs *
+                <Target className="w-4 h-4 inline mr-2" />Attendus de fin de séquence *
               </label>
-              <textarea {...register('attendus')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: Comprendre les causes... Identifier les acteurs..." />
+              <textarea {...register('attendus')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: À la fin de la séquence, les élèves seront capables de..." />
               {errors.attendus && <p className="text-sm text-red-600 mt-1">⚠️ {errors.attendus.message}</p>}
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ce que les élèves doivent savoir et savoir faire à l'issue de la séquence</p>
             </div>
 
             {/* Découpage */}
@@ -1152,7 +1136,6 @@ export function ScenarioPedagogiquePage() {
                   </p>
                 )}
 
-                {/* Liste des fichiers uploadés */}
                 {uploadedFiles.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {uploadedFiles.map((file, index) => (
@@ -1188,8 +1171,8 @@ export function ScenarioPedagogiquePage() {
                   <div className="flex items-center space-x-3">
                     <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Utiliser les ressources officielles (RAG)</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Connecter la génération aux textes officiels</p>
+                      <p className="font-medium text-gray-900 dark:text-white">Aligner sur les programmes officiels (RAG)</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Connecter aux attendus de fin de cycle et repères de progressivité</p>
                     </div>
                   </div>
                   
@@ -1201,9 +1184,38 @@ export function ScenarioPedagogiquePage() {
                 
                 {useRag && (
                   <div className="mt-3 pl-8 text-sm text-indigo-700 dark:text-indigo-300">
-                    ✓ La génération utilisera les programmes officiels pour enrichir le scénario
+                    ✓ La génération utilisera les programmes officiels et les attendus de fin de cycle pour enrichir le scénario
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* ================================================================
+                AVERTISSEMENT CONSOMMATION DE TOKENS
+            ================================================================ */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl p-4 border border-amber-300 dark:border-amber-700">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                    Consommation de crédits importante
+                  </h4>
+                  <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 mb-3">
+                    <li>• La génération d'un scénario consomme un <strong>nombre significatif de tokens</strong> (3 000 à 8 000+)</li>
+                    {uploadedFiles.length > 0 && (
+                      <li>• <strong>Documents ajoutés :</strong> +{uploadedFiles.length} fichier(s) = consommation accrue</li>
+                    )}
+                    {useRag && (
+                      <li>• <strong>RAG activé :</strong> enrichissement par les programmes officiels = consommation accrue</li>
+                    )}
+                  </ul>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+                    <strong>Avant de générer :</strong> vérifiez que tous les champs sont correctement remplis pour éviter de relancer une génération.
+                  </p>
+                  <p className="text-sm text-amber-600 dark:text-amber-400 italic">
+                    💡 Vous pourrez modifier et enregistrer votre scénario après génération.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1280,7 +1292,6 @@ export function ScenarioPedagogiquePage() {
                       <Edit className="w-4 h-4 mr-2" />Modifier
                     </button>
                     
-                    {/* Bouton Banque */}
                     {bankAccessLoading ? (
                       <button disabled className="inline-flex items-center px-4 py-2 bg-gray-400 text-gray-600 rounded-xl font-medium cursor-not-allowed opacity-60">
                         <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -1327,11 +1338,11 @@ export function ScenarioPedagogiquePage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider w-20">Séance</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Objectifs</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Attendus</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Prérequis</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Exemples</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider w-24">Séance</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Phase & Objectif</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Obstacles & Différenciation</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Activités & Dispositifs</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Évaluation & Critères</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -1346,27 +1357,27 @@ export function ScenarioPedagogiquePage() {
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
-                            <textarea value={row.objectifs} onChange={(e) => handleCellChange(index, 'objectifs', e.target.value)} rows={3}
+                            <textarea value={row.phaseObjectif} onChange={(e) => handleCellChange(index, 'phaseObjectif', e.target.value)} rows={4}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
-                          ) : renderMarkdown(row.objectifs)}
+                          ) : renderMarkdown(row.phaseObjectif)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
-                            <textarea value={row.attendus} onChange={(e) => handleCellChange(index, 'attendus', e.target.value)} rows={3}
+                            <textarea value={row.obstaclesDiff} onChange={(e) => handleCellChange(index, 'obstaclesDiff', e.target.value)} rows={4}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
-                          ) : renderMarkdown(row.attendus)}
+                          ) : renderMarkdown(row.obstaclesDiff)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
-                            <textarea value={row.prerequis} onChange={(e) => handleCellChange(index, 'prerequis', e.target.value)} rows={3}
+                            <textarea value={row.activitesDispositifs} onChange={(e) => handleCellChange(index, 'activitesDispositifs', e.target.value)} rows={4}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
-                          ) : renderMarkdown(row.prerequis)}
+                          ) : renderMarkdown(row.activitesDispositifs)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
-                            <textarea value={row.exemples} onChange={(e) => handleCellChange(index, 'exemples', e.target.value)} rows={3}
+                            <textarea value={row.evaluationCriteres} onChange={(e) => handleCellChange(index, 'evaluationCriteres', e.target.value)} rows={4}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
-                          ) : renderMarkdown(row.exemples)}
+                          ) : renderMarkdown(row.evaluationCriteres)}
                         </td>
                       </tr>
                     ))
@@ -1381,25 +1392,24 @@ export function ScenarioPedagogiquePage() {
               </table>
             </div>
 
-            {/* Section Notes Complémentaires */}
+            {/* Notes pédagogiques */}
             {additionalNotes && !isEditing && (
               <div className="mt-8 border-t-2 border-gray-200 dark:border-gray-600 pt-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <FileText className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">Notes complémentaires</h4>
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">Notes pédagogiques</h4>
                 </div>
                 
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-sans">
-                      {additionalNotes}
-                    </pre>
-                  </div>
-                </div>
+  <div className="text-sm text-gray-700 dark:text-gray-300">
+    {renderNotesMarkdown(additionalNotes)}
+  </div>
+</div>
+
               </div>
             )}
 
-            {/* Section Sources RAG */}
+            {/* Sources RAG */}
             {ragSources.length > 0 && !isEditing && (
               <div className="mt-8 border-t-2 border-gray-200 dark:border-gray-600 pt-6">
                 <div className="flex items-center space-x-3 mb-4">
@@ -1411,8 +1421,7 @@ export function ScenarioPedagogiquePage() {
                   <div className="flex items-start space-x-2">
                     <Info className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
                     <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                      Ces documents institutionnels ont été utilisés pour enrichir votre scénario. 
-                      Ils sont également inclus dans l'export PDF.
+                      Ces documents institutionnels ont été utilisés pour enrichir votre scénario et garantir l'alignement avec les programmes officiels.
                     </p>
                   </div>
                 </div>
@@ -1438,10 +1447,10 @@ export function ScenarioPedagogiquePage() {
               </div>
             )}
 
-            {/* Note */}
+            {/* Note finale */}
             <div className="mt-6 bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                <strong>💡 Conseil :</strong> Ce scénario est une vision macro de votre séquence. 
+                <strong>💡 Conseil :</strong> Ce scénario est une vision macro structurée selon les phases didactiques (émergence → construction → structuration → transfert). 
                 Vous pouvez ensuite utiliser le générateur de séances pour détailler chaque séance individuellement.
               </p>
             </div>
@@ -1453,6 +1462,7 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
 
 
 
