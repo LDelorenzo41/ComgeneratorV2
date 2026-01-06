@@ -23,8 +23,8 @@ interface ScenarioRequest {
   nombreSeances: number;
   dureeSeance: number;
   useRag: boolean;
-  documentsContent?: string;      // Contenu extrait des documents uploadés
-  documentNames?: string[];       // Noms des fichiers uploadés
+  documentsContent?: string;
+  documentNames?: string[];
 }
 
 interface RagChunk {
@@ -48,8 +48,8 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 8,                    // Augmenté pour plus de contexte
-  ragSimilarityThreshold: 0.40,  // Seuil relevé pour plus de pertinence
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.40,
 };
 
 const corsHeaders = {
@@ -58,39 +58,34 @@ const corsHeaders = {
 };
 
 // ============================================================================
-// MAPPING NIVEAU → CYCLE (pour recherche RAG optimisée)
+// MAPPING NIVEAU → CYCLE
 // ============================================================================
 
 function getCycleFromNiveau(niveau: string): { cycle: string; cycleNum: number } {
   const niveauLower = niveau.toLowerCase().trim();
   
-  // Cycle 1 : Maternelle
   if (niveauLower.includes('ps') || niveauLower.includes('ms') || niveauLower.includes('gs') ||
       niveauLower.includes('petite section') || niveauLower.includes('moyenne section') || 
       niveauLower.includes('grande section') || niveauLower.includes('maternelle')) {
     return { cycle: 'cycle 1', cycleNum: 1 };
   }
   
-  // Cycle 2 : CP, CE1, CE2
   if (niveauLower.includes('cp') || niveauLower.includes('ce1') || niveauLower.includes('ce2') ||
       niveauLower.includes('cours préparatoire') || niveauLower.includes('cours élémentaire')) {
     return { cycle: 'cycle 2', cycleNum: 2 };
   }
   
-  // Cycle 3 : CM1, CM2, 6ème
   if (niveauLower.includes('cm1') || niveauLower.includes('cm2') || niveauLower.includes('6') ||
       niveauLower.includes('sixième') || niveauLower.includes('cours moyen')) {
     return { cycle: 'cycle 3', cycleNum: 3 };
   }
   
-  // Cycle 4 : 5ème, 4ème, 3ème
   if (niveauLower.includes('5') || niveauLower.includes('4') || niveauLower.includes('3') ||
       niveauLower.includes('cinquième') || niveauLower.includes('quatrième') || 
       niveauLower.includes('troisième') || niveauLower.includes('collège')) {
     return { cycle: 'cycle 4', cycleNum: 4 };
   }
   
-  // Lycée
   if (niveauLower.includes('seconde') || niveauLower.includes('2nde') || 
       niveauLower.includes('première') || niveauLower.includes('1ère') ||
       niveauLower.includes('terminale') || niveauLower.includes('tle') ||
@@ -102,7 +97,7 @@ function getCycleFromNiveau(niveau: string): { cycle: string; cycleNum: number }
 }
 
 // ============================================================================
-// PROMPT SYSTÈME EXPERT EN DIDACTIQUE
+// PROMPT SYSTÈME EXPERT EN DIDACTIQUE (VERSION OPTIMISÉE)
 // ============================================================================
 
 const SYSTEM_PROMPT = `Tu es un conseiller pédagogique expert en ingénierie de formation, en didactique des disciplines et en sciences de l'éducation. Tu maîtrises les travaux de référence (Brousseau, Astolfi, Meirieu, Develay, Perrenoud) et les programmes officiels de l'Éducation nationale française.
@@ -160,13 +155,39 @@ Pour chaque séance, prévoir :
 - Critères de réussite explicites et partagés avec les élèves
 - Feedback formatif permettant l'autorégulation
 
+**6. LOGIQUE DIDACTIQUE EXPLICITE (savoir → situation → institution → preuve)**
+Pour chaque séance, la proposition doit rendre lisible :
+- Le SAVOIR visé (concept, procédure, attitude à construire)
+- La SITUATION qui permet de le construire (problème, tâche, milieu)
+- Le rôle du MILIEU (matériel, contraintes, consignes qui permettent l'apprentissage)
+- Le moment d'INSTITUTIONNALISATION par l'enseignant (ce qui est stabilisé)
+- Ce qui constitue la PREUVE que l'apprentissage a eu lieu
+
+⚠️ DISTINCTION CRUCIALE : Une activité réussie ≠ un apprentissage réalisé.
+Tu dois expliciter POURQUOI chaque activité permet réellement l'apprentissage visé,
+et anticiper les "fausses réussites" (réussite de la tâche sans compréhension).
+
+**7. MÉMOIRE DIDACTIQUE ET CONTINUITÉ**
+Un apprentissage durable nécessite :
+- Réactivation explicite des acquis antérieurs à chaque séance
+- Liens visibles entre les séances (ce qui est repris, transformé, approfondi)
+- Traces écrites évolutives (qui s'enrichissent au fil de la séquence)
+- Rituels de rappel et de consolidation
+- Anticipation : que doit rester 3 semaines après la séquence ?
+
+**8. STATUT DE L'ERREUR COMME LEVIER D'APPRENTISSAGE**
+L'erreur n'est pas un échec mais un outil didactique :
+- Erreurs ATTENDUES : celles que les élèves vont probablement commettre
+- Erreurs FÉCONDES : celles qui révèlent un obstacle et permettent d'avancer
+- EXPLOITATION DIDACTIQUE : comment l'enseignant utilise l'erreur pour faire progresser
+
 ═══════════════════════════════════════════════════════════════════════════════
                          FORMAT DE SORTIE OBLIGATOIRE
 ═══════════════════════════════════════════════════════════════════════════════
 
 Tu dois produire un tableau markdown avec EXACTEMENT ces 5 colonnes :
 
-| Séance | Phase et objectif opérationnel | Obstacles et différenciation | Activités et dispositifs | Évaluation et critères de réussite |
+| Séance | Phase et objectif opérationnel | Obstacles, erreurs et différenciation | Activités et dispositifs | Évaluation et critères de réussite |
 
 **DÉFINITION DES COLONNES :**
 
@@ -176,23 +197,37 @@ Tu dois produire un tableau markdown avec EXACTEMENT ces 5 colonnes :
   - Indiquer la phase (Émergence/Construction/Structuration/Transfert)
   - Objectif avec verbe d'action : "Identifier...", "Comparer...", "Produire..."
   - Lien explicite avec l'attendu de fin de cycle visé
+  - SAVOIR visé clairement identifié (concept, procédure ou attitude)
+  - Lien avec la séance précédente (réactivation des acquis)
 
-• **Obstacles et différenciation** :
-  - Obstacles didactiques anticipés (représentations erronées, difficultés prévisibles)
+• **Obstacles, erreurs et différenciation** :
+  - Obstacles didactiques anticipés (représentations erronées, conceptions initiales)
+  - Erreurs typiques ATTENDUES et leur origine probable
+  - Erreurs FÉCONDES à exploiter pour faire avancer la réflexion
+  - Modalités d'EXPLOITATION PÉDAGOGIQUE de l'erreur (confrontation, explicitation)
+  - Malentendus possibles sur la tâche ou le savoir
   - Adaptations pour élèves en difficulté (étayage, supports, aides)
   - Extensions pour élèves avancés (approfondissement, défis)
 
 • **Activités et dispositifs** :
   - Description concrète et réaliste des activités
+  - Explication de POURQUOI cette activité permet l'apprentissage visé
   - Modalités de travail (individuel/binôme/groupe/collectif)
-  - Matériel et supports nécessaires
+  - Matériel et supports nécessaires (le MILIEU)
   - Durées indicatives des phases
-  - Rôle de l'enseignant (consigne, étayage, relance, institutionnalisation)
+  - POSTURE DE L'ENSEIGNANT à chaque moment :
+    • Quand il observe sans intervenir (dévolution)
+    • Quand il étaye par questionnement (relance)
+    • Quand il régule les interactions (médiation)
+    • Quand il institutionnalise le savoir (formalisation)
+  - Trace écrite ou mémorielle construite (ce qui reste)
 
 • **Évaluation et critères de réussite** :
   - Modalités d'évaluation formative pendant la séance
   - Critères de réussite explicites et observables
   - Indicateurs de progrès pour les élèves
+  - Ce qui PROUVE que l'apprentissage a eu lieu (pas seulement la réussite de la tâche)
+  - Distinction entre réussite de l'activité et compréhension du savoir
 
 ═══════════════════════════════════════════════════════════════════════════════
                            EXIGENCES DE QUALITÉ
@@ -204,12 +239,31 @@ Tu dois produire un tableau markdown avec EXACTEMENT ces 5 colonnes :
 4. **Richesse pédagogique** : Variété des modalités, équilibre entre les phases d'apprentissage
 5. **Praticité** : Descriptions suffisamment détaillées pour être directement applicables
 6. **Professionnalisme** : Vocabulaire didactique précis, références aux programmes
+7. **Continuité inter-séances** : Chaque séance réactive explicitement un acquis antérieur
+8. **Exploitation de l'erreur** : Les erreurs sont anticipées et utilisées comme leviers
 
 Après le tableau, ajoute une section "**Notes pédagogiques**" avec :
 - Les attendus de fin de cycle visés (issus des programmes officiels)
 - Les compétences du socle commun travaillées (si pertinent)
 - Les points de vigilance pour l'enseignant
-- Les liens possibles avec d'autres disciplines (interdisciplinarité)`;
+- Les liens possibles avec d'autres disciplines (interdisciplinarité)
+- Ce qui doit RESTER chez les élèves 3 semaines après (mémoire didactique)
+- Les rituels de réactivation recommandés
+
+═══════════════════════════════════════════════════════════════════════════════
+                      AUTO-CONTRÔLE QUALITÉ (à effectuer avant de répondre)
+═══════════════════════════════════════════════════════════════════════════════
+
+Avant de finaliser ta réponse, vérifie systématiquement que :
+□ Aucune séance ne se limite à une simple activité sans apprentissage explicite
+□ Les objectifs sont réellement évaluables (verbes d'action observables)
+□ La progression est crédible pour des élèves réels du niveau indiqué
+□ Le vocabulaire est institutionnel et professionnel
+□ Chaque séance a un lien explicite avec la précédente (sauf la première)
+□ Les erreurs anticipées sont réalistes et leur exploitation est prévue
+□ Les postures enseignantes sont clairement indiquées
+□ La distinction tâche/activité/apprentissage est respectée
+□ Les traces écrites sont prévues et évolutives`;
 
 // ============================================================================
 // HELPERS - SUPABASE CLIENT
@@ -298,7 +352,6 @@ async function searchRagChunks(
 // ============================================================================
 
 const scenarioHandler = async (req: Request): Promise<Response> => {
-  // CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -313,7 +366,6 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       return new Response('Missing OPENAI_API_KEY', { status: 500, headers: corsHeaders });
     }
 
-    // Authentification
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Non authentifié' }), {
@@ -333,11 +385,8 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Parsing de la requête
     const data: ScenarioRequest = await req.json();
     const { documentsContent, documentNames } = data;
-
-    // Déterminer le cycle
     const { cycle, cycleNum } = getCycleFromNiveau(data.niveau);
 
     console.log(`[scenario] Generating for: ${data.matiere} - ${data.niveau} (${cycle})`);
@@ -345,7 +394,7 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     console.log(`[scenario] Documents fournis: ${documentNames?.length || 0}`);
 
     // ========================================================================
-    // SECTION RAG (optionnelle) - REQUÊTE OPTIMISÉE
+    // SECTION RAG (optionnelle)
     // ========================================================================
     
     let ragContext = '';
@@ -354,7 +403,6 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
       
-      // Construire une requête de recherche OPTIMISÉE et CIBLÉE
       const searchTerms = [
         data.matiere,
         data.niveau,
@@ -369,10 +417,8 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       
       console.log(`[scenario] RAG search query: ${searchTerms}`);
       
-      // Créer l'embedding
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
       
-      // Rechercher dans le RAG
       const chunks = await searchRagChunks(
         serviceClient,
         user.id,
@@ -383,7 +429,6 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       if (chunks.length > 0) {
         console.log(`[scenario] Found ${chunks.length} relevant chunks`);
         
-        // Capturer les sources pour les retourner au client
         ragSources = chunks.map((chunk: RagChunk) => ({
           document_name: chunk.documentTitle || 'Document officiel',
           chunk_content: chunk.content,
@@ -498,10 +543,24 @@ ${documentsContext}
 
 5. **Format de sortie** : Tableau markdown avec les 5 colonnes définies, suivi des notes pédagogiques
 
+6. **Continuité inter-séances obligatoire** :
+   - Chaque séance (sauf la première) doit RÉACTIVER explicitement un acquis de la séance précédente
+   - Indiquer ce qui est repris, transformé ou approfondi d'une séance à l'autre
+   - Préciser les traces écrites ou mémorielles construites et comment elles évoluent
+   - Anticiper ce qui doit RESTER chez les élèves après la séquence
+
+7. **Traitement de l'erreur** :
+   - Anticiper les erreurs typiques des élèves pour chaque séance
+   - Identifier les erreurs "fécondes" qui permettent de faire avancer la réflexion
+   - Prévoir comment l'enseignant exploitera ces erreurs (confrontation, explicitation)
+
+8. **Postures enseignantes explicites** :
+   - Pour chaque activité, indiquer quand l'enseignant observe, étaye, régule ou institutionnalise
+
 Génère maintenant le scénario pédagogique complet :`;
 
     // ========================================================================
-    // APPEL OPENAI AVEC SYSTEM PROMPT EXPERT
+    // APPEL OPENAI
     // ========================================================================
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -516,8 +575,8 @@ Génère maintenant le scénario pédagogique complet :`;
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.6,  // Légèrement réduit pour plus de cohérence
-        max_tokens: 5000,  // Augmenté pour contenu plus riche
+        temperature: 0.6,
+        max_tokens: 5500,
       }),
     });
 

@@ -921,6 +921,34 @@ export function ScenarioPedagogiquePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-purple-50/30 dark:from-gray-900 dark:via-indigo-900/20 dark:to-purple-900/20">
+      
+      {/* Overlay de chargement */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mx-4 max-w-md text-center border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-indigo-200 dark:border-indigo-900 rounded-full"></div>
+                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Génération en cours...
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Votre scénario pédagogique est en cours de création.
+              <br />
+              Cette opération peut prendre jusqu'à 30 secondes.
+            </p>
+            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl p-3">
+              <p className="text-amber-700 dark:text-amber-300 text-sm font-medium">
+                ⚠️ Veuillez rester sur cette page pour ne pas perdre la génération.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* En-tête */}
@@ -1171,8 +1199,8 @@ export function ScenarioPedagogiquePage() {
                   <div className="flex items-center space-x-3">
                     <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Aligner sur les programmes officiels (RAG)</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Connecter aux attendus de fin de cycle et repères de progressivité</p>
+                      <p className="font-medium text-gray-900 dark:text-white">Utiliser les corpus documentaires « Perso » et « ProfAssist » (cf. mon chatbot)</p>
+                    
                     </div>
                   </div>
                   
@@ -1184,7 +1212,7 @@ export function ScenarioPedagogiquePage() {
                 
                 {useRag && (
                   <div className="mt-3 pl-8 text-sm text-indigo-700 dark:text-indigo-300">
-                    ✓ La génération utilisera les programmes officiels et les attendus de fin de cycle pour enrichir le scénario
+                    ✓ La génération utilisera les textes officiels présents dans le corpus documentaire. Ce corpus est en cours de construction. Si aucun contenu pertinent n’est trouvé, l’IA générera le scénario à partir de ses propres connaissances.
                   </div>
                 )}
               </div>
@@ -1201,7 +1229,7 @@ export function ScenarioPedagogiquePage() {
                     Consommation de crédits importante
                   </h4>
                   <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 mb-3">
-                    <li>• La génération d'un scénario consomme un <strong>nombre significatif de tokens</strong> (3 000 à 8 000+)</li>
+                    <li>• La génération d'un scénario consomme un <strong>nombre significatif de tokens</strong> (5 000 à 10 000+)</li>
                     {uploadedFiles.length > 0 && (
                       <li>• <strong>Documents ajoutés :</strong> +{uploadedFiles.length} fichier(s) = consommation accrue</li>
                     )}
