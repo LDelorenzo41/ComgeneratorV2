@@ -7,7 +7,7 @@ export function CgvPage() {
   return (
     <LegalLayout 
       title="Conditions générales de vente" 
-      lastUpdated="31 décembre 2025"
+      lastUpdated="6 janvier 2026"
     >
       <div className="space-y-8">
         
@@ -106,19 +106,20 @@ export function CgvPage() {
                     <p className="text-lg font-semibold text-gray-900">~3500</p>
                   </div>
                   <div className="text-center">
-                    <div className="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
-                      <span className="text-amber-600 font-bold">Sc</span>
-                    </div>
-                    <p className="text-sm text-gray-700">Scénario</p>
-                    <p className="text-lg font-semibold text-gray-900">~4000</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="bg-indigo-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
-                      <span className="text-indigo-600 font-bold">🤖</span>
-                    </div>
-                    <p className="text-sm text-gray-700">Chatbot</p>
-                    <p className="text-lg font-semibold text-gray-900">~2000</p>
-                  </div>
+  <div className="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
+    <span className="text-amber-600 font-bold">Sc</span>
+  </div>
+  <p className="text-sm text-gray-700">Scénario</p>
+  <p className="text-lg font-semibold text-gray-900">8k-10k+</p>
+</div>
+<div className="text-center">
+  <div className="bg-indigo-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
+    <span className="text-indigo-600 font-bold">🤖</span>
+  </div>
+  <p className="text-sm text-gray-700">Chatbot</p>
+  <p className="text-lg font-semibold text-gray-900">2k-4k</p>
+</div>
+
                 </div>
               </div>
             </div>

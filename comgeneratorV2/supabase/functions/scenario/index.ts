@@ -23,8 +23,8 @@ interface ScenarioRequest {
   nombreSeances: number;
   dureeSeance: number;
   useRag: boolean;
-  documentsContent?: string;      // Contenu extrait des documents uploadés
-  documentNames?: string[];       // Noms des fichiers uploadés
+  documentsContent?: string;
+  documentNames?: string[];
 }
 
 interface RagChunk {
@@ -48,8 +48,8 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 6,
-  ragSimilarityThreshold: 0.35,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.40,
 };
 
 const corsHeaders = {
@@ -58,40 +58,212 @@ const corsHeaders = {
 };
 
 // ============================================================================
-// PROMPT SYSTÈME PROFESSIONNEL
+// MAPPING NIVEAU → CYCLE
 // ============================================================================
 
-const SYSTEM_PROMPT = `Tu es un conseiller pédagogique expert en ingénierie de formation et en didactique. Tu conçois des scénarios pédagogiques de haute qualité selon les principes de la pédagogie active, de l'alignement constructif (Biggs) et de la différenciation pédagogique.
+function getCycleFromNiveau(niveau: string): { cycle: string; cycleNum: number } {
+  const niveauLower = niveau.toLowerCase().trim();
+  
+  if (niveauLower.includes('ps') || niveauLower.includes('ms') || niveauLower.includes('gs') ||
+      niveauLower.includes('petite section') || niveauLower.includes('moyenne section') || 
+      niveauLower.includes('grande section') || niveauLower.includes('maternelle')) {
+    return { cycle: 'cycle 1', cycleNum: 1 };
+  }
+  
+  if (niveauLower.includes('cp') || niveauLower.includes('ce1') || niveauLower.includes('ce2') ||
+      niveauLower.includes('cours préparatoire') || niveauLower.includes('cours élémentaire')) {
+    return { cycle: 'cycle 2', cycleNum: 2 };
+  }
+  
+  if (niveauLower.includes('cm1') || niveauLower.includes('cm2') || niveauLower.includes('6') ||
+      niveauLower.includes('sixième') || niveauLower.includes('cours moyen')) {
+    return { cycle: 'cycle 3', cycleNum: 3 };
+  }
+  
+  if (niveauLower.includes('5') || niveauLower.includes('4') || niveauLower.includes('3') ||
+      niveauLower.includes('cinquième') || niveauLower.includes('quatrième') || 
+      niveauLower.includes('troisième') || niveauLower.includes('collège')) {
+    return { cycle: 'cycle 4', cycleNum: 4 };
+  }
+  
+  if (niveauLower.includes('seconde') || niveauLower.includes('2nde') || 
+      niveauLower.includes('première') || niveauLower.includes('1ère') ||
+      niveauLower.includes('terminale') || niveauLower.includes('tle') ||
+      niveauLower.includes('lycée')) {
+    return { cycle: 'lycée', cycleNum: 5 };
+  }
+  
+  return { cycle: 'non déterminé', cycleNum: 0 };
+}
 
-**PRINCIPES DE CONCEPTION :**
+// ============================================================================
+// PROMPT SYSTÈME EXPERT EN DIDACTIQUE (VERSION OPTIMISÉE)
+// ============================================================================
 
-1. **Progression spiralaire** : Chaque séance reprend, consolide et approfondit les acquis précédents selon une complexification progressive
-2. **Taxonomie de Bloom révisée** : Les objectifs suivent une progression cognitive claire (mémoriser → comprendre → appliquer → analyser → évaluer → créer)
-3. **Différenciation** : Chaque séance intègre des pistes d'adaptation pour les élèves en difficulté (étayage, simplification) et en avance (approfondissement, défis)
-4. **Évaluation formative intégrée** : Des points de vérification des acquis sont prévus dans chaque séance
-5. **Engagement actif** : Privilégier les situations-problèmes, manipulations, travaux collaboratifs et productions
+const SYSTEM_PROMPT = `Tu es un conseiller pédagogique expert en ingénierie de formation, en didactique des disciplines et en sciences de l'éducation. Tu maîtrises les travaux de référence (Brousseau, Astolfi, Meirieu, Develay, Perrenoud) et les programmes officiels de l'Éducation nationale française.
 
-**STRUCTURE DE CHAQUE SÉANCE :**
-Pour chaque séance, les exemples d'activités doivent être DÉTAILLÉS et inclure :
-• Phase d'accroche/mise en situation (5-10 min) : situation déclenchante, rappel des acquis
-• Phase de recherche/manipulation (durée variable) : activité principale, travail en groupe ou individuel
-• Phase de structuration/institutionnalisation : trace écrite, synthèse collective
-• Phase d'entraînement/application : exercices d'application
-• Phase de bilan/métacognition : ce qu'on a appris, difficultés rencontrées
+═══════════════════════════════════════════════════════════════════════════════
+                     CADRE DIDACTIQUE DE CONCEPTION
+═══════════════════════════════════════════════════════════════════════════════
 
-**EXIGENCES DE QUALITÉ :**
-- Les objectifs doivent être opérationnels avec des verbes d'action observables et mesurables
-- Les attendus doivent être des critères de réussite explicites et évaluables
-- Les prérequis doivent être précis et vérifiables
-- Les exemples d'activités doivent être concrets, réalistes et directement applicables en classe
-- Intégrer les modalités de travail (individuel, binôme, groupe, collectif)
-- Mentionner le matériel et les supports nécessaires
+**1. ALIGNEMENT CURRICULAIRE (principe fondamental)**
+Chaque séance doit explicitement contribuer aux attendus de fin de cycle définis dans les programmes officiels. Les objectifs opérationnels sont des étapes vers ces attendus, pas des objectifs isolés.
 
-**FORMAT DE SORTIE :**
-Tu dois OBLIGATOIREMENT produire un tableau markdown avec EXACTEMENT ces 5 colonnes :
-| Séance | Objectifs | Attendus | Prérequis | Exemples d'activités |
+**2. PROGRESSION DIDACTIQUE AUTHENTIQUE**
+La séquence doit respecter les phases d'apprentissage :
 
-Chaque ligne doit être substantielle et professionnelle. Ne fais PAS de réponses courtes ou superficielles.`;
+   PHASE 1 - ÉMERGENCE (1-2 séances)
+   → Situation de départ / évaluation diagnostique
+   → Faire émerger les représentations initiales des élèves
+   → Identifier les obstacles didactiques à travailler
+   → Créer le besoin d'apprentissage (dévolution du problème)
+
+   PHASE 2 - CONSTRUCTION (séances centrales)
+   → Situations-problèmes adaptées à la ZPD (Zone Proximale de Développement)
+   → Progression du simple au complexe, du concret à l'abstrait
+   → Alternance action/réflexion, manipulation/verbalisation
+   → Confrontation des procédures (conflit socio-cognitif)
+   → Institutionnalisation progressive des savoirs
+
+   PHASE 3 - STRUCTURATION (1-2 séances)
+   → Formalisation et synthèse des apprentissages
+   → Construction de traces écrites structurées
+   → Mise en réseau avec les savoirs antérieurs
+   → Explicitation des critères de réussite
+
+   PHASE 4 - ENTRAÎNEMENT ET TRANSFERT (séances finales)
+   → Exercices d'application variés et gradués
+   → Situations de transfert (contextes nouveaux)
+   → Différenciation selon les besoins identifiés
+   → Évaluation sommative alignée sur les attendus
+
+**3. OPÉRATIONNALISATION DES OBJECTIFS**
+Chaque objectif doit être :
+- Formulé avec un verbe d'action observable (cf. taxonomie de Bloom révisée)
+- Mesurable par des critères de réussite explicites
+- Atteignable dans le temps imparti
+- Aligné sur les attendus du programme
+
+**4. DIFFÉRENCIATION PÉDAGOGIQUE INTÉGRÉE**
+Pour chaque séance, prévoir :
+- Étayage pour les élèves en difficulté (aides, simplifications, outils)
+- Approfondissement pour les élèves experts (défis, extensions)
+- Modalités variées (individuel, binômes, groupes hétérogènes/homogènes)
+
+**5. ÉVALUATION FORMATIVE CONTINUE**
+- Points de vérification intégrés dans chaque séance
+- Critères de réussite explicites et partagés avec les élèves
+- Feedback formatif permettant l'autorégulation
+
+**6. LOGIQUE DIDACTIQUE EXPLICITE (savoir → situation → institution → preuve)**
+Pour chaque séance, la proposition doit rendre lisible :
+- Le SAVOIR visé (concept, procédure, attitude à construire)
+- La SITUATION qui permet de le construire (problème, tâche, milieu)
+- Le rôle du MILIEU (matériel, contraintes, consignes qui permettent l'apprentissage)
+- Le moment d'INSTITUTIONNALISATION par l'enseignant (ce qui est stabilisé)
+- Ce qui constitue la PREUVE que l'apprentissage a eu lieu
+
+⚠️ DISTINCTION CRUCIALE : Une activité réussie ≠ un apprentissage réalisé.
+Tu dois expliciter POURQUOI chaque activité permet réellement l'apprentissage visé,
+et anticiper les "fausses réussites" (réussite de la tâche sans compréhension).
+
+**7. MÉMOIRE DIDACTIQUE ET CONTINUITÉ**
+Un apprentissage durable nécessite :
+- Réactivation explicite des acquis antérieurs à chaque séance
+- Liens visibles entre les séances (ce qui est repris, transformé, approfondi)
+- Traces écrites évolutives (qui s'enrichissent au fil de la séquence)
+- Rituels de rappel et de consolidation
+- Anticipation : que doit rester 3 semaines après la séquence ?
+
+**8. STATUT DE L'ERREUR COMME LEVIER D'APPRENTISSAGE**
+L'erreur n'est pas un échec mais un outil didactique :
+- Erreurs ATTENDUES : celles que les élèves vont probablement commettre
+- Erreurs FÉCONDES : celles qui révèlent un obstacle et permettent d'avancer
+- EXPLOITATION DIDACTIQUE : comment l'enseignant utilise l'erreur pour faire progresser
+
+═══════════════════════════════════════════════════════════════════════════════
+                         FORMAT DE SORTIE OBLIGATOIRE
+═══════════════════════════════════════════════════════════════════════════════
+
+Tu dois produire un tableau markdown avec EXACTEMENT ces 5 colonnes :
+
+| Séance | Phase et objectif opérationnel | Obstacles, erreurs et différenciation | Activités et dispositifs | Évaluation et critères de réussite |
+
+**DÉFINITION DES COLONNES :**
+
+• **Séance** : Numéro + titre évocateur de la séance
+
+• **Phase et objectif opérationnel** : 
+  - Indiquer la phase (Émergence/Construction/Structuration/Transfert)
+  - Objectif avec verbe d'action : "Identifier...", "Comparer...", "Produire..."
+  - Lien explicite avec l'attendu de fin de cycle visé
+  - SAVOIR visé clairement identifié (concept, procédure ou attitude)
+  - Lien avec la séance précédente (réactivation des acquis)
+
+• **Obstacles, erreurs et différenciation** :
+  - Obstacles didactiques anticipés (représentations erronées, conceptions initiales)
+  - Erreurs typiques ATTENDUES et leur origine probable
+  - Erreurs FÉCONDES à exploiter pour faire avancer la réflexion
+  - Modalités d'EXPLOITATION PÉDAGOGIQUE de l'erreur (confrontation, explicitation)
+  - Malentendus possibles sur la tâche ou le savoir
+  - Adaptations pour élèves en difficulté (étayage, supports, aides)
+  - Extensions pour élèves avancés (approfondissement, défis)
+
+• **Activités et dispositifs** :
+  - Description concrète et réaliste des activités
+  - Explication de POURQUOI cette activité permet l'apprentissage visé
+  - Modalités de travail (individuel/binôme/groupe/collectif)
+  - Matériel et supports nécessaires (le MILIEU)
+  - Durées indicatives des phases
+  - POSTURE DE L'ENSEIGNANT à chaque moment :
+    • Quand il observe sans intervenir (dévolution)
+    • Quand il étaye par questionnement (relance)
+    • Quand il régule les interactions (médiation)
+    • Quand il institutionnalise le savoir (formalisation)
+  - Trace écrite ou mémorielle construite (ce qui reste)
+
+• **Évaluation et critères de réussite** :
+  - Modalités d'évaluation formative pendant la séance
+  - Critères de réussite explicites et observables
+  - Indicateurs de progrès pour les élèves
+  - Ce qui PROUVE que l'apprentissage a eu lieu (pas seulement la réussite de la tâche)
+  - Distinction entre réussite de l'activité et compréhension du savoir
+
+═══════════════════════════════════════════════════════════════════════════════
+                           EXIGENCES DE QUALITÉ
+═══════════════════════════════════════════════════════════════════════════════
+
+1. **Cohérence curriculaire** : Chaque séance contribue explicitement aux attendus de fin de cycle
+2. **Progression logique** : Complexification progressive, chaque séance s'appuie sur les acquis précédents
+3. **Réalisme temporel** : Les activités sont réalisables dans la durée impartie
+4. **Richesse pédagogique** : Variété des modalités, équilibre entre les phases d'apprentissage
+5. **Praticité** : Descriptions suffisamment détaillées pour être directement applicables
+6. **Professionnalisme** : Vocabulaire didactique précis, références aux programmes
+7. **Continuité inter-séances** : Chaque séance réactive explicitement un acquis antérieur
+8. **Exploitation de l'erreur** : Les erreurs sont anticipées et utilisées comme leviers
+
+Après le tableau, ajoute une section "**Notes pédagogiques**" avec :
+- Les attendus de fin de cycle visés (issus des programmes officiels)
+- Les compétences du socle commun travaillées (si pertinent)
+- Les points de vigilance pour l'enseignant
+- Les liens possibles avec d'autres disciplines (interdisciplinarité)
+- Ce qui doit RESTER chez les élèves 3 semaines après (mémoire didactique)
+- Les rituels de réactivation recommandés
+
+═══════════════════════════════════════════════════════════════════════════════
+                      AUTO-CONTRÔLE QUALITÉ (à effectuer avant de répondre)
+═══════════════════════════════════════════════════════════════════════════════
+
+Avant de finaliser ta réponse, vérifie systématiquement que :
+□ Aucune séance ne se limite à une simple activité sans apprentissage explicite
+□ Les objectifs sont réellement évaluables (verbes d'action observables)
+□ La progression est crédible pour des élèves réels du niveau indiqué
+□ Le vocabulaire est institutionnel et professionnel
+□ Chaque séance a un lien explicite avec la précédente (sauf la première)
+□ Les erreurs anticipées sont réalistes et leur exploitation est prévue
+□ Les postures enseignantes sont clairement indiquées
+□ La distinction tâche/activité/apprentissage est respectée
+□ Les traces écrites sont prévues et évolutives`;
 
 // ============================================================================
 // HELPERS - SUPABASE CLIENT
@@ -180,7 +352,6 @@ async function searchRagChunks(
 // ============================================================================
 
 const scenarioHandler = async (req: Request): Promise<Response> => {
-  // CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -195,7 +366,6 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       return new Response('Missing OPENAI_API_KEY', { status: 500, headers: corsHeaders });
     }
 
-    // Authentification
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Non authentifié' }), {
@@ -215,11 +385,11 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Parsing de la requête
     const data: ScenarioRequest = await req.json();
     const { documentsContent, documentNames } = data;
+    const { cycle, cycleNum } = getCycleFromNiveau(data.niveau);
 
-    console.log(`[scenario] Generating for: ${data.matiere} - ${data.niveau}`);
+    console.log(`[scenario] Generating for: ${data.matiere} - ${data.niveau} (${cycle})`);
     console.log(`[scenario] useRag: ${data.useRag}`);
     console.log(`[scenario] Documents fournis: ${documentNames?.length || 0}`);
 
@@ -233,13 +403,22 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
       
-      // Construire une requête de recherche pertinente
-      const searchQuery = `${data.matiere} ${data.niveau} ${data.theme} ${data.attendus} programmes officiels`;
+      const searchTerms = [
+        data.matiere,
+        data.niveau,
+        cycle,
+        data.theme,
+        'attendus de fin de cycle',
+        'repères de progressivité',
+        'programmes officiels',
+        'compétences',
+        cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
+      ].filter(Boolean).join(' ');
       
-      // Créer l'embedding
-      const embedding = await createEmbedding(searchQuery, OPENAI_API_KEY);
+      console.log(`[scenario] RAG search query: ${searchTerms}`);
       
-      // Rechercher dans le RAG
+      const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
+      
       const chunks = await searchRagChunks(
         serviceClient,
         user.id,
@@ -250,7 +429,6 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       if (chunks.length > 0) {
         console.log(`[scenario] Found ${chunks.length} relevant chunks`);
         
-        // Capturer les sources pour les retourner au client
         ragSources = chunks.map((chunk: RagChunk) => ({
           document_name: chunk.documentTitle || 'Document officiel',
           chunk_content: chunk.content,
@@ -259,23 +437,37 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         
         ragContext = `
 
-📚 **CONTEXTE DOCUMENTAIRE (Ressources officielles)**
+═══════════════════════════════════════════════════════════════════════════════
+              RESSOURCES OFFICIELLES (PROGRAMMES ET ACCOMPAGNEMENTS)
+═══════════════════════════════════════════════════════════════════════════════
 
-Les informations suivantes proviennent des textes officiels et ressources pédagogiques :
+Les extraits suivants proviennent des textes officiels de l'Éducation nationale.
+Tu DOIS t'appuyer sur ces ressources pour :
+- Formuler des objectifs alignés sur les attendus de fin de cycle
+- Utiliser le vocabulaire institutionnel exact
+- Respecter les repères de progressivité mentionnés
+- Référencer les compétences du socle commun (cycles 2-4)
 
 ${chunks.map((chunk, i) => `
---- Source ${i + 1} : ${chunk.documentTitle} ---
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SOURCE ${i + 1} : ${chunk.documentTitle}
+│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
+└─────────────────────────────────────────────────────────────────────────────┘
 ${chunk.content}
 `).join('\n')}
 
-**Consigne importante :** Utilise ces ressources officielles pour :
-- Aligner les objectifs avec les programmes en vigueur
-- Utiliser le vocabulaire institutionnel approprié
-- Respecter les attendus de fin de cycle mentionnés
-- Intégrer les compétences du socle commun si pertinent
+⚠️ CONSIGNE IMPÉRATIVE : Les objectifs et attendus de ta séquence doivent être 
+DIRECTEMENT ISSUS ou ALIGNÉS sur ces textes officiels. Cite explicitement les 
+attendus de fin de cycle dans la section "Notes pédagogiques".
 `;
       } else {
         console.log('[scenario] No relevant RAG chunks found');
+        ragContext = `
+
+⚠️ Aucune ressource officielle trouvée dans la base documentaire pour cette requête.
+Veille néanmoins à proposer des objectifs cohérents avec les programmes en vigueur
+pour le ${cycle} en ${data.matiere}.
+`;
       }
     }
 
@@ -290,50 +482,85 @@ ${chunk.content}
       
       documentsContext = `
 
-📎 **DOCUMENTS SUPPORTS FOURNIS PAR L'ENSEIGNANT**
+═══════════════════════════════════════════════════════════════════════════════
+                    DOCUMENTS SUPPORTS FOURNIS PAR L'ENSEIGNANT
+═══════════════════════════════════════════════════════════════════════════════
 
-Ces documents doivent être INTÉGRÉS dans le scénario pédagogique (textes à étudier, exercices à utiliser, ressources à exploiter) :
+Ces documents doivent être INTÉGRÉS dans le scénario pédagogique comme supports 
+d'activité (textes à étudier, exercices à utiliser, ressources à exploiter) :
 
 ${documentsContent}
 
-${documentNames && documentNames.length > 0 ? `Fichiers fournis : ${documentNames.join(', ')}` : ''}
+${documentNames && documentNames.length > 0 ? `📎 Fichiers fournis : ${documentNames.join(', ')}` : ''}
 
-**Consigne importante :** Utilise ces documents comme supports concrets dans les exemples de situations. Référence-les explicitement dans le tableau lorsque c'est pertinent.
+⚠️ CONSIGNE : Intègre ces documents dans les activités proposées. Référence-les 
+explicitement dans la colonne "Activités et dispositifs" quand c'est pertinent.
 `;
     }
 
     // ========================================================================
-    // CONSTRUCTION DU PROMPT UTILISATEUR
+    // CONSTRUCTION DU PROMPT UTILISATEUR ENRICHI
     // ========================================================================
 
-    const userPrompt = `**DEMANDE DE SCÉNARIO PÉDAGOGIQUE**
+    const userPrompt = `═══════════════════════════════════════════════════════════════════════════════
+                         DEMANDE DE SCÉNARIO PÉDAGOGIQUE
+═══════════════════════════════════════════════════════════════════════════════
 
-**Matière :** ${data.matiere}
-**Niveau :** ${data.niveau}
-**Thème / Titre de la séquence :** ${data.theme}
-**Nombre de séances :** ${data.nombreSeances}
-**Durée par séance :** ${data.dureeSeance} minutes
+**CONTEXTE INSTITUTIONNEL**
+• Matière : ${data.matiere}
+• Niveau : ${data.niveau}
+• Cycle : ${cycle}
+• Durée de la séquence : ${data.nombreSeances} séances de ${data.dureeSeance} minutes
 
-**Point de départ / Situation initiale :**
-${data.pointDepart || 'Non précisé - à définir selon le niveau habituel des élèves'}
+**THÈME / TITRE DE LA SÉQUENCE**
+${data.theme}
 
-**Attendus de fin de séquence :**
+**POINT DE DÉPART / DIAGNOSTIC INITIAL**
+${data.pointDepart || 'Non précisé - considérer un niveau hétérogène avec des acquis partiels sur les prérequis'}
+
+**ATTENDUS DE FIN DE SÉQUENCE (objectifs terminaux)**
 ${data.attendus}
 ${ragContext}
 ${documentsContext}
 
-**CONSIGNES SPÉCIFIQUES :**
-1. Crée un tableau de ${data.nombreSeances} séances cohérentes et progressives
-2. Chaque séance de ${data.dureeSeance} minutes doit être réaliste en termes de timing
-3. Les activités doivent être variées (individuel, groupe, collectif)
-4. Intègre systématiquement les phases d'une séance efficace (accroche, recherche, structuration, entraînement, bilan)
-5. ${documentsContent ? 'IMPORTANT : Intègre les documents supports fournis dans les activités proposées' : 'Propose des supports et ressources adaptés'}
-6. ${data.useRag ? 'Appuie-toi sur les ressources institutionnelles fournies pour garantir la conformité aux programmes' : 'Veille à la cohérence avec les programmes en vigueur'}
+═══════════════════════════════════════════════════════════════════════════════
+                              CONSIGNES DE GÉNÉRATION
+═══════════════════════════════════════════════════════════════════════════════
 
-Génère maintenant le tableau complet du scénario pédagogique :`;
+1. **Structure progressive obligatoire** :
+   - Séance(s) 1-2 : Phase d'émergence (diagnostic, représentations, dévolution)
+   - Séances centrales : Phase de construction (situations-problèmes, institutionnalisation progressive)
+   - Avant-dernière(s) séance(s) : Phase de structuration (synthèse, trace écrite)
+   - Dernière(s) séance(s) : Phase de transfert (réinvestissement, évaluation)
+
+2. **Réalisme temporel** : Chaque séance de ${data.dureeSeance} minutes doit être réaliste
+   - Prévoir le temps d'installation, de passation des consignes, de rangement
+   - Ne pas surcharger : mieux vaut un objectif bien traité que plusieurs survolés
+
+3. **Différenciation systématique** : Pour chaque séance, préciser les adaptations
+
+4. **Cohérence avec les programmes** : ${data.useRag ? 'Utilise les ressources officielles fournies ci-dessus pour aligner les objectifs' : 'Veille à la cohérence avec les programmes du ' + cycle}
+
+5. **Format de sortie** : Tableau markdown avec les 5 colonnes définies, suivi des notes pédagogiques
+
+6. **Continuité inter-séances obligatoire** :
+   - Chaque séance (sauf la première) doit RÉACTIVER explicitement un acquis de la séance précédente
+   - Indiquer ce qui est repris, transformé ou approfondi d'une séance à l'autre
+   - Préciser les traces écrites ou mémorielles construites et comment elles évoluent
+   - Anticiper ce qui doit RESTER chez les élèves après la séquence
+
+7. **Traitement de l'erreur** :
+   - Anticiper les erreurs typiques des élèves pour chaque séance
+   - Identifier les erreurs "fécondes" qui permettent de faire avancer la réflexion
+   - Prévoir comment l'enseignant exploitera ces erreurs (confrontation, explicitation)
+
+8. **Postures enseignantes explicites** :
+   - Pour chaque activité, indiquer quand l'enseignant observe, étaye, régule ou institutionnalise
+
+Génère maintenant le scénario pédagogique complet :`;
 
     // ========================================================================
-    // APPEL OPENAI AVEC SYSTEM PROMPT
+    // APPEL OPENAI
     // ========================================================================
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -348,8 +575,8 @@ Génère maintenant le tableau complet du scénario pédagogique :`;
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.7,
-        max_tokens: 4000,
+        temperature: 0.6,
+        max_tokens: 5500,
       }),
     });
 

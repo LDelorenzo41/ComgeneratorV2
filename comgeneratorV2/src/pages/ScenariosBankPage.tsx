@@ -16,11 +16,13 @@ import {
   Calendar,
   Clock,
   BookOpen,
-  Users,
   AlertCircle,
   Loader2,
   FolderOpen,
-  ArrowLeft
+  ArrowLeft,
+  Copy,
+  Check,
+  Sparkles
 } from 'lucide-react';
 
 // ============================================================================
@@ -42,10 +44,10 @@ interface ScenarioItem {
 
 interface SeanceRow {
   numero: string;
-  objectifs: string;
-  attendus: string;
-  prerequis: string;
-  exemples: string;
+  phaseObjectif: string;
+  obstaclesDiff: string;
+  activitesDispositifs: string;
+  evaluationCriteres: string;
 }
 
 // ============================================================================
@@ -55,15 +57,16 @@ interface SeanceRow {
 export function ScenariosBankPage() {
   const { user, loading: authLoading } = useAuthStore();
   
-  // États
   const [scenarios, setScenarios] = React.useState<ScenarioItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  
+  // État pour le feedback de copie du thème
+  const [copiedRowKey, setCopiedRowKey] = React.useState<string | null>(null);
 
-  // Charger les scénarios
   React.useEffect(() => {
     const fetchScenarios = async () => {
       if (!user) return;
@@ -79,7 +82,6 @@ export function ScenariosBankPage() {
           .order('created_at', { ascending: false });
         
         if (error) throw error;
-        
         setScenarios(data as ScenarioItem[] || []);
       } catch (err: any) {
         console.error('Erreur lors du chargement des scénarios:', err);
@@ -146,10 +148,10 @@ export function ScenariosBankPage() {
           if (firstCell.match(/\d+/) || firstCell.toLowerCase().includes('séance') || firstCell.toLowerCase().includes('seance')) {
             rows.push({
               numero: firstCell,
-              objectifs: cells[1] || '',
-              attendus: cells[2] || '',
-              prerequis: cells[3] || '',
-              exemples: cells.slice(4).join(' | '),
+              phaseObjectif: cells[1] || '',
+              obstaclesDiff: cells[2] || '',
+              activitesDispositifs: cells[3] || '',
+              evaluationCriteres: cells.slice(4).join(' | '),
             });
           }
         }
@@ -167,48 +169,92 @@ export function ScenariosBankPage() {
   };
 
   // ============================================================================
-  // RENDU MARKDOWN POUR L'ÉCRAN (gras, italique, retours à la ligne)
+  // SYNTHÈSE DU THÈME POUR LE GÉNÉRATEUR DE SÉANCE
+  // ============================================================================
+
+  const cleanTextForPrompt = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const synthesizeThemeForLesson = (row: SeanceRow, scenario: ScenarioItem): string => {
+    const parts: string[] = [];
+    
+    // 1. Thème général de la séquence (l'activité/sujet principal)
+    if (scenario.theme) {
+      parts.push(`Thème : ${cleanTextForPrompt(scenario.theme)}`);
+    }
+    
+    // 2. Phase et objectif de cette séance spécifique
+    if (row.phaseObjectif) {
+      const seanceNum = cleanTextForPrompt(row.numero);
+      parts.push(`\n\nSéance ${seanceNum} - Phase et objectif : ${cleanTextForPrompt(row.phaseObjectif)}`);
+    }
+    
+    // 3. Obstacles et différenciation (guide l'IA sur les points d'attention)
+    if (row.obstaclesDiff) {
+      parts.push(`\n\nPoints d'attention : ${cleanTextForPrompt(row.obstaclesDiff)}`);
+    }
+    
+    return parts.join('');
+  };
+
+  const handleCopyTheme = async (row: SeanceRow, scenario: ScenarioItem, rowKey: string) => {
+    try {
+      const synthesizedTheme = synthesizeThemeForLesson(row, scenario);
+      await navigator.clipboard.writeText(synthesizedTheme);
+      
+      // Feedback visuel
+      setCopiedRowKey(rowKey);
+      setTimeout(() => setCopiedRowKey(null), 2500);
+    } catch (err) {
+      console.error('Erreur lors de la copie:', err);
+      alert('Erreur lors de la copie. Veuillez réessayer.');
+    }
+  };
+
+  // ============================================================================
+  // RENDU MARKDOWN
   // ============================================================================
 
   const renderMarkdown = (text: string): React.ReactNode => {
     if (!text) return null;
 
-    // Remplacer les <br> par un marqueur temporaire
     let processedText = text.replace(/<br\s*\/?>/gi, '{{BR}}');
     const parts = processedText.split('{{BR}}');
 
     return parts.map((part, index) => {
       const elements: React.ReactNode[] = [];
-      // Regex pour bold+italic, bold, italic, code
       const regex = /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
       let lastIndex = 0;
       let match;
       let keyCounter = 0;
 
       while ((match = regex.exec(part)) !== null) {
-        // Ajouter le texte avant le match
         if (match.index > lastIndex) {
           elements.push(part.substring(lastIndex, match.index));
         }
 
         if (match[2]) {
-          // Bold + italic (***text***)
           elements.push(<strong key={`bi-${index}-${keyCounter++}`}><em>{match[2]}</em></strong>);
         } else if (match[3]) {
-          // Bold (**text**)
           elements.push(<strong key={`b-${index}-${keyCounter++}`}>{match[3]}</strong>);
         } else if (match[4]) {
-          // Italic (*text*)
           elements.push(<em key={`i-${index}-${keyCounter++}`}>{match[4]}</em>);
         } else if (match[5]) {
-          // Code (`text`)
           elements.push(<code key={`c-${index}-${keyCounter++}`} className="bg-gray-100 dark:bg-gray-700 px-1 rounded text-sm">{match[5]}</code>);
         }
 
         lastIndex = regex.lastIndex;
       }
 
-      // Ajouter le reste du texte
       if (lastIndex < part.length) {
         elements.push(part.substring(lastIndex));
       }
@@ -243,7 +289,7 @@ export function ScenariosBankPage() {
   };
 
   // ============================================================================
-  // SUPPRESSION D'UN SCÉNARIO
+  // SUPPRESSION
   // ============================================================================
 
   const handleDelete = async (id: string, theme: string) => {
@@ -264,15 +310,12 @@ export function ScenariosBankPage() {
       
       if (error) throw error;
       
-      // Retirer de l'affichage
       setScenarios(prev => prev.filter(s => s.id !== id));
       
-      // Si c'était le scénario développé, le fermer
       if (expandedId === id) {
         setExpandedId(null);
       }
       
-      // Notification
       const successDiv = document.createElement('div');
       successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
       successDiv.innerHTML = '✅ Scénario supprimé';
@@ -301,12 +344,10 @@ export function ScenariosBankPage() {
     const margin = 10;
     const contentWidth = pageWidth - 2 * margin;
     
-    // Titre
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(16);
     pdf.text('Scénario pédagogique', margin, 15);
     
-    // Infos
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
     pdf.text(`${scenario.matiere} - ${scenario.niveau} | ${scenario.nombre_seances} séances de ${scenario.duree_seance} min`, margin, 22);
@@ -316,10 +357,9 @@ export function ScenariosBankPage() {
     pdf.setLineWidth(0.3);
     pdf.line(margin, 35, pageWidth - margin, 35);
     
-    // Tableau
     const rows = parseMarkdownTable(scenario.content);
-    const colWidths = [18, 50, 50, 45, 104];
-    const headers = ['Séance', 'Objectifs', 'Attendus', 'Prérequis', 'Exemples'];
+    const colWidths = [22, 55, 55, 70, 65];
+    const headers = ['Séance', 'Phase & Objectif', 'Obstacles & Diff.', 'Activités & Dispositifs', 'Évaluation & Critères'];
     const fontSize = 7;
     const lineHeightFactor = 3.5;
     const cellPadding = 2;
@@ -329,7 +369,7 @@ export function ScenariosBankPage() {
     
     const calculateRowHeight = (row: SeanceRow): number => {
       pdf.setFontSize(fontSize);
-      const cellData = [row.numero, row.objectifs, row.attendus, row.prerequis, row.exemples];
+      const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
       let maxLines = 1;
       
       cellData.forEach((text, i) => {
@@ -389,7 +429,7 @@ export function ScenariosBankPage() {
       
       pdf.setFontSize(fontSize);
       let xPos = margin + cellPadding;
-      const cellData = [row.numero, row.objectifs, row.attendus, row.prerequis, row.exemples];
+      const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
       
       cellData.forEach((text, i) => {
         const maxWidth = colWidths[i] - 2 * cellPadding;
@@ -409,7 +449,6 @@ export function ScenariosBankPage() {
       yPos += rowHeight;
     });
     
-    // Pied de page
     const totalPages = pdf.internal.pages.length - 1;
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
@@ -464,6 +503,18 @@ export function ScenariosBankPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Retrouvez et gérez vos scénarios pédagogiques sauvegardés
           </p>
+        </div>
+
+        {/* Info-bulle pour expliquer le bouton Copier thème */}
+        <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                <strong>Astuce :</strong> Utilisez le bouton <span className="inline-flex items-center px-2 py-0.5 bg-indigo-100 dark:bg-indigo-800/50 rounded text-xs font-medium"><Copy className="w-3 h-3 mr-1" />Copier thème</span> pour générer un prompt optimisé à coller dans le champ "Thème" du <Link to="/generate" className="underline hover:no-underline font-medium">générateur de séance</Link>.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Barre de recherche et actions */}
@@ -607,23 +658,62 @@ export function ScenariosBankPage() {
                           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30">
                               <tr>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase w-16">Séance</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Objectifs</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Attendus</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Prérequis</th>
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Exemples</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase w-32">Séance</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Phase & Objectif</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Obstacles & Diff.</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Activités & Dispositifs</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Évaluation & Critères</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                              {rows.map((row, index) => (
-                                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                  <td className="px-3 py-3 text-sm font-medium text-gray-900 dark:text-white">{renderMarkdown(row.numero)}</td>
-                                  <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">{renderMarkdown(row.objectifs)}</td>
-                                  <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">{renderMarkdown(row.attendus)}</td>
-                                  <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">{renderMarkdown(row.prerequis)}</td>
-                                  <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">{renderMarkdown(row.exemples)}</td>
-                                </tr>
-                              ))}
+                              {rows.map((row, index) => {
+                                const rowKey = `${scenario.id}-${index}`;
+                                const isCopied = copiedRowKey === rowKey;
+                                
+                                return (
+                                  <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    {/* Colonne Séance avec bouton Copier thème */}
+                                    <td className="px-3 py-3 align-top">
+                                      <div className="flex flex-col items-start gap-2">
+                                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {renderMarkdown(row.numero)}
+                                        </span>
+                                        
+                                        {/* Bouton Copier le thème */}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleCopyTheme(row, scenario, rowKey);
+                                          }}
+                                          className={`inline-flex items-center px-2 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                                            isCopied
+                                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                                              : 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 hover:shadow-sm'
+                                          }`}
+                                          title="Copier le thème optimisé pour le générateur de séance"
+                                        >
+                                          {isCopied ? (
+                                            <>
+                                              <Check className="w-3.5 h-3.5 mr-1" />
+                                              Copié !
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="w-3.5 h-3.5 mr-1" />
+                                              Copier thème
+                                            </>
+                                          )}
+                                        </button>
+                                      </div>
+                                    </td>
+                                    
+                                    <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.phaseObjectif)}</td>
+                                    <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.obstaclesDiff)}</td>
+                                    <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.activitesDispositifs)}</td>
+                                    <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.evaluationCriteres)}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -653,5 +743,8 @@ export function ScenariosBankPage() {
 }
 
 export default ScenariosBankPage;
+
+
+
 
 

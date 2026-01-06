@@ -6,7 +6,7 @@ export function MentionsLegalesPage() {
   return (
     <LegalLayout 
       title="Mentions légales" 
-      lastUpdated="24 août 2025"
+      lastUpdated="6 janvier 2026"
     >
       <div className="space-y-8">
         

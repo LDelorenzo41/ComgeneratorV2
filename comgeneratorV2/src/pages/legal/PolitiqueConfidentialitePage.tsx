@@ -7,7 +7,7 @@ export function PolitiqueConfidentialitePage() {
   return (
     <LegalLayout 
       title="Politique de confidentialité" 
-      lastUpdated="31 décembre 2025"
+      lastUpdated="6 janvier 2026"
     >
       <div className="space-y-8">
         
