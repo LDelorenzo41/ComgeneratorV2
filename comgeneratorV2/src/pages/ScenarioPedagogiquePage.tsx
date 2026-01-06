@@ -129,7 +129,9 @@ export function ScenarioPedagogiquePage() {
   
   const [selectedNombreSeances, setSelectedNombreSeances] = React.useState<string>('6');
   const [selectedDureeSeance, setSelectedDureeSeance] = React.useState<string>('55');
-
+    // État pour la bannière promo SCENARIO2026
+  const [hasUsedScenarioCode, setHasUsedScenarioCode] = React.useState<boolean>(false);
+  const [promoCheckDone, setPromoCheckDone] = React.useState<boolean>(false);
   React.useEffect(() => {
     const checkBankAccess = async () => {
       if (!user) {
@@ -160,6 +162,53 @@ export function ScenarioPedagogiquePage() {
     };
 
     checkBankAccess();
+  }, [user]);
+  // Vérification si l'utilisateur a déjà utilisé le code SCENARIO2026
+  React.useEffect(() => {
+    const checkScenarioPromoCode = async () => {
+      if (!user) {
+        setPromoCheckDone(true);
+        return;
+      }
+
+      try {
+        // 1. Trouver la campagne avec le code SCENARIO2026
+        const { data: campaign, error: campaignError } = await supabase
+          .from('promo_campaigns')
+          .select('id')
+          .eq('code', 'SCENARIO2026')
+          .single();
+
+        if (campaignError || !campaign) {
+          // La campagne n'existe pas encore, on affiche la bannière
+          setHasUsedScenarioCode(false);
+          setPromoCheckDone(true);
+          return;
+        }
+
+        // 2. Vérifier si l'utilisateur a utilisé ce code
+        const { data: redemption, error: redemptionError } = await supabase
+          .from('promo_redemptions')
+          .select('id')
+          .eq('campaign_id', campaign.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (redemptionError) {
+          console.error('Erreur vérification promo:', redemptionError);
+          setHasUsedScenarioCode(false);
+        } else {
+          setHasUsedScenarioCode(!!redemption);
+        }
+      } catch (err) {
+        console.error('Erreur dans checkScenarioPromoCode:', err);
+        setHasUsedScenarioCode(false);
+      } finally {
+        setPromoCheckDone(true);
+      }
+    };
+
+    checkScenarioPromoCode();
   }, [user]);
 
   const { register, handleSubmit, setValue, formState: { errors }, reset } = useForm<ScenarioFormData>({
@@ -997,6 +1046,37 @@ export function ScenarioPedagogiquePage() {
             </div>
           )}
         </div>
+                {/* Bannière offre de lancement SCENARIO2026 - Expire le 05/02/2026 */}
+        {promoCheckDone && 
+         !hasUsedScenarioCode && 
+         new Date() < new Date('2026-02-05T23:59:59') && (
+          <div className="mb-8 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-300 dark:border-emerald-700 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-200 mb-2">
+                  🎁 Offre de lancement !
+                </h3>
+                <p className="text-emerald-700 dark:text-emerald-300 mb-3">
+                  Pour vous permettre de tester sans sereinement la fonctionnalité de création de scénario pédagogique, 
+                  allez dans les <strong>paramètres</strong> (icône en forme de roue crantée) et choisissez "<strong>J'ai un code !</strong>"
+                </p>
+                <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border-2 border-dashed border-emerald-400 dark:border-emerald-600 rounded-xl">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium mr-2">Entrez le code :</span>
+                  <code className="text-lg font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-lg">
+                    SCENARIO2026
+                  </code>
+                </div>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-3 italic">
+                  Profitez de vos tokens gratuits pour découvrir cette nouvelle fonctionnalité !
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Alerte tokens épuisés */}
         {tokenCount === 0 && (

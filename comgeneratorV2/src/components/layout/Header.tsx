@@ -160,13 +160,17 @@ export function Header() {
                             onClick={() => setIsConcevoirOpen(false)}
                           >
                             <ClipboardList className="w-4 h-4 mr-2" />
-                            Scénarios pédagogiques
+Scénarios pédagogiques
+<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
+
                           </Link>
                         ) : (
                           <span className={menuItemDisabledClass}>
                             <ClipboardList className="w-4 h-4 mr-2" />
-                            Scénarios pédagogiques
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+Scénarios pédagogiques
+<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
+<span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+
                           </span>
                         )}
                         
@@ -550,13 +554,17 @@ export function Header() {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <ClipboardList className="w-4 h-4 mr-2" />
-                    Scénarios pédagogiques
+Scénarios pédagogiques
+<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
+
                   </Link>
                 ) : (
                   <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
                     <ClipboardList className="w-4 h-4 mr-2" />
-                    Scénarios pédagogiques
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+Scénarios pédagogiques
+<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
+<span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
+
                   </span>
                 )}
                 

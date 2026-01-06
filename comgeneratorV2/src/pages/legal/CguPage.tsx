@@ -7,7 +7,8 @@ export function CguPage() {
   return (
     <LegalLayout 
       title="Conditions générales d'utilisation" 
-      lastUpdated="31 décembre 2025"
+      lastUpdated="6 janvier 2026"
+
     >
       <div className="space-y-8">
         
@@ -180,8 +181,9 @@ export function CguPage() {
                     <li>• Synthèse : ~1800 tokens</li>
                     <li>• Communication : ~1000 tokens</li>
                     <li>• Séance : ~3500 tokens</li>
-                    <li>• Scénario pédagogique : ~4000 tokens</li>
-                    <li>• Question chatbot : ~2000 tokens</li>
+                    <li>• Scénario pédagogique : 8 000 à 10 000+ tokens</li>
+                    <li>• Question chatbot : 2 000 à 4 000 tokens</li>
+
                   </ul>
                 </div>
                 

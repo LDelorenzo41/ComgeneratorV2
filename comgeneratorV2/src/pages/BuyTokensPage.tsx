@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp } from 'lucide-react';
+import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, Bot, ClipboardList } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuthStore } from '../lib/store';
 
@@ -23,6 +23,8 @@ export function BuyTokensPage() {
     'Synthèses automatiques de bulletins', 
     'Communications professionnelles',
     'Création de séances pédagogiques',
+    'Création de scénarios pédagogiques',
+    'Chatbot personnel avec vos documents',
     'Support par email',
     'Accès mobile et desktop'
   ];
@@ -30,6 +32,8 @@ export function BuyTokensPage() {
   const bankFeatures = [
     'Banque d\'appréciations avec tags',
     'Banque de séances archivées',
+    'Banque de scénarios pédagogiques',
+    'Banque de réponses chatbot',
     'Recherche dans vos contenus',
     'Réutilisation de vos modèles'
   ];
@@ -49,6 +53,8 @@ export function BuyTokensPage() {
           '💬 150 communications + 50 appréciations',
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
+          '🗺️ 30 scénarios pédagogiques',
+          '🤖 75-150 questions chatbot',
           '🔄 Mix équilibré selon vos besoins'
         ],
         withoutBank: [
@@ -56,6 +62,8 @@ export function BuyTokensPage() {
           '💬 150 communications + 50 appréciations', 
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
+          '🗺️ 30 scénarios pédagogiques',
+          '🤖 75-150 questions chatbot',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -75,6 +83,8 @@ export function BuyTokensPage() {
           '💬 300 communications + 100 appréciations',
           '📄 150 synthèses + 110 appréciations',
           '📚 85 séances + 100 appréciations',
+          '🗺️ 60 scénarios pédagogiques',
+          '🤖 150-300 questions chatbot',
           '🔥 Usage intensif toute l\'année'
         ],
         withoutBank: [
@@ -82,6 +92,8 @@ export function BuyTokensPage() {
           '💬 300 communications + 100 appréciations',
           '📄 150 synthèses + 110 appréciations', 
           '📚 85 séances + 100 appréciations',
+          '🗺️ 60 scénarios pédagogiques',
+          '🤖 150-300 questions chatbot',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -205,7 +217,7 @@ export function BuyTokensPage() {
           </p>
 
           {/* Calculateur de consommation */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 max-w-4xl mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 max-w-5xl mx-auto">
             <div className="flex items-center justify-center mb-4">
               <Calculator className="w-5 h-5 text-blue-600 mr-2" />
               <span className="font-semibold text-gray-900 dark:text-white">Guide de consommation</span>
@@ -215,22 +227,36 @@ export function BuyTokensPage() {
               Un token = unité de mesure pour l'IA (environ 4 caractères de texte). Les estimations incluent la consommation complète : votre demande + la réponse générée.
             </p>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-              <div className="flex items-center">
-                <PenTool className="w-4 h-4 text-green-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Appréciation: 3000 tokens</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm mb-4">
+              <div className="flex flex-col items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <PenTool className="w-5 h-5 text-green-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Appréciation</span>
+                <span className="text-gray-600 dark:text-gray-400">~3 000</span>
               </div>
-              <div className="flex items-center">
-                <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Synthèse: 1800 tokens</span>
+              <div className="flex flex-col items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <FileText className="w-5 h-5 text-blue-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Synthèse</span>
+                <span className="text-gray-600 dark:text-gray-400">~1 800</span>
               </div>
-              <div className="flex items-center">
-                <MessageCircle className="w-4 h-4 text-purple-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Communication: 1000 tokens</span>
+              <div className="flex flex-col items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+                <MessageCircle className="w-5 h-5 text-purple-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Communication</span>
+                <span className="text-gray-600 dark:text-gray-400">~1 000</span>
               </div>
-              <div className="flex items-center">
-                <BookOpen className="w-4 h-4 text-orange-600 mr-2" />
-                <span className="text-gray-600 dark:text-gray-400">Séance: 3500 tokens</span>
+              <div className="flex flex-col items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                <BookOpen className="w-5 h-5 text-orange-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Séance</span>
+                <span className="text-gray-600 dark:text-gray-400">~3 500</span>
+              </div>
+              <div className="flex flex-col items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                <ClipboardList className="w-5 h-5 text-amber-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Scénario</span>
+                <span className="text-gray-600 dark:text-gray-400">8k - 10k+</span>
+              </div>
+              <div className="flex flex-col items-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
+                <Bot className="w-5 h-5 text-indigo-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white">Chatbot</span>
+                <span className="text-gray-600 dark:text-gray-400">2k - 4k</span>
               </div>
             </div>
             
