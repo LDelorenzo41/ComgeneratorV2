@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import jsPDF from 'jspdf';
 import { 
   BookOpen, 
   Search, 
@@ -41,6 +43,76 @@ const tagColors = {
   duration: { bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-700 dark:text-orange-200', border: 'border-orange-200 dark:border-orange-800' }
 };
 
+// ✅ Fonction pour convertir les tableaux Markdown en HTML
+const convertMarkdownTablesToHtml = (markdown: string): string => {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableLines: string[] = [];
+
+  const processTable = (tableLines: string[]): string => {
+    if (tableLines.length < 2) return tableLines.join('\n');
+    
+    const headerLine = tableLines[0];
+    const dataLines = tableLines.slice(2); // Skip separator line
+    
+    const parseRow = (line: string): string[] => {
+      return line
+        .slice(1, -1) // Remove first and last |
+        .split('|')
+        .map(cell => cell.trim());
+    };
+    
+    const headers = parseRow(headerLine);
+    
+    let html = '<table class="markdown-table"><thead><tr>';
+    headers.forEach(h => {
+      html += `<th>${h}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    dataLines.forEach(line => {
+      if (line.trim()) {
+        const cells = parseRow(line);
+        html += '<tr>';
+        cells.forEach(c => {
+          html += `<td>${c}</td>`;
+        });
+        html += '</tr>';
+      }
+    });
+    
+    html += '</tbody></table>';
+    return html;
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableLines = [];
+      }
+      tableLines.push(trimmed);
+    } else {
+      if (inTable) {
+        result.push(processTable(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
+      result.push(line);
+    }
+  });
+
+  // Handle table at end of content
+  if (inTable && tableLines.length > 0) {
+    result.push(processTable(tableLines));
+  }
+
+  return result.join('\n');
+};
+
 export function LessonsBankPage() {
   const { user } = useAuthStore();
   const [lessons, setLessons] = React.useState<LessonBank[]>([]);
@@ -50,6 +122,7 @@ export function LessonsBankPage() {
   const [filterSubject, setFilterSubject] = React.useState<string>('all');
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
+  const [exportingId, setExportingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const fetchLessons = async () => {
@@ -85,6 +158,546 @@ export function LessonsBankPage() {
       console.error("Erreur lors de la copie:", err);
     }
   };
+
+    // ✅ Export PDF CORRIGÉ - Gestion complète du markdown
+  const handleExportPDF = async (lesson: LessonBank) => {
+    setExportingId(lesson.id);
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      let yPosition = margin;
+
+      // Fonction de nettoyage du texte (emojis, caractères spéciaux)
+      const cleanText = (text: string): string => {
+        return text
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+          .replace(/[\u{2600}-\u{26FF}]/gu, '')
+          .replace(/[\u{2700}-\u{27BF}]/gu, '')
+          .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+          .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+          .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+          .replace(/[📚🎯🛠️🏫⏰🚀🔍🏗️📝🎨🟢🔵♿📊💡⚠️🗣️🔄📈💻🔥💪🧘📎✅❌⭐🏃💪🎯📋📄🗑️✓●○◆◇■□▪▫•]/g, '')
+          .replace(/[""]/g, '"')
+          .replace(/['']/g, "'")
+          .replace(/…/g, '...')
+          .replace(/[–—]/g, '-')
+          .replace(/[\x00-\x1F\x7F]/g, '')
+          .trim();
+      };
+
+      // Vérifier si on a besoin d'une nouvelle page
+      const checkNewPage = (neededHeight: number = 25) => {
+        if (yPosition > pageHeight - neededHeight) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+      };
+
+      // ✅ Fonction pour écrire du texte avec segments gras/normal
+      const writeTextWithBold = (text: string, fontSize: number, baseIndent: number = 0) => {
+        const cleaned = cleanText(text);
+        if (!cleaned) return;
+
+        pdf.setFontSize(fontSize);
+        const lineHeight = fontSize * 0.45;
+        const availableWidth = maxWidth - baseIndent;
+
+        // Découper le texte en segments (gras ou normal)
+        const segments: { text: string; bold: boolean }[] = [];
+        let remaining = cleaned;
+        
+        // Pattern pour trouver **texte** ou le texte sans **
+        const boldPattern = /\*\*([^*]+)\*\*/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = boldPattern.exec(cleaned)) !== null) {
+          // Texte avant le gras
+          if (match.index > lastIndex) {
+            segments.push({ text: cleaned.slice(lastIndex, match.index), bold: false });
+          }
+          // Texte en gras (sans les **)
+          segments.push({ text: match[1], bold: true });
+          lastIndex = match.index + match[0].length;
+        }
+        // Texte restant après le dernier gras
+        if (lastIndex < cleaned.length) {
+          segments.push({ text: cleaned.slice(lastIndex), bold: false });
+        }
+
+        // Si pas de segments (pas de gras trouvé), tout est normal
+        if (segments.length === 0) {
+          segments.push({ text: cleaned, bold: false });
+        }
+
+        // Reconstruire le texte complet sans les ** pour le wrapping
+        const fullText = segments.map(s => s.text).join('');
+        
+        // Calculer les lignes avec wrapping
+        pdf.setFont('helvetica', 'normal');
+        const wrappedLines = pdf.splitTextToSize(fullText, availableWidth);
+
+        wrappedLines.forEach((line: string) => {
+          checkNewPage();
+          
+          let xPos = margin + baseIndent;
+          let lineRemaining = line;
+          
+          // Pour chaque ligne, on doit déterminer quelles parties sont en gras
+          // On parcourt les segments et on écrit chaque partie
+          let charIndex = 0;
+          
+          // Trouver où on en est dans les segments
+          for (const segment of segments) {
+            if (lineRemaining.length === 0) break;
+            
+            const segmentText = segment.text;
+            let toWrite = '';
+            
+            // Trouver combien de ce segment est dans cette ligne
+            for (let i = 0; i < segmentText.length && lineRemaining.length > 0; i++) {
+              if (segmentText[i] === lineRemaining[0]) {
+                toWrite += lineRemaining[0];
+                lineRemaining = lineRemaining.slice(1);
+              }
+            }
+            
+            if (toWrite) {
+              pdf.setFont('helvetica', segment.bold ? 'bold' : 'normal');
+              pdf.text(toWrite, xPos, yPosition);
+              xPos += pdf.getTextWidth(toWrite);
+            }
+          }
+          
+          yPosition += lineHeight;
+        });
+
+        yPosition += 1;
+      };
+
+      // ✅ Fonction simplifiée pour le texte simple (sans parsing complexe)
+      const addSimpleText = (text: string, fontSize: number, isBold: boolean = false, indent: number = 0) => {
+        const cleaned = cleanText(text).replace(/\*\*/g, ''); // Retire les ** pour le texte simple
+        if (!cleaned) return;
+
+        checkNewPage();
+        pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+        pdf.setFontSize(fontSize);
+
+        const availableWidth = maxWidth - indent;
+        const lines = pdf.splitTextToSize(cleaned, availableWidth);
+        const lineHeight = fontSize * 0.45;
+
+        lines.forEach((line: string) => {
+          checkNewPage();
+          pdf.text(line, margin + indent, yPosition);
+          yPosition += lineHeight;
+        });
+
+        yPosition += 1;
+      };
+
+      // ✅ Fonction pour le texte avec markdown inline
+      const addMarkdownText = (text: string, fontSize: number, indent: number = 0) => {
+        const cleaned = cleanText(text);
+        if (!cleaned) return;
+
+        checkNewPage();
+        pdf.setFontSize(fontSize);
+
+        const availableWidth = maxWidth - indent;
+        const lineHeight = fontSize * 0.45;
+
+        // Retirer les ** pour calculer le wrapping
+        const textWithoutMd = cleaned.replace(/\*\*/g, '');
+        const wrappedLines = pdf.splitTextToSize(textWithoutMd, availableWidth);
+
+        // Pour chaque ligne wrappée, on réécrit avec le bon formatage
+        let globalPos = 0; // Position dans le texte original sans **
+
+        wrappedLines.forEach((wrappedLine: string) => {
+          checkNewPage();
+          
+          let xPos = margin + indent;
+          let lineText = wrappedLine;
+          
+          // Trouver les parties bold dans cette ligne
+          // On doit mapper la ligne wrappée au texte original avec **
+          
+          // Approche simple: écrire la ligne et chercher les mots en gras
+          const parts = cleaned.split(/(\*\*[^*]+\*\*)/g);
+          let currentLinePos = 0;
+          
+          parts.forEach(part => {
+            if (!part) return;
+            
+            const isBold = part.startsWith('**') && part.endsWith('**');
+            const partText = isBold ? part.slice(2, -2) : part;
+            
+            // Vérifier si cette partie est dans la ligne actuelle
+            const partInLine = lineText.includes(partText) || 
+                              partText.split(' ').some(word => lineText.includes(word));
+            
+            if (partInLine) {
+              // Trouver quelle portion de partText est dans lineText
+              let toWrite = '';
+              for (const char of partText) {
+                if (lineText.startsWith(char) || lineText.includes(char)) {
+                  const idx = lineText.indexOf(char);
+                  if (idx === 0 || idx <= 2) {
+                    toWrite += char;
+                    lineText = lineText.slice(idx + 1);
+                  }
+                }
+              }
+              
+              if (toWrite.trim()) {
+                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+                pdf.text(toWrite, xPos, yPosition);
+                xPos += pdf.getTextWidth(toWrite);
+              }
+            }
+          });
+          
+          yPosition += lineHeight;
+        });
+
+        yPosition += 1;
+      };
+
+      // ✅ Fonction améliorée pour rendre les tableaux
+      const renderTablePDF = (headers: string[], rows: string[][]) => {
+        if (headers.length === 0 && rows.length === 0) return;
+
+        const colCount = headers.length || (rows[0]?.length || 0);
+        const tableWidth = maxWidth;
+        const colWidth = tableWidth / colCount;
+        const cellPadding = 2;
+        const fontSize = 8;
+        const lineHeight = fontSize * 0.4;
+
+        pdf.setFontSize(fontSize);
+
+        const calculateRowHeight = (cells: string[]): number => {
+          let maxLines = 1;
+          cells.forEach((cell) => {
+            const cleaned = cleanText(cell).replace(/\*\*/g, '');
+            pdf.setFont('helvetica', 'normal');
+            const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
+            maxLines = Math.max(maxLines, lines.length);
+          });
+          return maxLines * (lineHeight + 2) + cellPadding * 2;
+        };
+
+        const drawRow = (cells: string[], rowY: number, rowHeight: number, isHeader: boolean = false) => {
+          cells.forEach((cell, colIndex) => {
+            const cellX = margin + colIndex * colWidth;
+            const cleaned = cleanText(cell).replace(/\*\*/g, '');
+
+            if (isHeader) {
+              pdf.setFillColor(230, 240, 255);
+              pdf.rect(cellX, rowY, colWidth, rowHeight, 'F');
+            }
+
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.2);
+            pdf.rect(cellX, rowY, colWidth, rowHeight, 'S');
+
+            pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+            pdf.setTextColor(0, 0, 0);
+            
+            const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
+            let textY = rowY + cellPadding + fontSize * 0.35;
+            
+            lines.forEach((line: string) => {
+              if (textY < rowY + rowHeight - cellPadding) {
+                pdf.text(line, cellX + cellPadding, textY);
+                textY += lineHeight + 2;
+              }
+            });
+          });
+        };
+
+        if (headers.length > 0) {
+          const headerHeight = calculateRowHeight(headers);
+          checkNewPage(headerHeight + 20);
+          drawRow(headers, yPosition, headerHeight, true);
+          yPosition += headerHeight;
+        }
+
+        rows.forEach((row) => {
+          const rowHeight = calculateRowHeight(row);
+          checkNewPage(rowHeight + 10);
+          drawRow(row, yPosition, rowHeight, false);
+          yPosition += rowHeight;
+        });
+
+        yPosition += 6;
+      };
+
+      // ✅ Parser le markdown
+      const parseMarkdownToPDF = (markdownContent: string) => {
+        const lines = markdownContent.split('\n');
+        let inTable = false;
+        let tableRows: string[][] = [];
+        let tableHeaders: string[] = [];
+
+        const flushTable = () => {
+          if (tableHeaders.length > 0 || tableRows.length > 0) {
+            renderTablePDF(tableHeaders, tableRows);
+            tableHeaders = [];
+            tableRows = [];
+          }
+          inTable = false;
+        };
+
+        lines.forEach((line) => {
+          const trimmedLine = line.trim();
+
+          // Tableau
+          if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
+            if (trimmedLine.match(/^\|[\s\-:|]+\|$/)) {
+              inTable = true;
+              return;
+            }
+            
+            const cells = trimmedLine.slice(1, -1).split('|').map(c => c.trim());
+            
+            if (!inTable) {
+              tableHeaders = cells;
+              inTable = true;
+            } else {
+              tableRows.push(cells);
+            }
+            return;
+          }
+          
+          if (inTable && !trimmedLine.startsWith('|')) {
+            flushTable();
+          }
+
+          // Ligne vide
+          if (trimmedLine === '' || trimmedLine === '---') {
+            yPosition += 3;
+            return;
+          }
+
+          // H1
+          if (trimmedLine.startsWith('# ')) {
+            yPosition += 4;
+            addSimpleText(trimmedLine.substring(2), 16, true);
+            yPosition += 2;
+          }
+          // H2
+          else if (trimmedLine.startsWith('## ')) {
+            yPosition += 3;
+            addSimpleText(trimmedLine.substring(3), 13, true);
+            yPosition += 1;
+          }
+          // H3
+          else if (trimmedLine.startsWith('### ')) {
+            yPosition += 2;
+            addSimpleText(trimmedLine.substring(4), 11, true);
+          }
+          // H4
+          else if (trimmedLine.startsWith('#### ')) {
+            yPosition += 2;
+            addSimpleText(trimmedLine.substring(5), 10, true);
+          }
+          // Liste à puces
+          else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ') || trimmedLine.startsWith('• ')) {
+            const content = trimmedLine.replace(/^[-*•]\s*/, '');
+            // Gérer le gras dans les listes
+            const cleanContent = cleanText(content).replace(/\*\*/g, '');
+            const hasBold = content.includes('**');
+            
+            checkNewPage();
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('•', margin + 3, yPosition);
+            
+            if (hasBold && content.includes(':')) {
+              // Format "**Titre :** description"
+              const colonIndex = content.indexOf(':');
+              const beforeColon = content.substring(0, colonIndex + 1).replace(/\*\*/g, '');
+              const afterColon = content.substring(colonIndex + 1).replace(/\*\*/g, '');
+              
+              pdf.setFont('helvetica', 'bold');
+              pdf.text(beforeColon, margin + 7, yPosition);
+              const boldWidth = pdf.getTextWidth(beforeColon);
+              
+              pdf.setFont('helvetica', 'normal');
+              const remainingWidth = maxWidth - 7 - boldWidth;
+              const restLines = pdf.splitTextToSize(afterColon.trim(), remainingWidth);
+              
+              if (restLines.length > 0) {
+                pdf.text(restLines[0], margin + 7 + boldWidth, yPosition);
+                yPosition += 9 * 0.45;
+                
+                for (let i = 1; i < restLines.length; i++) {
+                  checkNewPage();
+                  pdf.text(restLines[i], margin + 7, yPosition);
+                  yPosition += 9 * 0.45;
+                }
+              }
+            } else {
+              const lines = pdf.splitTextToSize(cleanContent, maxWidth - 7);
+              lines.forEach((l: string, idx: number) => {
+                if (idx > 0) checkNewPage();
+                pdf.text(l, margin + 7, yPosition);
+                yPosition += 9 * 0.45;
+              });
+            }
+            yPosition += 1;
+          }
+          // Liste numérotée
+          else if (/^\d+\.\s/.test(trimmedLine)) {
+            const match = trimmedLine.match(/^(\d+\.)\s*(.*)/);
+            if (match) {
+              const num = match[1];
+              const content = cleanText(match[2]).replace(/\*\*/g, '');
+              
+              checkNewPage();
+              pdf.setFontSize(9);
+              pdf.setFont('helvetica', 'normal');
+              pdf.text(num, margin + 2, yPosition);
+              
+              const lines = pdf.splitTextToSize(content, maxWidth - 10);
+              lines.forEach((l: string, idx: number) => {
+                if (idx > 0) checkNewPage();
+                pdf.text(l, margin + 10, yPosition);
+                yPosition += 9 * 0.45;
+              });
+              yPosition += 1;
+            }
+          }
+          // Citation
+          else if (trimmedLine.startsWith('> ')) {
+            const content = cleanText(trimmedLine.substring(2)).replace(/\*\*/g, '');
+            checkNewPage();
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'italic');
+            
+            const lines = pdf.splitTextToSize(content, maxWidth - 10);
+            lines.forEach((l: string) => {
+              checkNewPage();
+              pdf.text(l, margin + 5, yPosition);
+              yPosition += 9 * 0.45;
+            });
+            yPosition += 1;
+          }
+          // Texte normal (avec potentiellement du gras)
+          else {
+            const cleaned = cleanText(trimmedLine);
+            if (!cleaned) return;
+            
+            // Vérifier si c'est une ligne entièrement en gras
+            if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.indexOf('**', 2) === trimmedLine.length - 2) {
+              addSimpleText(cleaned.replace(/\*\*/g, ''), 9, true);
+            }
+            // Ligne avec format "**Label :** valeur"
+            else if (cleaned.includes(':**') || (cleaned.includes(':') && trimmedLine.includes('**'))) {
+              const colonIdx = cleaned.indexOf(':');
+              if (colonIdx > 0) {
+                const label = cleaned.substring(0, colonIdx + 1).replace(/\*\*/g, '');
+                const value = cleaned.substring(colonIdx + 1).replace(/\*\*/g, '').trim();
+                
+                checkNewPage();
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(label, margin, yPosition);
+                const labelWidth = pdf.getTextWidth(label + ' ');
+                
+                pdf.setFont('helvetica', 'normal');
+                const valueLines = pdf.splitTextToSize(value, maxWidth - labelWidth);
+                
+                if (valueLines.length > 0) {
+                  pdf.text(valueLines[0], margin + labelWidth, yPosition);
+                  yPosition += 9 * 0.45;
+                  
+                  for (let i = 1; i < valueLines.length; i++) {
+                    checkNewPage();
+                    pdf.text(valueLines[i], margin, yPosition);
+                    yPosition += 9 * 0.45;
+                  }
+                }
+                yPosition += 1;
+              } else {
+                addSimpleText(cleaned.replace(/\*\*/g, ''), 9, false);
+              }
+            }
+            // Texte simple
+            else {
+              addSimpleText(cleaned.replace(/\*\*/g, ''), 9, false);
+            }
+          }
+        });
+
+        if (inTable) {
+          flushTable();
+        }
+      };
+
+      // === GÉNÉRATION DU PDF ===
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.setTextColor(30, 64, 175);
+      pdf.text('Séance Pédagogique', margin, yPosition);
+      yPosition += 10;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`${lesson.subject} | ${lesson.level} | ${lesson.duration} min | ${lesson.pedagogy_type}`, margin, yPosition);
+      yPosition += 5;
+      pdf.text(`Générée avec ProfAssist`, margin, yPosition);
+      yPosition += 6;
+
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 8;
+
+      pdf.setTextColor(0, 0, 0);
+
+      parseMarkdownToPDF(lesson.content);
+
+      // Pagination
+      const pdfInternal = pdf.internal as any;
+      const totalPages = pdfInternal.getNumberOfPages();
+      
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(`Page ${i} / ${totalPages}`, (pageWidth - pdf.getTextWidth(`Page ${i} / ${totalPages}`)) / 2, pageHeight - 8);
+      }
+
+      const safeFilename = lesson.topic
+        .replace(/[^a-zA-Z0-9àâäéèêëïîôùûüçÀÂÄÉÈÊËÏÎÔÙÛÜÇ\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .substring(0, 50);
+      pdf.save(`Seance-${safeFilename}.pdf`);
+
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
+      successDiv.innerHTML = 'PDF exporté !';
+      document.body.appendChild(successDiv);
+      setTimeout(() => { successDiv.remove(); }, 2000);
+
+    } catch (error) {
+      console.error('Erreur export PDF:', error);
+      alert('Erreur lors de l\'export PDF.');
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+
 
   const handleDelete = async (id: string, topic: string) => {
     if (!confirm(`Êtes-vous sûr de vouloir supprimer la séance "${topic}" ?`)) {
@@ -374,12 +987,13 @@ export function LessonsBankPage() {
                   </div>
                 </div>
 
-                {/* Contenu */}
+                {/* Contenu avec support tableaux */}
                 <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden mb-4">
                   <div className={`prose prose-sm max-w-none dark:prose-invert p-6 ${
                     expandedItems.has(lesson.id) ? '' : 'max-h-96 overflow-hidden'
                   }`}>
                     <ReactMarkdown
+                      rehypePlugins={[rehypeRaw as any]}
                       components={{
                         h1: ({ children }) => (
                           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">
@@ -440,13 +1054,36 @@ export function LessonsBankPage() {
                           <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">
                             {children}
                           </pre>
-                        )
+                        ),
+                        table: ({ children }) => (
+                          <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">
+                            {children}
+                          </table>
+                        ),
+                        thead: ({ children }) => (
+                          <thead className="bg-blue-100 dark:bg-blue-900/40">{children}</thead>
+                        ),
+                        tbody: ({ children }) => <tbody>{children}</tbody>,
+                        tr: ({ children }) => (
+                          <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
+                        ),
+                        th: ({ children }) => (
+                          <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/30">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
+                            {children}
+                          </td>
+                        ),
                       }}
                     >
-                      {expandedItems.has(lesson.id) 
-                        ? lesson.content 
-                        : getTruncatedContent(lesson.content, viewMode === 'grid' ? 200 : 300)
-                      }
+                      {convertMarkdownTablesToHtml(
+                        expandedItems.has(lesson.id) 
+                          ? lesson.content 
+                          : getTruncatedContent(lesson.content, viewMode === 'grid' ? 200 : 300)
+                      )}
                     </ReactMarkdown>
                   </div>
                   
@@ -481,6 +1118,16 @@ export function LessonsBankPage() {
                     </button>
                     
                     <button
+                      onClick={() => handleExportPDF(lesson)}
+                      disabled={exportingId === lesson.id}
+                      className="inline-flex items-center px-3 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-all duration-200 disabled:opacity-50"
+                      title="Exporter en PDF"
+                    >
+                      <FileDown className="w-4 h-4 mr-1" />
+                      {exportingId === lesson.id ? 'Export...' : 'PDF'}
+                    </button>
+                    
+                    <button
                       onClick={() => handleDelete(lesson.id, lesson.topic)}
                       className="inline-flex items-center px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-all duration-200"
                       title="Supprimer la séance"
@@ -500,3 +1147,4 @@ export function LessonsBankPage() {
 }
 
 export default LessonsBankPage;
+
