@@ -2,14 +2,13 @@
 
 // @ts-ignore - Deno global disponible en runtime
 
-// ⭐ MODIFICATION : Ajout de documentContext optionnel
 interface LessonRequest {
   subject: string;
   topic: string;
   level: string;
   pedagogy_type: string;
   duration: string;
-  documentContext?: string;  // ⭐ NOUVEAU - Texte extrait du PDF
+  documentContext?: string;
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -41,7 +40,6 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
     const data: LessonRequest = await req.json();
 
-    // Reproduction exacte des pédagogies de votre code
     const pedagogies = [
       {
         value: 'traditionnelle',
@@ -91,220 +89,526 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     ];
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
+    const isEPS = data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') || data.subject.toLowerCase().includes('éducation physique');
 
-    // ⭐ MODIFICATION : Prompt enrichi avec contexte documentaire
-    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique, spécialisé dans la conception de séances d'enseignement primaire et secondaire.
+    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
 
-**CONTEXTE DE LA SÉANCE :**
-- Matière : ${data.subject}
-- Thème/Notion : ${data.topic}
-- Niveau : ${data.level}
-- Durée : ${data.duration} minutes
-- Approche pédagogique : ${pedagogyDescription}
+═══════════════════════════════════════════════════════════════
+                    CONTEXTE DE LA SÉANCE
+═══════════════════════════════════════════════════════════════
+
+**Matière :** ${data.subject}
+**Thème/Notion :** ${data.topic}
+**Niveau :** ${data.level}
+**Durée :** ${data.duration} minutes
+**Approche pédagogique :** ${pedagogyDescription}
 
 ${data.documentContext ? `
-**📎 DOCUMENT DE RÉFÉRENCE FOURNI PAR L'ENSEIGNANT :**
+═══════════════════════════════════════════════════════════════
+            📎 DOCUMENT DE RÉFÉRENCE FOURNI
+═══════════════════════════════════════════════════════════════
 
-L'enseignant a fourni un document de contexte (bulletin officiel, programme, manuel, exercices...) pour guider la conception de cette séance.
-Voici le contenu extrait de ce document :
-
----
-${data.documentContext}
----
-
-**Consigne importante :** Utilise les informations de ce document pour :
+L'enseignant a fourni ce document de contexte. UTILISE-LE IMPÉRATIVEMENT pour :
 - Aligner la séance avec les programmes officiels mentionnés
 - Intégrer les compétences et objectifs spécifiques indiqués
 - Respecter le niveau de difficulté et les prérequis décrits
 - T'inspirer des exemples d'exercices ou d'activités fournis
-- Adapter le vocabulaire et les concepts au cadre pédagogique précisé
 
-Intègre ces éléments de manière naturelle dans la séance tout en respectant la structure demandée ci-dessous.
-
+CONTENU DU DOCUMENT :
+---
+${data.documentContext}
+---
 ` : ''}
 
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 
-`**🏃 SPÉCIFICITÉS EPS - INSTRUCTIONS PRIORITAIRES :**
+═══════════════════════════════════════════════════════════════
+        EXIGENCES PÉDAGOGIQUES NON NÉGOCIABLES
+═══════════════════════════════════════════════════════════════
 
-**IMPÉRATIFS PÉDAGOGIQUES EPS :**
-- **75% minimum d'activité motrice** : La séance doit être majoritairement composée d'exercices pratiques et de situations motrices
-- **Progressivité des apprentissages** : Du simple au complexe, du global au spécifique
-- **Sécurité active et passive** : Intégrer systématiquement les consignes de sécurité et l'échauffement
-- **Différenciation motrice** : Adapter les exercices selon les niveaux d'habileté des élèves
-- **Évaluation par l'action** : Privilégier l'observation des comportements moteurs et les critères de réalisation
+### 🎯 PRINCIPE 1 : CONSIGNES DOUBLEMENT STRUCTURÉES
 
-**STRUCTURE SPÉCIFIQUE EPS (à respecter absolument) :**
+Chaque activité DOIT comporter DEUX types de consignes distinctes :
 
-### 🔥 **Phase 1 : Échauffement/Mise en activité** - [12-15 minutes sur ${data.duration} min]
-**Activité motrice obligatoire :** [Exercices d'échauffement spécifiques à l'APSA, mobilisation articulaire, activation cardio-vasculaire]
-**Exercices concrets :** [Détailler 3-4 exercices progressifs avec consignes de sécurité]
-**Modalité :** [Collectif puis individuel/binômes]
+**A) CONSIGNES ORGANISATIONNELLES (Comment s'organiser)**
+- Organisation de l'espace (disposition des tables/élèves/matériel)
+- Modalités de travail (individuel, binôme, groupe de X, collectif)
+- Rôle précis de chaque acteur (enseignant, élèves, pairs/tuteurs)
+- Gestion du temps (durées, rotations, transitions, signaux)
+- Distribution et récupération du matériel
 
-### 💪 **Phase 2 : Apprentissage moteur principal** - [${Math.floor((parseInt(data.duration) * 0.6))} minutes]
-**Situation d'apprentissage 1 :** [Exercice technique spécifique avec critères de réalisation]
-**Situation d'apprentissage 2 :** [Situation d'opposition/coopération ou perfectionnement technique]
-**Situation d'apprentissage 3 :** [Mise en application complexe ou situation de jeu]
-**Variables didactiques :** [Espace, temps, matériel, nombre de joueurs, règles...]
+**B) CONSIGNES DE RÉUSSITE (Comment réussir la tâche)**
+- Ce que l'élève doit FAIRE CONCRÈTEMENT pour réussir
+- Ce qui est ATTENDU dans l'action ou la production
+- Les CRITÈRES OBSERVABLES de réussite (ce qu'on doit voir/entendre/constater)
+- Les ERREURS FRÉQUENTES à éviter (points de vigilance explicites)
+- Les INDICATEURS DE RÉUSSITE pour l'auto-évaluation
 
-### 🎯 **Phase 3 : Mise en situation complexe/Jeu** - [${Math.floor((parseInt(data.duration) * 0.2))} minutes]
-**Application pratique :** [Situation de match, parcours, ou évaluation pratique]
-**Rôles des élèves :** [Joueurs, arbitres, observateurs, coaches...]
+⚠️ INTERDICTION : Aucune consigne ne doit rester générale, vague ou implicite.
 
-### 🧘 **Phase 4 : Retour au calme/Bilan** - [5-8 minutes]
-**Récupération active :** [Étirements, relaxation, exercices respiratoires]
-**Bilan moteur :** [Analyse des sensations, verbalisation des apprentissages]
+---
 
-**MATÉRIEL EPS SPÉCIFIQUE :**
-- [Lister précisément tout le matériel sportif nécessaire]
-- [Préciser l'aménagement des espaces et la sécurité]
-- [Indiquer les alternatives en cas de manque de matériel]
+### 🎯 PRINCIPE 2 : SITUATIONS D'APPRENTISSAGE OPÉRATIONNELLES
 
-**CRITÈRES DE RÉALISATION MOTRICE :**
-- [Définir 3-4 critères observables pour évaluer la réussite technique]
-- [Préciser les observables comportementaux et moteurs]
-- [Adapter selon les niveaux d'habileté]
+Chaque situation proposée DOIT être directement exploitable en classe avec :
 
-**SÉCURITÉ ET GESTION DE CLASSE :**
-- [Consignes de sécurité spécifiques à l'APSA]
-- [Gestion des groupes et rotations]
-- [Signaux et codes de communication]
+**DÉROULEMENT PRÉCIS :**
+- Étapes chronologiques numérotées
+- Actions concrètes et observables
+- Transitions entre les étapes
 
-**DIFFÉRENCIATION MOTRICE :**
-- **Élèves en difficulté motrice :** [Adaptations techniques, matériel adapté, simplifications]
-- **Élèves experts :** [Complexifications, rôles de tuteur, défis supplémentaires]
-- **Élèves en situation de handicap :** [Adaptations inclusives spécifiques]` 
-: ''}
+**ACTIONS ATTENDUES DES ÉLÈVES :**
+- Verbes d'action précis (pas "comprendre" mais "identifier", "formuler", "justifier")
+- Productions ou comportements attendus
+- Traces écrites ou orales à produire
 
-**CONSIGNES DE STRUCTURATION :**
-Génère une séance pédagogique complète et directement exploitable en respectant OBLIGATOIREMENT cette structure Markdown :
+**INTERVENTIONS DE L'ENSEIGNANT :**
+- Relances pour les élèves bloqués (formulations exactes)
+- Régulations possibles en cours d'activité
+- Aides méthodologiques et cognitives différenciées
+- Questions de guidage graduées (du plus étayant au moins étayant)
 
-# 📚 [Titre accrocheur de la séance]
+**PROGRESSION LOGIQUE :**
+- Entrée dans l'activité (mise en confiance, appropriation)
+- Stabilisation (pratique guidée, entraînement)
+- Complexification (transfert, autonomie)
+
+---
+
+### 🎯 PRINCIPE 3 : LIENS EXPLICITES AVEC LES PROGRAMMES
+
+**OBLIGATOIRE pour chaque séance :**
+- Citer les ATTENDUS DE FIN DE CYCLE précis (avec références BO)
+- Formuler les compétences de manière OPÉRATIONNELLE (verbes d'action observables)
+- Expliciter le lien avec le SOCLE COMMUN (domaines concernés)
+- Justifier POURQUOI cette séance répond à ces attendus (pas juste les citer)
+
+${isEPS ? `
+═══════════════════════════════════════════════════════════════
+          🏃 SPÉCIFICITÉS EPS - INSTRUCTIONS PRIORITAIRES
+═══════════════════════════════════════════════════════════════
+
+**IMPÉRATIFS DISCIPLINAIRES EPS :**
+
+1. **75% MINIMUM D'ACTIVITÉ MOTRICE**
+   - La séance doit être majoritairement composée d'exercices pratiques
+   - Limiter les temps d'explication verbale (max 2-3 min consécutives)
+   - Privilégier la démonstration et la pratique immédiate
+
+2. **SITUATIONS MOTRICES CONTEXTUALISÉES**
+   - Chaque situation doit avoir un BUT clair pour l'élève
+   - Les exercices doivent être SIGNIFIANTS (pas de gestes isolés sans contexte)
+   - Intégrer des situations de référence proches de la pratique sociale
+
+3. **ORGANISATION MATÉRIELLE ET SPATIALE CENTRALE**
+   - Schéma ou description précise de la disposition des ateliers
+   - Circulation des élèves (sens, rotations, regroupements)
+   - Gestion des rôles sociaux (observateur, juge, chronométreur, coach, pareur)
+
+4. **CONSIGNES EPS SPÉCIFIQUES**
+   - **Ce qu'il faut faire CORPORELLEMENT pour réussir** (placement, trajectoire, timing)
+   - **Critères de RÉALISATION MOTRICE** (comment faire techniquement)
+   - **Critères de RÉUSSITE MESURABLES** (score, temps, distance, précision)
+
+5. **SÉCURITÉ ACTIVE ET PASSIVE**
+   - Échauffement spécifique à l'APSA (articulaire + cardio + spécifique)
+   - Consignes de sécurité intégrées à chaque situation
+   - Parade et entraide entre élèves si nécessaire
+
+6. **COMPÉTENCES MÉTHODOLOGIQUES ET SOCIALES**
+   - Rôles sociaux explicites (arbitre, observateur, coach)
+   - Outils d'observation fournis (fiches, grilles simples)
+   - Temps de verbalisation des sensations et stratégies
+
+**STRUCTURE TEMPORELLE EPS (${data.duration} min) :**
+- Échauffement : 12-15 min (obligatoire et spécifique)
+- Corps de séance (apprentissage moteur) : ${Math.floor(parseInt(data.duration) * 0.55)} min
+- Situation complexe/jeu : ${Math.floor(parseInt(data.duration) * 0.2)} min  
+- Retour au calme + bilan : 8-10 min
+` : `
+═══════════════════════════════════════════════════════════════
+          📚 SPÉCIFICITÉS DISCIPLINAIRES - ${data.subject.toUpperCase()}
+═══════════════════════════════════════════════════════════════
+
+**IMPÉRATIFS POUR CETTE DISCIPLINE :**
+
+1. **RIGUEUR DIDACTIQUE**
+   - Vocabulaire disciplinaire précis et approprié au niveau ${data.level}
+   - Progression du simple au complexe, du concret à l'abstrait
+   - Articulation entre manipulation/observation et conceptualisation
+
+2. **TRACES ÉCRITES STRUCTURÉES**
+   - Préciser le moment et le contenu de l'institutionnalisation
+   - Distinguer trace collective et trace individuelle
+   - Indiquer les éléments à retenir explicitement
+
+3. **ACTIVITÉ COGNITIVE DES ÉLÈVES**
+   - Tâches qui engagent réellement la réflexion
+   - Temps de recherche individuelle avant mise en commun
+   - Confrontation des procédures et justification des réponses
+`}
+
+═══════════════════════════════════════════════════════════════
+              STRUCTURE DE SORTIE OBLIGATOIRE
+═══════════════════════════════════════════════════════════════
+
+Génère la séance en respectant EXACTEMENT cette structure Markdown :
+
+# 📚 [Titre accrocheur et explicite de la séance]
 **Niveau :** ${data.level} | **Durée :** ${data.duration} min | **Matière :** ${data.subject}
 
-## 🎯 Objectifs et compétences visées
-### Objectifs d'apprentissage
-- [3-4 objectifs précis et mesurables]
+---
 
-### Compétences du socle/programmes officiels
-- [Références aux programmes en vigueur]
+## 🎯 Objectifs et ancrage institutionnel
 
-## 🛠️ Matériel et supports nécessaires
+### Objectif d'apprentissage principal
+> [Formulation précise : "À l'issue de cette séance, l'élève sera capable de..." avec verbe d'action observable]
+
+### Objectifs secondaires
+- [Objectif 2 - verbe d'action + contenu + contexte]
+- [Objectif 3 - verbe d'action + contenu + contexte]
+
+### Ancrage dans les programmes officiels
+| Référence | Attendu / Compétence |
+|-----------|---------------------|
+| Programme ${data.level} | [Attendu de fin de cycle précis] |
+| Socle commun | [Domaine X : compétence visée] |
+${isEPS ? '| Champ d\'apprentissage | [CA1/CA2/CA3/CA4 avec précision] |' : '| Compétence disciplinaire | [Référence programme] |'}
+
+### Prérequis nécessaires
+- [Ce que l'élève doit déjà savoir/savoir-faire - liste précise]
+
+---
+
+## 🛠️ Matériel et préparation
+
 ### Pour l'enseignant
-- [Liste détaillée]
+- [Liste détaillée avec quantités]
+- [Documents à préparer/photocopier]
 
 ### Pour les élèves
-- [Liste détaillée]
+- [Matériel individuel]
+- [Matériel collectif par groupe]
 
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ?
-`### Espace et terrain
-- [Configuration spatiale nécessaire]
-- [Matériel sportif requis]
-- [Consignes de sécurité]` : ''}
+${isEPS ? `### Aménagement de l'espace
+\`\`\`
+[Schéma textuel de la disposition : terrain, ateliers, zones, circulation]
+\`\`\`
+- **Sécurité :** [Consignes spécifiques, zones interdites, parade]
+- **Matériel sportif :** [Liste exhaustive avec quantités]` : `### Organisation spatiale
+- [Configuration des tables/espaces selon la pédagogie ${data.pedagogy_type}]
+- [Affichages nécessaires]`}
 
-## 🏫 Organisation spatiale de la classe
-> **💡 Configuration adaptée à la pédagogie ${data.pedagogy_type}**
-- [Description précise de l'aménagement de l'espace selon la pédagogie choisie]
-- [Disposition des élèves, des tables, des espaces de travail]
+---
 
 ## ⏰ Déroulé détaillé de la séance
 
-### 🚀 **Phase 1 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Échauffement/Mise en activité' : 'Accroche/Situation déclenchante'}** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
+${isEPS ? `
+### 🔥 **Phase 1 : Échauffement** — 12-15 min
+> **Modalité :** Collectif puis vagues/binômes
 
-**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - OBLIGATOIREMENT MOTRICE avec exercices concrets' : ''}]
+#### Consignes organisationnelles
+- **Espace :** [Disposition précise des élèves]
+- **Signal de départ/arrêt :** [Coup de sifflet, musique, signal visuel]
+- **Rotations :** [Sens de circulation, regroupements]
 
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+#### Déroulement
+| Temps | Exercice | Consignes de réalisation | Critères de réussite |
+|-------|----------|--------------------------|---------------------|
+| 3 min | [Activation cardio] | [Consigne motrice précise] | [Observable] |
+| 4 min | [Mobilisation articulaire] | [Consigne motrice précise] | [Observable] |
+| 5 min | [Échauffement spécifique APSA] | [Consigne motrice précise] | [Observable] |
 
-**Rôle des élèves :** [Actions attendues des élèves]
-
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '**Consignes de sécurité :** [Précisions sécuritaires spécifiques]' : ''}
-
----
-
-### 🔍 **Phase 2 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Apprentissage moteur principal' : '[Nom de la phase]'}** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
-
-**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - SITUATIONS MOTRICES DÉTAILLÉES avec critères de réalisation' : ''}]
-
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
-
-**Rôle des élèves :** [Actions attendues des élèves]
-
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '**Variables didactiques :** [Adaptations possibles : espace, temps, règles...]' : ''}
+#### Interventions enseignant
+- **Relance si passivité :** "[Formulation exacte]"
+- **Correction posturale :** "[Formulation exacte]"
 
 ---
 
-### 🏗️ **Phase 3 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Mise en situation complexe/Application' : '[Nom de la phase]'}** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
+### 💪 **Phase 2 : Apprentissage moteur** — ${Math.floor(parseInt(data.duration) * 0.55)} min
+> **Modalité :** [Ateliers/Vagues/Opposition]
 
-**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - SITUATION DE JEU OU APPLICATION COMPLEXE' : ''}]
+#### Situation d'apprentissage 1 : [Nom explicite]
+**But pour l'élève :** [Ce qu'il doit réussir à faire]
 
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+**Consignes organisationnelles :**
+- Groupes de [X] élèves
+- Disposition : [description précise]
+- Rotation toutes les [X] min au signal [préciser]
+- Rôles : [joueur/observateur/coach...]
 
-**Rôle des élèves :** [Actions attendues des élèves]
+**Consignes de réussite :**
+- **Pour réussir, tu dois :** [action motrice précise]
+- **Critère technique :** [placement, trajectoire, timing]
+- **Tu as réussi si :** [observable mesurable]
+- **Erreur fréquente à éviter :** [description et correction]
+
+**Variables didactiques :**
+| Pour simplifier | Pour complexifier |
+|-----------------|-------------------|
+| [Adaptation 1] | [Adaptation 1] |
+| [Adaptation 2] | [Adaptation 2] |
+
+**Interventions enseignant :**
+- Si blocage : "[Question ou aide précise]"
+- Pour les experts : "[Défi supplémentaire]"
+
+#### Situation d'apprentissage 2 : [Nom explicite]
+[Même structure détaillée]
 
 ---
 
-### 📝 **Phase 4 : ${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Retour au calme/Bilan moteur' : 'Synthèse/Institutionnalisation'}** - [X minutes]
-> **Modalité :** [Individuel/Groupe/Collectif]
+### 🎯 **Phase 3 : Situation complexe / Match** — ${Math.floor(parseInt(data.duration) * 0.2)} min
+> **Modalité :** [Opposition/Coopération]
 
-**Activité :** [Description précise de l'activité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - RETOUR AU CALME + VERBALISATION' : ''}]
+**But :** [Application des apprentissages en situation de référence]
 
-**Rôle de l'enseignant :** [Actions concrètes de l'enseignant]
+**Organisation :**
+- [Équipes, terrains, rotations]
+- **Rôles sociaux :** [Arbitre : règles à faire respecter] [Observateur : critère à observer]
 
-**Rôle des élèves :** [Actions attendues des élèves]
+**Consignes de réussite :**
+- [Critère collectif de réussite]
+- [Critère individuel de réussite]
 
-## 🎨 Différenciation et adaptations
+**Fiche d'observation fournie :**
+| Joueur | Critère 1 | Critère 2 | Remarques |
+|--------|-----------|-----------|-----------|
+| ... | ✓ / ✗ | ✓ / ✗ | ... |
 
-### 🟢 Pour les élèves en difficulté${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' motrice' : ''}
-- [3-4 adaptations concrètes${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' : matériel adapté, simplifications techniques, aides visuelles' : ''}]
+---
 
-### 🔵 Pour les élèves à l'aise${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '/experts moteurs' : ''}
-- [3-4 enrichissements possibles${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' : complexifications, rôles de tuteur, défis supplémentaires' : ''}]
+### 🧘 **Phase 4 : Retour au calme et bilan** — 8-10 min
+> **Modalité :** Collectif assis
+
+**Récupération (5 min) :**
+- [Étirements spécifiques avec consignes précises]
+- [Exercices respiratoires]
+
+**Bilan collectif (5 min) :**
+- **Question 1 :** "Qu'avez-vous appris à faire aujourd'hui ?" → [Réponse attendue]
+- **Question 2 :** "Qu'est-ce qui vous a aidé à réussir ?" → [Réponse attendue]
+- **Question 3 :** "Quelle difficulté reste à travailler ?" → [Piste pour prochaine séance]
+
+` : `
+### 🚀 **Phase 1 : Entrée dans l'activité** — [X] min
+> **Modalité :** [Individuel/Collectif]
+
+#### Consignes organisationnelles
+- **Disposition :** [Configuration précise de la classe]
+- **Matériel distribué :** [Quoi, quand, comment]
+- **Signal de début/fin :** [Préciser]
+
+#### Situation déclenchante
+**Accroche :** [Question, défi, problème, document surprenant - formulation exacte]
+
+**Ce que font les élèves :**
+1. [Action 1 - verbe précis]
+2. [Action 2 - verbe précis]
+3. [Production attendue]
+
+**Consignes de réussite données aux élèves :**
+> "[Formulation exacte de la consigne telle que dite aux élèves]"
+- Tu as réussi si : [critère observable]
+- Attention à : [erreur fréquente à éviter]
+
+**Interventions enseignant :**
+- Relance si blocage : "[Formulation exacte]"
+- Validation intermédiaire : "[Ce qu'on valide, comment]"
+
+---
+
+### 🔍 **Phase 2 : Recherche / Investigation** — [X] min
+> **Modalité :** [Individuel puis binômes/groupes]
+
+#### Consignes organisationnelles
+- **Temps individuel :** [X] min de recherche silencieuse
+- **Mise en binôme/groupe :** [Comment, signal, placement]
+- **Trace écrite :** [Support, contenu attendu]
+
+#### Tâche proposée
+**Énoncé exact :** "[Formulation précise de la consigne]"
+
+**Ce que fait l'élève - étapes :**
+1. [Étape 1 - action précise]
+2. [Étape 2 - action précise]  
+3. [Étape 3 - production]
+
+**Consignes de réussite :**
+- **Pour réussir, tu dois :** [action cognitive précise]
+- **Ta réponse est correcte si :** [critères de validité]
+- **Erreur fréquente :** [description] → **Correction :** [comment l'éviter]
+
+**Aides graduées (différenciation) :**
+| Niveau d'aide | Formulation |
+|---------------|-------------|
+| Aide 1 (légère) | "[Question de relance]" |
+| Aide 2 (moyenne) | "[Indice méthodologique]" |
+| Aide 3 (forte) | "[Étayage direct]" |
+
+**Interventions enseignant :**
+- Circule et observe : [Ce qu'on observe, erreurs typiques]
+- Relance productive : "[Formulation]"
+- Valorisation : "[Ce qu'on valorise explicitement]"
+
+---
+
+### 🏗️ **Phase 3 : Mise en commun / Structuration** — [X] min
+> **Modalité :** Collectif
+
+#### Consignes organisationnelles
+- **Retour en configuration collective :** [Comment]
+- **Supports de mise en commun :** [Tableau, affiche, vidéoprojecteur]
+
+#### Déroulement
+**Étape 1 - Recueil des propositions :**
+- Sollicitation : "[Question exacte posée]"
+- Réponses attendues : [Types de réponses, procédures]
+- Notation au tableau : [Comment on organise]
+
+**Étape 2 - Confrontation et validation :**
+- "[Question de comparaison/justification]"
+- Critères de validation explicités aux élèves
+
+**Étape 3 - Institutionnalisation :**
+> **Trace écrite collective :**
+> [Contenu exact de ce qui est noté/dicté - formulation précise]
+
+**Questions types pour guider :**
+1. "[Question pour faire émerger la règle/notion]"
+2. "[Question pour vérifier la compréhension]"
+3. "[Question pour faire le lien avec les connaissances antérieures]"
+
+---
+
+### 📝 **Phase 4 : Entraînement / Application** — [X] min
+> **Modalité :** Individuel
+
+#### Consignes organisationnelles
+- **Distribution :** [Exercices, support]
+- **Temps imparti :** [Durée, signal de fin]
+- **Attendu :** [Nombre d'exercices, qualité attendue]
+
+#### Exercices proposés
+**Exercice 1 (application directe) :**
+[Énoncé complet]
+- Critère de réussite : [Observable]
+
+**Exercice 2 (transfert) :**
+[Énoncé complet]
+- Critère de réussite : [Observable]
+
+**Exercice 3 (défi/approfondissement) :**
+[Énoncé complet]
+- Pour les élèves ayant terminé
+
+**Correction :**
+- [Modalité : auto-correction, correction collective, par les pairs]
+- [Éléments de correction fournis]
+
+---
+
+### ✅ **Phase 5 : Bilan et clôture** — [X] min
+> **Modalité :** Collectif
+
+**Questions bilan :**
+1. "Qu'avons-nous appris aujourd'hui ?" → [Réponse attendue]
+2. "À quoi cela va-t-il nous servir ?" → [Lien avec la suite]
+3. "Qu'est-ce qui était difficile ?" → [Identifier les obstacles]
+
+**Annonce de la suite :**
+- [Lien avec la prochaine séance]
+`}
+
+---
+
+## 🎨 Différenciation pédagogique
+
+### 🟢 Pour les élèves en difficulté
+| Obstacle identifié | Adaptation proposée | Aide concrète |
+|-------------------|---------------------|---------------|
+| [Obstacle 1] | [Adaptation] | "[Formulation de l'aide]" |
+| [Obstacle 2] | [Adaptation] | "[Formulation de l'aide]" |
+| [Obstacle 3] | [Adaptation] | "[Formulation de l'aide]" |
+
+### 🔵 Pour les élèves experts
+| Enrichissement | Description | Consigne |
+|----------------|-------------|----------|
+| [Défi 1] | [Description] | "[Consigne exacte]" |
+| [Défi 2] | [Description] | "[Consigne exacte]" |
 
 ### ♿ Adaptations inclusives
-- [Adaptations pour élèves à besoins particuliers${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' et situations de handicap moteur' : ''}]
-
-## 📊 Évaluation et critères de réussite
-
-### Critères de réussite observables
-- **Critère 1 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE MOTEUR OBSERVABLE' : ''}]
-- **Critère 2 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE TECHNIQUE MESURABLE' : ''}]
-- **Critère 3 :** [Comportement/production attendue${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - CRITÈRE COMPORTEMENTAL EN SITUATION' : ''}]
-
-### Modalités d'évaluation
-- [${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? 'Observation directe des comportements moteurs/Auto-évaluation des sensations/Évaluation par les pairs' : 'Formative/Sommative/Auto-évaluation/Etc.'}]
-
-## 💡 Conseils pratiques et anticipation
-
-### ⚠️ Points de vigilance
-- [Difficultés prévisibles et solutions${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Focus sur la sécurité et la gestion des groupes' : ''}]
-
-### 🗣️ Questions types à poser
-- [5-6 questions pour guider les élèves${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Verbalisation des sensations et analyse technique' : ''}]
-
-### 🔄 Variantes possibles
-- [Adaptations selon le contexte${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ', météo, matériel disponible' : ''}]
-
-## 📈 Prolongements possibles
-- **Séance suivante :** [Piste pour la continuité${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Évolution des situations motrices' : ''}]
-- **Interdisciplinarité :** [Liens avec d'autres matières]
-- **À la maison :** [Travail personnel éventuel${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? ' - Pratique autonome, recherches' : ''}]
+- **Troubles DYS :** [Adaptations spécifiques]
+- **Troubles attentionnels :** [Adaptations spécifiques]
+${isEPS ? '- **Handicap moteur :** [Adaptations motrices spécifiques]' : '- **Élèves allophones :** [Adaptations linguistiques]'}
 
 ---
-> **💻 Ressources numériques :** [Sites, apps, outils TICE recommandés]
-> **📚 Pour aller plus loin :** [Ressources pédagogiques complémentaires]
 
-**EXIGENCES QUALITÉ :**
-1. Chaque timing doit être précis et la somme doit correspondre à ${data.duration} minutes
-2. Les activités doivent être concrètes et directement réalisables
-3. La pédagogie ${data.pedagogy_type} doit être clairement visible dans les modalités
-4. Les consignes aux élèves doivent être formulées simplement
-5. Prévoir des transitions fluides entre les phases
-6. Intégrer des éléments de différenciation naturelle
-${data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') ? '7. **PRIORITÉ EPS :** Au moins 75% d\'exercices pratiques et situations motrices avec critères techniques précis' : ''}
+## 📊 Évaluation
 
-Génère maintenant cette séance en respectant scrupuleusement cette structure et en étant très concret dans toutes les descriptions.`;
+### Critères de réussite observables
+| Critère | Indicateur observable | Niveau atteint |
+|---------|----------------------|----------------|
+| [Critère 1] | [Ce qu'on voit/entend] | 🔴 Non acquis / 🟡 En cours / 🟢 Acquis |
+| [Critère 2] | [Ce qu'on voit/entend] | 🔴 / 🟡 / 🟢 |
+| [Critère 3] | [Ce qu'on voit/entend] | 🔴 / 🟡 / 🟢 |
+
+### Modalité d'évaluation
+- **Type :** [Diagnostique/Formative/Sommative]
+- **Outil :** [Grille d'observation / Auto-évaluation / Production]
+${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- **Trace écrite analysée :** [Critères de correction]'}
+
+---
+
+## 💡 Anticipation et gestion de classe
+
+### ⚠️ Difficultés prévisibles et remédiations
+| Difficulté anticipée | Solution préparée |
+|---------------------|-------------------|
+| [Difficulté 1] | [Remédiation immédiate] |
+| [Difficulté 2] | [Remédiation immédiate] |
+| [Difficulté 3] | [Remédiation immédiate] |
+
+### 🗣️ Formulations clés à utiliser
+- **Pour lancer l'activité :** "[Formulation exacte]"
+- **Pour relancer un élève :** "[Formulation exacte]"
+- **Pour valider une réponse :** "[Formulation exacte]"
+- **Pour institutionnaliser :** "[Formulation exacte]"
+
+### ⏱️ Gestion du temps - Plan B
+- Si retard : [Ce qu'on raccourcit/supprime]
+- Si avance : [Ce qu'on ajoute]
+
+---
+
+## 📈 Prolongements
+
+### Séance suivante
+- [Objectif et lien de continuité]
+
+### Interdisciplinarité
+- [Liens concrets avec autres disciplines]
+
+### Travail autonome possible
+- [Activité réalisable en autonomie ou à la maison]
+
+---
+
+> **📚 Ressources complémentaires :** [Sites institutionnels, manuels, outils TICE]
+
+═══════════════════════════════════════════════════════════════
+              EXIGENCES QUALITÉ FINALES
+═══════════════════════════════════════════════════════════════
+
+✅ Chaque timing doit être précis et totaliser ${data.duration} minutes
+✅ TOUTES les consignes sont doublement structurées (organisationnelles + réussite)
+✅ Les situations sont OPÉRATIONNELLES (directement utilisables)
+✅ Les liens avec les programmes sont EXPLICITES et JUSTIFIÉS
+✅ La pédagogie ${data.pedagogy_type} transparaît dans TOUTES les modalités
+✅ Les interventions enseignant sont FORMULÉES EXACTEMENT
+✅ La différenciation est CONCRÈTE (pas de formules vagues)
+${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alternance judicieuse des modalités de travail'}
+✅ Document exploitable IMMÉDIATEMENT sans interprétation
+
+Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

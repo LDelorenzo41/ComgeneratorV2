@@ -13,6 +13,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+// ✅ AJOUT IMPORT REHYPE-RAW
+import rehypeRaw from 'rehype-raw';
+
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -115,6 +118,76 @@ const lessonSchema = z.object({
 
 type LessonFormData = z.infer<typeof lessonSchema>;
 
+// ✅ FONCTION AJOUTÉE : Conversion des tableaux Markdown en HTML
+const convertMarkdownTablesToHtml = (markdown: string): string => {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableLines: string[] = [];
+
+  const processTable = (tableLines: string[]): string => {
+    if (tableLines.length < 2) return tableLines.join('\n');
+    
+    const headerLine = tableLines[0];
+    const dataLines = tableLines.slice(2); // Skip separator line
+    
+    const parseRow = (line: string): string[] => {
+      return line
+        .slice(1, -1) // Remove first and last |
+        .split('|')
+        .map(cell => cell.trim());
+    };
+    
+    const headers = parseRow(headerLine);
+    
+    let html = '<table class="markdown-table"><thead><tr>';
+    headers.forEach(h => {
+      html += `<th>${h}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    dataLines.forEach(line => {
+      if (line.trim()) {
+        const cells = parseRow(line);
+        html += '<tr>';
+        cells.forEach(c => {
+          html += `<td>${c}</td>`;
+        });
+        html += '</tr>';
+      }
+    });
+    
+    html += '</tbody></table>';
+    return html;
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableLines = [];
+      }
+      tableLines.push(trimmed);
+    } else {
+      if (inTable) {
+        result.push(processTable(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
+      result.push(line);
+    }
+  });
+
+  // Handle table at end of content
+  if (inTable && tableLines.length > 0) {
+    result.push(processTable(tableLines));
+  }
+
+  return result.join('\n');
+};
+
 const MarkdownEditor: React.FC<{
   content: string;
   onChange: (content: string) => void;
@@ -195,139 +268,361 @@ const MarkdownEditor: React.FC<{
     onSaveToBank(content);
   };
 
-  const handleExportPDF = async () => {
+    const handleExportPDF = async () => {
     setIsExporting(true);
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20;
+      const margin = 15;
       const maxWidth = pageWidth - 2 * margin;
       let yPosition = margin;
 
-      const addText = (text: string, fontSize: number, isBold: boolean = false, isItalic: boolean = false, marginLeft: number = 0) => {
-        if (yPosition > pageHeight - 30) {
-          pdf.addPage();
-          yPosition = margin;
-        }
-
-        const cleanText = text
-          .replace(/[📚🎯🛠️🏫⏰🚀🔍🏗️📝🎨🟢🔵♿📊💡⚠️🗣️🔄📈💻🔥💪🎯🧘]/g, '')
+      // Fonction de nettoyage du texte
+      const cleanText = (text: string): string => {
+        return text
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+          .replace(/[\u{2600}-\u{26FF}]/gu, '')
+          .replace(/[\u{2700}-\u{27BF}]/gu, '')
+          .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+          .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+          .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+          .replace(/[📚🎯🛠️🏫⏰🚀🔍🏗️📝🎨🟢🔵♿📊💡⚠️🗣️🔄📈💻🔥💪🧘📎✅❌⭐🏃💪🎯📋📄🗑️✓●○◆◇■□▪▫•]/g, '')
           .replace(/[""]/g, '"')
           .replace(/['']/g, "'")
           .replace(/…/g, '...')
-          .replace(/–/g, '-')
-          .replace(/—/g, '-')
+          .replace(/[–—]/g, '-')
+          .replace(/[\x00-\x1F\x7F]/g, '')
           .trim();
+      };
 
-        if (!cleanText) return;
+      const checkNewPage = (neededHeight: number = 25) => {
+        if (yPosition > pageHeight - neededHeight) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+      };
 
-        let fontStyle = 'normal';
-        if (isBold && isItalic) fontStyle = 'bolditalic';
-        else if (isBold) fontStyle = 'bold';
-        else if (isItalic) fontStyle = 'italic';
+      const addSimpleText = (text: string, fontSize: number, isBold: boolean = false, indent: number = 0) => {
+        const cleaned = cleanText(text).replace(/\*\*/g, '');
+        if (!cleaned) return;
 
-        pdf.setFont('helvetica', fontStyle);
+        checkNewPage();
+        pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
         pdf.setFontSize(fontSize);
 
-        const availableWidth = maxWidth - marginLeft;
-        const lines = pdf.splitTextToSize(cleanText, availableWidth);
-        
+        const availableWidth = maxWidth - indent;
+        const lines = pdf.splitTextToSize(cleaned, availableWidth);
+        const lineHeight = fontSize * 0.45;
+
         lines.forEach((line: string) => {
-          if (yPosition > pageHeight - 30) {
-            pdf.addPage();
-            yPosition = margin;
-          }
-          pdf.text(line.trim(), margin + marginLeft, yPosition);
-          yPosition += fontSize * 0.35 + 1;
+          checkNewPage();
+          pdf.text(line, margin + indent, yPosition);
+          yPosition += lineHeight;
         });
 
-        yPosition += Math.max(2, fontSize * 0.1);
+        yPosition += 1;
+      };
+
+      const renderTablePDF = (headers: string[], rows: string[][]) => {
+        if (headers.length === 0 && rows.length === 0) return;
+
+        const colCount = headers.length || (rows[0]?.length || 0);
+        const tableWidth = maxWidth;
+        const colWidth = tableWidth / colCount;
+        const cellPadding = 2;
+        const fontSize = 8;
+        const lineHeight = fontSize * 0.4;
+
+        pdf.setFontSize(fontSize);
+
+        const calculateRowHeight = (cells: string[]): number => {
+          let maxLines = 1;
+          cells.forEach((cell) => {
+            const cleaned = cleanText(cell).replace(/\*\*/g, '');
+            pdf.setFont('helvetica', 'normal');
+            const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
+            maxLines = Math.max(maxLines, lines.length);
+          });
+          return maxLines * (lineHeight + 2) + cellPadding * 2;
+        };
+
+        const drawRow = (cells: string[], rowY: number, rowHeight: number, isHeader: boolean = false) => {
+          cells.forEach((cell, colIndex) => {
+            const cellX = margin + colIndex * colWidth;
+            const cleaned = cleanText(cell).replace(/\*\*/g, '');
+
+            if (isHeader) {
+              pdf.setFillColor(230, 240, 255);
+              pdf.rect(cellX, rowY, colWidth, rowHeight, 'F');
+            }
+
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.2);
+            pdf.rect(cellX, rowY, colWidth, rowHeight, 'S');
+
+            pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
+            pdf.setTextColor(0, 0, 0);
+            
+            const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
+            let textY = rowY + cellPadding + fontSize * 0.35;
+            
+            lines.forEach((line: string) => {
+              if (textY < rowY + rowHeight - cellPadding) {
+                pdf.text(line, cellX + cellPadding, textY);
+                textY += lineHeight + 2;
+              }
+            });
+          });
+        };
+
+        if (headers.length > 0) {
+          const headerHeight = calculateRowHeight(headers);
+          checkNewPage(headerHeight + 20);
+          drawRow(headers, yPosition, headerHeight, true);
+          yPosition += headerHeight;
+        }
+
+        rows.forEach((row) => {
+          const rowHeight = calculateRowHeight(row);
+          checkNewPage(rowHeight + 10);
+          drawRow(row, yPosition, rowHeight, false);
+          yPosition += rowHeight;
+        });
+
+        yPosition += 6;
       };
 
       const parseMarkdownToPDF = (markdownContent: string) => {
         const lines = markdownContent.split('\n');
-        let inList = false;
-        let listLevel = 0;
+        let inTable = false;
+        let tableRows: string[][] = [];
+        let tableHeaders: string[] = [];
+
+        const flushTable = () => {
+          if (tableHeaders.length > 0 || tableRows.length > 0) {
+            renderTablePDF(tableHeaders, tableRows);
+            tableHeaders = [];
+            tableRows = [];
+          }
+          inTable = false;
+        };
 
         lines.forEach((line) => {
           const trimmedLine = line.trim();
 
-          if (trimmedLine === '') {
-            if (inList) {
-              yPosition += 2;
+          // Tableau
+          if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
+            if (trimmedLine.match(/^\|[\s\-:|]+\|$/)) {
+              inTable = true;
+              return;
+            }
+            
+            const cells = trimmedLine.slice(1, -1).split('|').map(c => c.trim());
+            
+            if (!inTable) {
+              tableHeaders = cells;
+              inTable = true;
             } else {
-              yPosition += 4;
+              tableRows.push(cells);
             }
             return;
           }
-
-          if (!trimmedLine.match(/^[\s]*[-*•]\s/) && !trimmedLine.match(/^[\s]*\d+\.\s/)) {
-            inList = false;
-            listLevel = 0;
+          
+          if (inTable && !trimmedLine.startsWith('|')) {
+            flushTable();
           }
 
-          if (trimmedLine.startsWith('# ')) {
-            const title = trimmedLine.substring(2);
-            yPosition += 8;
-            addText(title, 16, true);
-            yPosition += 4;
-          }
-          else if (trimmedLine.startsWith('## ')) {
-            const title = trimmedLine.substring(3);
-            yPosition += 6;
-            addText(title, 14, true);
+          if (trimmedLine === '' || trimmedLine === '---') {
             yPosition += 3;
+            return;
           }
-          else if (trimmedLine.startsWith('### ')) {
-            const title = trimmedLine.substring(4);
+
+          // H1
+          if (trimmedLine.startsWith('# ')) {
             yPosition += 4;
-            addText(title, 12, true);
+            addSimpleText(trimmedLine.substring(2), 16, true);
             yPosition += 2;
           }
-          else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-            inList = true;
-            const listItem = '• ' + trimmedLine.substring(2);
-            addText(listItem, 10, false, false, 5);
+          // H2
+          else if (trimmedLine.startsWith('## ')) {
+            yPosition += 3;
+            addSimpleText(trimmedLine.substring(3), 13, true);
+            yPosition += 1;
           }
+          // H3
+          else if (trimmedLine.startsWith('### ')) {
+            yPosition += 2;
+            addSimpleText(trimmedLine.substring(4), 11, true);
+          }
+          // H4
+          else if (trimmedLine.startsWith('#### ')) {
+            yPosition += 2;
+            addSimpleText(trimmedLine.substring(5), 10, true);
+          }
+          // Liste à puces
+          else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ') || trimmedLine.startsWith('• ')) {
+            const content = trimmedLine.replace(/^[-*•]\s*/, '');
+            const cleanContent = cleanText(content).replace(/\*\*/g, '');
+            const hasBold = content.includes('**');
+            
+            checkNewPage();
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text('•', margin + 3, yPosition);
+            
+            if (hasBold && content.includes(':')) {
+              const colonIndex = cleanContent.indexOf(':');
+              if (colonIndex > 0) {
+                const beforeColon = cleanContent.substring(0, colonIndex + 1);
+                const afterColon = cleanContent.substring(colonIndex + 1).trim();
+                
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(beforeColon, margin + 7, yPosition);
+                const boldWidth = pdf.getTextWidth(beforeColon + ' ');
+                
+                pdf.setFont('helvetica', 'normal');
+                const remainingWidth = maxWidth - 7 - boldWidth;
+                const restLines = pdf.splitTextToSize(afterColon, remainingWidth);
+                
+                if (restLines.length > 0) {
+                  pdf.text(restLines[0], margin + 7 + boldWidth, yPosition);
+                  yPosition += 9 * 0.45;
+                  
+                  for (let i = 1; i < restLines.length; i++) {
+                    checkNewPage();
+                    pdf.text(restLines[i], margin + 7, yPosition);
+                    yPosition += 9 * 0.45;
+                  }
+                }
+              } else {
+                const lines = pdf.splitTextToSize(cleanContent, maxWidth - 7);
+                lines.forEach((l: string, idx: number) => {
+                  if (idx > 0) checkNewPage();
+                  pdf.text(l, margin + 7, yPosition);
+                  yPosition += 9 * 0.45;
+                });
+              }
+            } else {
+              const lines = pdf.splitTextToSize(cleanContent, maxWidth - 7);
+              lines.forEach((l: string, idx: number) => {
+                if (idx > 0) checkNewPage();
+                pdf.text(l, margin + 7, yPosition);
+                yPosition += 9 * 0.45;
+              });
+            }
+            yPosition += 1;
+          }
+          // Liste numérotée
           else if (/^\d+\.\s/.test(trimmedLine)) {
-            inList = true;
-            addText(trimmedLine, 10, false, false, 5);
+            const match = trimmedLine.match(/^(\d+\.)\s*(.*)/);
+            if (match) {
+              const num = match[1];
+              const content = cleanText(match[2]).replace(/\*\*/g, '');
+              
+              checkNewPage();
+              pdf.setFontSize(9);
+              pdf.setFont('helvetica', 'normal');
+              pdf.text(num, margin + 2, yPosition);
+              
+              const lines = pdf.splitTextToSize(content, maxWidth - 10);
+              lines.forEach((l: string, idx: number) => {
+                if (idx > 0) checkNewPage();
+                pdf.text(l, margin + 10, yPosition);
+                yPosition += 9 * 0.45;
+              });
+              yPosition += 1;
+            }
           }
+          // Citation
           else if (trimmedLine.startsWith('> ')) {
-            const quote = trimmedLine.substring(2);
-            addText('"' + quote + '"', 10, false, true, 10);
+            const content = cleanText(trimmedLine.substring(2)).replace(/\*\*/g, '');
+            checkNewPage();
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'italic');
+            
+            const lines = pdf.splitTextToSize(content, maxWidth - 10);
+            lines.forEach((l: string) => {
+              checkNewPage();
+              pdf.text(l, margin + 5, yPosition);
+              yPosition += 9 * 0.45;
+            });
+            yPosition += 1;
           }
-          else if (trimmedLine.includes('**')) {
-            const cleanedText = trimmedLine.replace(/\*\*/g, '');
-            addText(cleanedText, 10, true);
-          }
-          else if (trimmedLine.includes('**Niveau :**') || trimmedLine.includes('Niveau :')) {
-            addText(trimmedLine.replace(/\*/g, ''), 11, true);
-            yPosition += 2;
-          }
+          // Texte normal
           else {
-            addText(trimmedLine, 10);
+            const cleaned = cleanText(trimmedLine);
+            if (!cleaned) return;
+            
+            // Ligne entièrement en gras
+            if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.indexOf('**', 2) === trimmedLine.length - 2) {
+              addSimpleText(cleaned.replace(/\*\*/g, ''), 9, true);
+            }
+            // Format "**Label :** valeur"
+            else if (cleaned.includes(':') && trimmedLine.includes('**')) {
+              const colonIdx = cleaned.replace(/\*\*/g, '').indexOf(':');
+              if (colonIdx > 0) {
+                const fullCleaned = cleaned.replace(/\*\*/g, '');
+                const label = fullCleaned.substring(0, colonIdx + 1);
+                const value = fullCleaned.substring(colonIdx + 1).trim();
+                
+                checkNewPage();
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(label, margin, yPosition);
+                const labelWidth = pdf.getTextWidth(label + ' ');
+                
+                pdf.setFont('helvetica', 'normal');
+                const valueLines = pdf.splitTextToSize(value, maxWidth - labelWidth);
+                
+                if (valueLines.length > 0) {
+                  pdf.text(valueLines[0], margin + labelWidth, yPosition);
+                  yPosition += 9 * 0.45;
+                  
+                  for (let i = 1; i < valueLines.length; i++) {
+                    checkNewPage();
+                    pdf.text(valueLines[i], margin, yPosition);
+                    yPosition += 9 * 0.45;
+                  }
+                }
+                yPosition += 1;
+              } else {
+                addSimpleText(cleaned.replace(/\*\*/g, ''), 9, false);
+              }
+            }
+            else {
+              addSimpleText(cleaned.replace(/\*\*/g, ''), 9, false);
+            }
           }
         });
+
+        if (inTable) {
+          flushTable();
+        }
       };
 
+      // === GÉNÉRATION ===
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(20);
+      pdf.setFontSize(18);
+      pdf.setTextColor(30, 64, 175);
       pdf.text('Séance Pédagogique', margin, yPosition);
-      yPosition += 12;
+      yPosition += 10;
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
       pdf.text(`Générée le ${new Date().toLocaleDateString('fr-FR')} avec ProfAssist`, margin, yPosition);
-      yPosition += 8;
+      yPosition += 6;
 
+      pdf.setDrawColor(200, 200, 200);
       pdf.setLineWidth(0.5);
       pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 10;
+      yPosition += 8;
 
+      pdf.setTextColor(0, 0, 0);
       parseMarkdownToPDF(content);
 
+      // Pagination
       const pdfInternal = pdf.internal as any;
       const totalPages = pdfInternal.getNumberOfPages();
       
@@ -335,27 +630,23 @@ const MarkdownEditor: React.FC<{
         pdf.setPage(i);
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(8);
-        pdf.setTextColor(100, 100, 100);
-        
-        const pageText = `Page ${i} sur ${totalPages}`;
-        const pageTextWidth = pdf.getTextWidth(pageText);
-        pdf.text(pageText, (pageWidth - pageTextWidth) / 2, pageHeight - 10);
-        
-        pdf.setTextColor(0, 0, 0);
+        pdf.setTextColor(150, 150, 150);
+        pdf.text(`Page ${i} / ${totalPages}`, (pageWidth - pdf.getTextWidth(`Page ${i} / ${totalPages}`)) / 2, pageHeight - 8);
       }
 
       const now = new Date();
       const dateStr = now.toLocaleDateString('fr-FR').replace(/\//g, '-');
       const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
-      pdf.save(`Séance-${dateStr}-${timeStr}.pdf`);
+      pdf.save(`Seance-${dateStr}-${timeStr}.pdf`);
 
     } catch (error) {
-      console.error('Erreur lors de l\'export PDF:', error);
-      alert('Erreur lors de l\'export PDF. Veuillez réessayer.');
+      console.error('Erreur export PDF:', error);
+      alert('Erreur lors de l\'export PDF.');
     } finally {
       setIsExporting(false);
     }
   };
+
 
   const renderSaveToBankButton = () => {
     if (bankAccessLoading) {
@@ -518,11 +809,37 @@ const MarkdownEditor: React.FC<{
               em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
               blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">{children}</blockquote>,
               code: ({ children }) => <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">{children}</code>,
-              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>
+              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>,
+              // ✅ COMPOSANTS TABLE MIS À JOUR
+              table: ({ children }) => (
+                <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">
+                  {children}
+                </table>
+              ),
+              thead: ({ children }) => (
+                <thead className="bg-blue-100 dark:bg-blue-900/40">{children}</thead>
+              ),
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+              tr: ({ children }) => (
+                <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
+              ),
+              th: ({ children }) => (
+                <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/30">
+                  {children}
+                </th>
+              ),
+              td: ({ children }) => (
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
+                  {children}
+                </td>
+              ),
             }}
+            // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
+            rehypePlugins={[rehypeRaw as any]} 
           >
-            {content}
+            {convertMarkdownTablesToHtml(content)}
           </ReactMarkdown>
+
         </div>
       </ResizableBox>
     </div>
@@ -815,9 +1132,9 @@ export function LessonGeneratorPage() {
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
           
-          <a 
-            href="https://youtube.com/shorts/j3N7ZSTlXjc" 
-            target="_blank" 
+          <a
+            href="#"
+            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-6"
           >
@@ -830,7 +1147,7 @@ export function LessonGeneratorPage() {
           </p>
 
           {tokenCount !== null && (
-            <div className={tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}>
+            <div className={`mt-6 ${tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
               {tokenCount === 0 ? (
                 <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
               ) : (
