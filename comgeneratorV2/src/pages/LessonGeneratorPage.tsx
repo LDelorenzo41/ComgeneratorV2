@@ -13,6 +13,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
+// ✅ AJOUT IMPORT REHYPE-RAW
+import rehypeRaw from 'rehype-raw';
+
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -114,6 +117,76 @@ const lessonSchema = z.object({
 });
 
 type LessonFormData = z.infer<typeof lessonSchema>;
+
+// ✅ FONCTION AJOUTÉE : Conversion des tableaux Markdown en HTML
+const convertMarkdownTablesToHtml = (markdown: string): string => {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableLines: string[] = [];
+
+  const processTable = (tableLines: string[]): string => {
+    if (tableLines.length < 2) return tableLines.join('\n');
+    
+    const headerLine = tableLines[0];
+    const dataLines = tableLines.slice(2); // Skip separator line
+    
+    const parseRow = (line: string): string[] => {
+      return line
+        .slice(1, -1) // Remove first and last |
+        .split('|')
+        .map(cell => cell.trim());
+    };
+    
+    const headers = parseRow(headerLine);
+    
+    let html = '<table class="markdown-table"><thead><tr>';
+    headers.forEach(h => {
+      html += `<th>${h}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    dataLines.forEach(line => {
+      if (line.trim()) {
+        const cells = parseRow(line);
+        html += '<tr>';
+        cells.forEach(c => {
+          html += `<td>${c}</td>`;
+        });
+        html += '</tr>';
+      }
+    });
+    
+    html += '</tbody></table>';
+    return html;
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableLines = [];
+      }
+      tableLines.push(trimmed);
+    } else {
+      if (inTable) {
+        result.push(processTable(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
+      result.push(line);
+    }
+  });
+
+  // Handle table at end of content
+  if (inTable && tableLines.length > 0) {
+    result.push(processTable(tableLines));
+  }
+
+  return result.join('\n');
+};
 
 const MarkdownEditor: React.FC<{
   content: string;
@@ -245,13 +318,92 @@ const MarkdownEditor: React.FC<{
         yPosition += Math.max(2, fontSize * 0.1);
       };
 
-      const parseMarkdownToPDF = (markdownContent: string) => {
+            const parseMarkdownToPDF = (markdownContent: string) => {
         const lines = markdownContent.split('\n');
         let inList = false;
-        let listLevel = 0;
+        let inTable = false;
+        let tableRows: string[][] = [];
+        let tableHeaders: string[] = [];
 
-        lines.forEach((line) => {
+        const renderTable = () => {
+          if (tableHeaders.length === 0 && tableRows.length === 0) return;
+          
+          const colCount = tableHeaders.length || (tableRows[0]?.length || 0);
+          const colWidth = (maxWidth - 10) / colCount;
+          
+          // En-têtes
+          if (tableHeaders.length > 0) {
+            if (yPosition > pageHeight - 40) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(9);
+            tableHeaders.forEach((header, i) => {
+              const cellX = margin + 5 + (i * colWidth);
+              const cellText = header.trim().substring(0, 40);
+              pdf.text(cellText, cellX, yPosition);
+            });
+            yPosition += 5;
+            pdf.setLineWidth(0.3);
+            pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 3;
+          }
+          
+          // Lignes du tableau
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          tableRows.forEach((row) => {
+            if (yPosition > pageHeight - 30) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            row.forEach((cell, i) => {
+              const cellX = margin + 5 + (i * colWidth);
+              const cellText = cell.trim().substring(0, 40);
+              pdf.text(cellText, cellX, yPosition);
+            });
+            yPosition += 5;
+          });
+          
+          yPosition += 4;
+          tableHeaders = [];
+          tableRows = [];
+        };
+
+        lines.forEach((line, lineIndex) => {
           const trimmedLine = line.trim();
+
+          // Détection des lignes de tableau
+          if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
+            // Ligne de séparation (|---|---|)
+            if (trimmedLine.match(/^\|[\s\-:]+\|$/)) {
+              inTable = true;
+              return;
+            }
+            
+            // Extraire les cellules
+            const cells = trimmedLine
+              .slice(1, -1)
+              .split('|')
+              .map(c => c.trim());
+            
+            if (!inTable) {
+              // Première ligne = en-têtes
+              tableHeaders = cells;
+              inTable = true;
+            } else {
+              // Lignes de données
+              tableRows.push(cells);
+            }
+            return;
+          }
+          
+          // Si on sort d'un tableau, le rendre
+          if (inTable && !trimmedLine.startsWith('|')) {
+            renderTable();
+            inTable = false;
+          }
 
           if (trimmedLine === '') {
             if (inList) {
@@ -264,7 +416,6 @@ const MarkdownEditor: React.FC<{
 
           if (!trimmedLine.match(/^[\s]*[-*•]\s/) && !trimmedLine.match(/^[\s]*\d+\.\s/)) {
             inList = false;
-            listLevel = 0;
           }
 
           if (trimmedLine.startsWith('# ')) {
@@ -310,7 +461,13 @@ const MarkdownEditor: React.FC<{
             addText(trimmedLine, 10);
           }
         });
+
+        // Rendre le dernier tableau s'il y en a un
+        if (inTable) {
+          renderTable();
+        }
       };
+
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(20);
@@ -518,11 +675,37 @@ const MarkdownEditor: React.FC<{
               em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
               blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-blue-50 dark:bg-blue-900/20 py-2 rounded-r-lg">{children}</blockquote>,
               code: ({ children }) => <code className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-sm font-mono text-blue-800 dark:text-blue-200">{children}</code>,
-              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>
+              pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl overflow-x-auto my-4 border border-gray-200 dark:border-gray-700">{children}</pre>,
+              // ✅ COMPOSANTS TABLE MIS À JOUR
+              table: ({ children }) => (
+                <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">
+                  {children}
+                </table>
+              ),
+              thead: ({ children }) => (
+                <thead className="bg-blue-100 dark:bg-blue-900/40">{children}</thead>
+              ),
+              tbody: ({ children }) => <tbody>{children}</tbody>,
+              tr: ({ children }) => (
+                <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
+              ),
+              th: ({ children }) => (
+                <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/30">
+                  {children}
+                </th>
+              ),
+              td: ({ children }) => (
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
+                  {children}
+                </td>
+              ),
             }}
+            // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
+            rehypePlugins={[rehypeRaw as any]} 
           >
-            {content}
+            {convertMarkdownTablesToHtml(content)}
           </ReactMarkdown>
+
         </div>
       </ResizableBox>
     </div>
@@ -815,9 +998,9 @@ export function LessonGeneratorPage() {
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
           
-          <a 
-            href="https://youtube.com/shorts/j3N7ZSTlXjc" 
-            target="_blank" 
+          <a
+            href="#"
+            target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-6"
           >
@@ -830,7 +1013,7 @@ export function LessonGeneratorPage() {
           </p>
 
           {tokenCount !== null && (
-            <div className={tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}>
+            <div className={`mt-6 ${tokenCount === 0 ? 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800' : 'inline-flex items-center px-6 py-3 rounded-xl shadow-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
               {tokenCount === 0 ? (
                 <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
               ) : (
