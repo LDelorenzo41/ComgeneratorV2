@@ -290,13 +290,17 @@ ${getToneInstructionsForAppreciation(params.tone)}
 
 **FORMAT DE RÉPONSE OBLIGATOIRE :**
 
-Version détaillée :
-[Rédige ici l'appréciation détaillée respectant STRICTEMENT ${params.minLength}-${params.maxLength} caractères]
+⚠️ IMPORTANT : Utilise EXACTEMENT les marqueurs ci-dessous pour séparer les deux versions. N'écris PAS de titre ou d'étiquette comme "Version détaillée" ou "Version synthétique" - commence DIRECTEMENT par le texte de l'appréciation après chaque marqueur.
 
-Version synthétique :
-[Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
+---DEBUT_DETAILLEE---
+[Écris DIRECTEMENT l'appréciation détaillée ici, sans aucun titre ni étiquette, respectant STRICTEMENT ${params.minLength}-${params.maxLength} caractères]
+---FIN_DETAILLEE---
 
-⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom.`;
+---DEBUT_SYNTHETIQUE---
+[Écris DIRECTEMENT l'appréciation synthétique ici, sans aucun titre ni étiquette, respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
+---FIN_SYNTHETIQUE---
+
+⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom. N'ajoute AUCUN titre ou étiquette avant les textes, commence directement par l'appréciation.`;
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -359,19 +363,40 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
     }
 
     const content = openAIData.choices[0].message.content;
-    const parts = content.split('Version synthétique :');
-    
-    if (parts.length !== 2) {
-      return new Response(JSON.stringify({
-        error: 'Format de réponse invalide. Veuillez réessayer.'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+
+    // Extraction avec les nouveaux marqueurs
+    const detailedMatch = content.match(/---DEBUT_DETAILLEE---\s*([\s\S]*?)\s*---FIN_DETAILLEE---/);
+    const syntheticMatch = content.match(/---DEBUT_SYNTHETIQUE---\s*([\s\S]*?)\s*---FIN_SYNTHETIQUE---/);
+
+    let detailed: string;
+    let summary: string;
+
+    if (detailedMatch && syntheticMatch) {
+      // Nouveau format avec marqueurs
+      detailed = detailedMatch[1].trim();
+      summary = syntheticMatch[1].trim();
+      console.log('Parsing avec nouveaux marqueurs');
+    } else {
+      // Fallback sur l'ancien format si les nouveaux marqueurs ne sont pas trouvés
+      const parts = content.split('Version synthétique :');
+      if (parts.length === 2) {
+        detailed = parts[0].replace('Version détaillée :', '').trim();
+        summary = parts[1].trim();
+        console.log('Utilisation du fallback parsing (ancien format)');
+      } else {
+        console.error('Impossible de parser la réponse:', content.substring(0, 500));
+        return new Response(JSON.stringify({
+          error: 'Format de réponse invalide. Veuillez réessayer.'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
     }
 
-    let detailed = parts[0].replace('Version détaillée :', '').trim();
-    let summary = parts[1].trim();
+    // Nettoyage des labels résiduels (au cas où l'IA les ajoute quand même)
+    detailed = detailed.replace(/^Version détaillée\s*:?\s*/i, '').trim();
+    summary = summary.replace(/^Version synthétique\s*:?\s*/i, '').trim();
     
     // ✅ VALIDATION ET CORRECTION AUTOMATIQUE DES LONGUEURS
     const detailedLength = detailed.length;
