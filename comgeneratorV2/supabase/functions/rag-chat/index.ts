@@ -1,10 +1,10 @@
 // supabase/functions/rag-chat/index.ts
-// VERSION V6.1 "ADAPTIVE RECALL - BUGFIX"
-// Corrections:
-// - Fix fusion when chunk IDs are missing
-// - Better FTS fallback
-// - Improved diagnostics
-// - Fix filtering logic
+// VERSION V6.2 "ADAPTIVE RECALL - DISCIPLINE ROUTING"
+// Ajouts V6.2:
+// - Routing multi-RAG par discipline (détection déterministe)
+// - Filtrage conditionnel sur métadonnées discipline
+// - Fallback automatique vers RAG global
+// - Observabilité du routing
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -73,6 +73,12 @@ const CONFIG = {
   
   // Limits
   maxHistoryMessages: 6,
+  
+  // Discipline Routing (NEW V6.2)
+  disciplineRouting: {
+    minConfidence: 0.6,
+    minChunksForFiltered: 5, // Fallback si moins de chunks après filtrage
+  },
 };
 
 const CORS_HEADERS = {
@@ -136,6 +142,16 @@ interface RetrievalMetrics {
   documentsSearched: number;
   totalDurationMs: number;
   retrievalPasses: number;
+  // NEW V6.2
+  disciplineDetected?: string | null;
+  disciplineConfidence?: number;
+  disciplineMode?: 'filtered' | 'global' | 'fallback';
+}
+
+// NEW V6.2: Type pour le résultat de détection de discipline
+interface DisciplineDetection {
+  discipline: string | null;
+  confidence: number;
 }
 
 // ============================================================================
@@ -155,6 +171,274 @@ function createServiceClient() {
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
+}
+
+// ============================================================================
+// NEW V6.2: DISCIPLINE DETECTION (PURE FUNCTION - NO LLM)
+// ============================================================================
+
+/**
+ * Dictionnaire des disciplines avec leurs patterns de détection
+ * Chaque discipline a des mots-clés explicites et des patterns regex
+ */
+const DISCIPLINE_PATTERNS: Record<string, {
+  explicit: string[];      // Mots-clés explicites (haute confiance)
+  contextual: string[];    // Termes contextuels (confiance moyenne)
+  regex?: RegExp[];        // Patterns regex optionnels
+}> = {
+  'EPS': {
+    explicit: [
+      'en eps', 'l\'eps', 'cours d\'eps', 'séance eps', 'programme eps',
+      'éducation physique', 'sport scolaire', 'activité physique'
+    ],
+    contextual: [
+      'motricité', 'échauffement', 'match', 'équipe sportive', 'course',
+      'natation', 'gymnastique', 'athlétisme', 'jeux collectifs', 
+      'handball', 'basketball', 'volleyball', 'football', 'rugby',
+      'badminton', 'tennis de table', 'danse', 'escalade', 'combat',
+      'performance motrice', 'savoir-nager', 'aisance aquatique',
+      'champ d\'apprentissage', 'ca1', 'ca2', 'ca3', 'ca4', 'ca5',
+      'compétence motrice', 'effort', 'entraînement'
+    ],
+    regex: [/\beps\b/i, /\bca[1-5]\b/i]
+  },
+  'Mathématiques': {
+    explicit: [
+      'en mathématiques', 'en maths', 'cours de maths', 'séance de mathématiques',
+      'programme mathématiques', 'programme maths'
+    ],
+    contextual: [
+      'calcul', 'géométrie', 'algèbre', 'équation', 'fonction', 'nombre',
+      'fraction', 'pourcentage', 'proportion', 'théorème', 'démonstration',
+      'trigonométrie', 'probabilité', 'statistique', 'algorithme',
+      'résolution de problème', 'raisonnement mathématique', 'numération',
+      'opération', 'multiplication', 'division', 'addition', 'soustraction',
+      'pythagore', 'thalès', 'aire', 'périmètre', 'volume', 'mesure',
+      'repère', 'coordonnées', 'vecteur', 'matrice', 'suite', 'limite'
+    ]
+  },
+  'Français': {
+    explicit: [
+      'en français', 'cours de français', 'séance de français',
+      'programme français', 'maîtrise de la langue'
+    ],
+    contextual: [
+      'lecture', 'écriture', 'rédaction', 'orthographe', 'grammaire',
+      'conjugaison', 'vocabulaire', 'compréhension de texte', 'expression écrite',
+      'expression orale', 'dictée', 'poésie', 'littérature', 'roman',
+      'nouvelle', 'théâtre', 'argumentation', 'dissertation', 'commentaire',
+      'analyse littéraire', 'figure de style', 'narrateur', 'personnage',
+      'syntaxe', 'ponctuation', 'accord', 'verbe', 'sujet', 'complément'
+    ]
+  },
+  'Histoire-Géographie': {
+    explicit: [
+      'en histoire', 'en géographie', 'histoire-géographie', 'histoire-géo',
+      'cours d\'histoire', 'cours de géographie', 'programme histoire',
+      'en hggsp', 'hggsp'
+    ],
+    contextual: [
+      'période historique', 'civilisation', 'guerre mondiale', 'révolution',
+      'empire', 'monarchie', 'république', 'démocratie', 'colonisation',
+      'territoire', 'carte', 'paysage', 'population', 'urbanisation',
+      'mondialisation', 'développement durable', 'changement climatique',
+      'géopolitique', 'frontière', 'migration', 'aménagement', 'espace',
+      'antiquité', 'moyen âge', 'renaissance', 'lumières', 'contemporain',
+      'chronologie', 'frise', 'source historique', 'document', 'patrimoine'
+    ],
+    regex: [/\bhggsp\b/i, /\bhistoire[- ]?géo/i]
+  },
+  'Sciences': {
+    explicit: [
+      'en sciences', 'en svt', 'sciences de la vie', 'sciences physiques',
+      'cours de sciences', 'programme sciences', 'physique-chimie',
+      'en physique', 'en chimie', 'en biologie'
+    ],
+    contextual: [
+      'expérience', 'hypothèse', 'démarche scientifique', 'observation',
+      'cellule', 'organisme', 'écosystème', 'biodiversité', 'évolution',
+      'génétique', 'reproduction', 'nutrition', 'respiration', 'digestion',
+      'énergie', 'matière', 'atome', 'molécule', 'réaction chimique',
+      'électricité', 'magnétisme', 'optique', 'mécanique', 'force',
+      'vitesse', 'accélération', 'température', 'pression', 'son', 'lumière',
+      'circuit électrique', 'transformation', 'conservation'
+    ],
+    regex: [/\bsvt\b/i, /\bphysique[- ]?chimie\b/i]
+  },
+  'Langues vivantes': {
+    explicit: [
+      'en anglais', 'en espagnol', 'en allemand', 'en italien',
+      'cours d\'anglais', 'cours de langue', 'langues vivantes',
+      'lv1', 'lv2', 'langue étrangère'
+    ],
+    contextual: [
+      'compréhension orale', 'expression orale', 'compréhension écrite',
+      'expression écrite', 'interaction orale', 'médiation',
+      'cecrl', 'niveau a1', 'niveau a2', 'niveau b1', 'niveau b2',
+      'vocabulaire anglais', 'grammar', 'pronunciation', 'fluency',
+      'phonologie', 'lexique', 'communication'
+    ],
+    regex: [/\blv[12]\b/i, /\bcecrl\b/i]
+  },
+  'Arts': {
+    explicit: [
+      'en arts plastiques', 'éducation musicale', 'éducation artistique',
+      'cours d\'arts', 'histoire des arts', 'musique'
+    ],
+    contextual: [
+      'création artistique', 'œuvre', 'artiste', 'technique artistique',
+      'peinture', 'sculpture', 'dessin', 'collage', 'photographie',
+      'installation', 'performance', 'composition', 'mélodie', 'rythme',
+      'harmonie', 'instrument', 'chant', 'chorale', 'écoute musicale',
+      'expression artistique', 'culture artistique', 'peac'
+    ],
+    regex: [/\bpeac\b/i]
+  },
+  'EMC': {
+    explicit: [
+      'en emc', 'enseignement moral et civique', 'éducation civique',
+      'éducation morale', 'parcours citoyen'
+    ],
+    contextual: [
+      'citoyenneté', 'valeurs républicaines', 'laïcité', 'droits',
+      'devoirs', 'engagement', 'solidarité', 'discrimination', 'égalité',
+      'fraternité', 'liberté', 'démocratie', 'vote', 'institution',
+      'justice', 'respect', 'tolérance', 'débat', 'argumentation civique'
+    ],
+    regex: [/\bemc\b/i]
+  },
+  'Technologie': {
+    explicit: [
+      'en technologie', 'cours de technologie', 'programme technologie'
+    ],
+    contextual: [
+      'objet technique', 'conception', 'fabrication', 'prototype',
+      'cahier des charges', 'fonction technique', 'matériaux',
+      'énergie', 'information', 'programmation', 'robotique',
+      'arduino', 'scratch', 'maquette', 'modélisation 3d',
+      'chaîne d\'énergie', 'chaîne d\'information', 'automatisme'
+    ]
+  },
+  'SNT': {
+    explicit: [
+      'en snt', 'sciences numériques', 'numérique et sciences informatiques',
+      'nsi', 'informatique'
+    ],
+    contextual: [
+      'algorithme', 'programmation', 'python', 'données', 'réseau',
+      'internet', 'web', 'cybersécurité', 'intelligence artificielle',
+      'base de données', 'html', 'css', 'javascript', 'code',
+      'variable', 'boucle', 'condition', 'fonction informatique'
+    ],
+    regex: [/\bsnt\b/i, /\bnsi\b/i]
+  }
+};
+
+/**
+ * Normalise une chaîne pour la comparaison
+ */
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+    .replace(/['']/g, "'")           // Normalise les apostrophes
+    .trim();
+}
+
+/**
+ * Détecte la discipline d'une requête de manière déterministe
+ * Fonction PURE: pas d'appel LLM, uniquement règles et patterns
+ * 
+ * @param query - La requête utilisateur
+ * @returns {discipline, confidence} - Discipline détectée et niveau de confiance
+ */
+function detectDiscipline(query: string): DisciplineDetection {
+  const normalizedQuery = normalizeForMatch(query);
+  
+  let bestMatch: { discipline: string; confidence: number } | null = null;
+  
+  for (const [discipline, patterns] of Object.entries(DISCIPLINE_PATTERNS)) {
+    let score = 0;
+    let matchCount = 0;
+    
+    // 1. Vérification des patterns explicites (haute confiance: 0.9)
+    for (const explicit of patterns.explicit) {
+      const normalizedPattern = normalizeForMatch(explicit);
+      if (normalizedQuery.includes(normalizedPattern)) {
+        score = Math.max(score, 0.9);
+        matchCount++;
+      }
+    }
+    
+    // 2. Vérification des regex si définis (haute confiance: 0.85)
+    if (patterns.regex) {
+      for (const regex of patterns.regex) {
+        if (regex.test(query)) {
+          score = Math.max(score, 0.85);
+          matchCount++;
+        }
+      }
+    }
+    
+    // 3. Vérification des termes contextuels (confiance variable selon nombre)
+    let contextualMatches = 0;
+    for (const contextual of patterns.contextual) {
+      const normalizedContextual = normalizeForMatch(contextual);
+      // Vérifier que c'est un mot complet (pas une sous-chaîne)
+      const wordBoundaryRegex = new RegExp(`\\b${normalizedContextual.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      if (wordBoundaryRegex.test(normalizedQuery)) {
+        contextualMatches++;
+      }
+    }
+    
+    // Calcul du score contextuel
+    if (contextualMatches >= 3) {
+      score = Math.max(score, 0.75);
+    } else if (contextualMatches >= 2) {
+      score = Math.max(score, 0.55);
+    } else if (contextualMatches === 1 && score < 0.5) {
+      score = Math.max(score, 0.35);
+    }
+    
+    // Bonus si multiple types de matches
+    if (matchCount > 1 || (matchCount >= 1 && contextualMatches >= 1)) {
+      score = Math.min(score + 0.05, 0.95);
+    }
+    
+    // Garder le meilleur match
+    if (score > 0 && (!bestMatch || score > bestMatch.confidence)) {
+      bestMatch = { discipline, confidence: score };
+    }
+  }
+  
+  // Retourner le résultat
+  if (bestMatch && bestMatch.confidence >= 0.3) {
+    return bestMatch;
+  }
+  
+  return { discipline: null, confidence: 0 };
+}
+
+/**
+ * Mappe le nom de discipline détecté vers la valeur stockée en métadonnées
+ * Adapte selon votre schéma de données
+ */
+function mapDisciplineToMetadata(discipline: string): string[] {
+  const mapping: Record<string, string[]> = {
+    'EPS': ['EPS', 'eps', 'Éducation physique et sportive'],
+    'Mathématiques': ['Mathématiques', 'Maths', 'maths', 'mathematiques'],
+    'Français': ['Français', 'français', 'Francais', 'francais'],
+    'Histoire-Géographie': ['Histoire-Géographie', 'Histoire', 'Géographie', 'HGGSP', 'hggsp', 'histoire-géographie'],
+    'Sciences': ['Sciences', 'SVT', 'Physique-Chimie', 'physique-chimie', 'svt', 'sciences'],
+    'Langues vivantes': ['Langues vivantes', 'Anglais', 'Espagnol', 'Allemand', 'LV1', 'LV2'],
+    'Arts': ['Arts plastiques', 'Éducation musicale', 'Arts', 'arts'],
+    'EMC': ['EMC', 'emc', 'Enseignement moral et civique'],
+    'Technologie': ['Technologie', 'technologie'],
+    'SNT': ['SNT', 'NSI', 'snt', 'nsi', 'Sciences numériques'],
+  };
+  
+  return mapping[discipline] || [discipline];
 }
 
 // ============================================================================
@@ -429,7 +713,7 @@ async function getAllowedDocumentsProgressive(
 }
 
 // ============================================================================
-// STEP 3: RETRIEVAL AVEC FIX DES IDs
+// STEP 3: RETRIEVAL AVEC FIX DES IDs ET FILTRAGE DISCIPLINE (V6.2)
 // ============================================================================
 
 /**
@@ -444,6 +728,39 @@ function generateChunkId(item: any, index: number): string {
   const docId = item.document_id || 'unknown';
   const chunkIdx = item.chunk_index ?? index;
   return `${docId}_chunk_${chunkIdx}`;
+}
+
+/**
+ * V6.2: Filtre les documents par discipline (soft filter sur allowedDocIds)
+ */
+async function filterDocumentsByDiscipline(
+  supabase: any,
+  allowedDocIds: string[],
+  disciplineValues: string[]
+): Promise<string[]> {
+  if (allowedDocIds.length === 0 || disciplineValues.length === 0) {
+    return allowedDocIds;
+  }
+
+  try {
+    // Requête pour filtrer les documents par subject/discipline
+    const { data, error } = await supabase
+      .from('rag_documents')
+      .select('id')
+      .in('id', allowedDocIds)
+      .overlaps('subjects', disciplineValues);
+
+    if (error) {
+      console.warn('[Discipline Filter] Query error, using all docs:', error.message);
+      return allowedDocIds;
+    }
+
+    const filteredIds = (data || []).map((d: any) => d.id);
+    return filteredIds;
+  } catch (err) {
+    console.warn('[Discipline Filter] Exception, using all docs:', err);
+    return allowedDocIds;
+  }
 }
 
 async function searchByVector(
@@ -524,19 +841,26 @@ async function searchByFTS(
 
 /**
  * Retrieval adaptatif avec plusieurs passes si nécessaire
+ * V6.2: Supporte le filtrage par discipline avec fallback
  */
 async function adaptiveRetrieval(
   supabase: any,
   userId: string,
   embedding: number[],
   searchTerms: string,
-  allowedDocIds: string[]
+  allowedDocIds: string[],
+  disciplineFilter?: {
+    discipline: string;
+    disciplineValues: string[];
+    confidence: number;
+  }
 ): Promise<{ 
   vectorResults: RetrievedChunk[]; 
   ftsResults: RetrievedChunk[]; 
   threshold: number; 
   passes: number;
   rawVectorCount: number;
+  disciplineMode: 'filtered' | 'global' | 'fallback';
 }> {
   
   const thresholds = [
@@ -549,9 +873,29 @@ async function adaptiveRetrieval(
   let rawVectorCount = 0;
   let usedThreshold = thresholds[0];
   let passes = 0;
+  let disciplineMode: 'filtered' | 'global' | 'fallback' = 'global';
+  
+  // V6.2: Déterminer les documents à utiliser (avec ou sans filtre discipline)
+  let effectiveDocIds = allowedDocIds;
+  
+  if (disciplineFilter && disciplineFilter.confidence >= CONFIG.disciplineRouting.minConfidence) {
+    const filteredDocIds = await filterDocumentsByDiscipline(
+      supabase,
+      allowedDocIds,
+      disciplineFilter.disciplineValues
+    );
+    
+    if (filteredDocIds.length > 0) {
+      effectiveDocIds = filteredDocIds;
+      disciplineMode = 'filtered';
+      console.log(`[Routing] Discipline=${disciplineFilter.discipline} | confidence=${disciplineFilter.confidence.toFixed(2)} | mode=filtered | docs=${filteredDocIds.length}/${allowedDocIds.length}`);
+    } else {
+      console.log(`[Routing] Discipline=${disciplineFilter.discipline} | No matching docs, using global`);
+    }
+  }
   
   // FTS en parallèle (ne dépend pas du threshold)
-  const ftsPromise = searchByFTS(supabase, searchTerms, allowedDocIds, CONFIG.ftsTopK);
+  const ftsPromise = searchByFTS(supabase, searchTerms, effectiveDocIds, CONFIG.ftsTopK);
   
   // Retrieval adaptatif pour vector search
   for (const threshold of thresholds) {
@@ -560,7 +904,7 @@ async function adaptiveRetrieval(
       supabase,
       userId,
       embedding,
-      allowedDocIds,
+      effectiveDocIds,
       threshold,
       CONFIG.vectorTopK
     );
@@ -579,7 +923,53 @@ async function adaptiveRetrieval(
   
   const ftsResults = await ftsPromise;
   
-  return { vectorResults, ftsResults, threshold: usedThreshold, passes, rawVectorCount };
+  // V6.2: Fallback vers RAG global si pas assez de résultats après filtrage discipline
+  const totalUniqueChunks = new Set([
+    ...vectorResults.map(c => c.id),
+    ...ftsResults.map(c => c.id)
+  ]).size;
+  
+  if (disciplineMode === 'filtered' && totalUniqueChunks < CONFIG.disciplineRouting.minChunksForFiltered) {
+    console.log(`[Routing] Fallback to global retrieval (only ${totalUniqueChunks} chunks found)`);
+    disciplineMode = 'fallback';
+    
+    // Relancer avec tous les documents
+    const ftsGlobal = searchByFTS(supabase, searchTerms, allowedDocIds, CONFIG.ftsTopK);
+    
+    // Reset et relancer vector search avec tous les documents
+    passes = 0;
+    for (const threshold of thresholds) {
+      passes++;
+      const result = await searchByVector(
+        supabase,
+        userId,
+        embedding,
+        allowedDocIds,
+        threshold,
+        CONFIG.vectorTopK
+      );
+      
+      vectorResults = result.chunks;
+      rawVectorCount = result.rawCount;
+      usedThreshold = threshold;
+      
+      if (vectorResults.length >= CONFIG.minDesiredChunks) {
+        break;
+      }
+    }
+    
+    const ftsResultsGlobal = await ftsGlobal;
+    return { 
+      vectorResults, 
+      ftsResults: ftsResultsGlobal, 
+      threshold: usedThreshold, 
+      passes, 
+      rawVectorCount,
+      disciplineMode
+    };
+  }
+  
+  return { vectorResults, ftsResults, threshold: usedThreshold, passes, rawVectorCount, disciplineMode };
 }
 
 async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
@@ -1018,6 +1408,15 @@ async function chatHandler(req: Request): Promise<Response> {
 
     metrics.queryLength = message.length;
 
+    // ========== NEW V6.2: Détection de discipline ==========
+    const disciplineDetection = detectDiscipline(message);
+    metrics.disciplineDetected = disciplineDetection.discipline;
+    metrics.disciplineConfidence = disciplineDetection.confidence;
+    
+    if (disciplineDetection.discipline) {
+      console.log(`[Discipline] Detected: ${disciplineDetection.discipline} (confidence: ${disciplineDetection.confidence.toFixed(2)})`);
+    }
+
     // ========== STEP 1: Analyse HyDE adaptative ==========
     const hydeDecision = analyzeQueryForHyDE(message);
     metrics.hydeUsed = hydeDecision.shouldUse;
@@ -1136,15 +1535,26 @@ async function chatHandler(req: Request): Promise<Response> {
     const searchTerms = extractSearchTerms(message);
     console.log(`[FTS] Search terms: "${searchTerms}"`);
 
-    // ========== STEP 4: Adaptive Hybrid Retrieval ==========
+    // ========== STEP 4: Adaptive Hybrid Retrieval (V6.2: avec discipline routing) ==========
     const embedding = await createEmbedding(queryForEmbedding, OPENAI_API_KEY);
     
-    const { vectorResults, ftsResults, threshold, passes, rawVectorCount } = await adaptiveRetrieval(
+    // V6.2: Préparer le filtre discipline si confiance suffisante
+    const disciplineFilter = disciplineDetection.discipline && 
+      disciplineDetection.confidence >= CONFIG.disciplineRouting.minConfidence
+      ? {
+          discipline: disciplineDetection.discipline,
+          disciplineValues: mapDisciplineToMetadata(disciplineDetection.discipline),
+          confidence: disciplineDetection.confidence,
+        }
+      : undefined;
+    
+    const { vectorResults, ftsResults, threshold, passes, rawVectorCount, disciplineMode } = await adaptiveRetrieval(
       serviceClient,
       user.id,
       embedding,
       searchTerms,
-      allowedDocIds
+      allowedDocIds,
+      disciplineFilter
     );
 
     metrics.vectorResultsRaw = rawVectorCount;
@@ -1152,8 +1562,9 @@ async function chatHandler(req: Request): Promise<Response> {
     metrics.ftsResultsCount = ftsResults.length;
     metrics.similarityThreshold = threshold;
     metrics.retrievalPasses = passes;
+    metrics.disciplineMode = disciplineMode;
 
-    console.log(`[Retrieval] Vector: ${vectorResults.length} (raw: ${rawVectorCount}, threshold: ${threshold}) | FTS: ${ftsResults.length} | Passes: ${passes}`);
+    console.log(`[Retrieval] Vector: ${vectorResults.length} (raw: ${rawVectorCount}, threshold: ${threshold}) | FTS: ${ftsResults.length} | Passes: ${passes} | DisciplineMode: ${disciplineMode}`);
 
     // ========== STEP 5: Weighted RRF Fusion ==========
     const fusedResults = fuseWithWeightedRRF(vectorResults, ftsResults, docsMap);
@@ -1233,7 +1644,7 @@ async function chatHandler(req: Request): Promise<Response> {
     const duration = Date.now() - startTime;
     metrics.totalDurationMs = duration;
     
-    console.log(`[rag-chat] Completed in ${duration}ms | Tokens: ${totalTokensUsed} | Sources: ${sources.length}`);
+    console.log(`[rag-chat] Completed in ${duration}ms | Tokens: ${totalTokensUsed} | Sources: ${sources.length} | Discipline: ${disciplineDetection.discipline || 'none'} (${disciplineMode})`);
 
     return new Response(
       JSON.stringify({
@@ -1263,3 +1674,4 @@ async function chatHandler(req: Request): Promise<Response> {
 }
 
 Deno.serve(chatHandler);
+
