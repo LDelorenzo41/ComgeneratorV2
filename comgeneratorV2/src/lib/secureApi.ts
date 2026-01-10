@@ -1,5 +1,6 @@
 // src/lib/secureApi.ts
 import { supabase } from './supabase';
+import { getAIModelChoice, AIModelChoice } from './aiModelConfig';
 
 // Types pour les paramètres des différentes fonctions
 export interface GenerateAppreciationParams {
@@ -83,13 +84,21 @@ class SecureApiService {
         throw new Error('Utilisateur non authentifié');
       }
 
+      // ✅ AJOUT : Récupérer le choix de modèle IA et l'ajouter aux paramètres
+      const aiModel: AIModelChoice = getAIModelChoice();
+      const enrichedParams = {
+        ...params,
+        // N'ajouter aiModel que si ce n'est pas "default" (pour ne pas polluer les requêtes)
+        ...(aiModel !== 'default' && { aiModel }),
+      };
+
       const response = await fetch(`${this.baseUrl}/${functionName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(params),
+        body: JSON.stringify(enrichedParams),
       });
 
       if (!response.ok) {
@@ -177,3 +186,4 @@ class SecureApiService {
 
 // Instance singleton
 export const secureApi = new SecureApiService();
+
