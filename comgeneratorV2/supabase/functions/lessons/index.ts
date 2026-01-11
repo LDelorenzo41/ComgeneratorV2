@@ -9,6 +9,101 @@ interface LessonRequest {
   pedagogy_type: string;
   duration: string;
   documentContext?: string;
+  aiModel?: string;
+}
+
+interface AIConfig {
+  provider: 'openai' | 'mistral';
+  model: string;
+  apiKey: string;
+  apiUrl: string;
+  useResponsesApi: boolean;
+}
+
+function resolveAIConfig(requestedModel: string | undefined): AIConfig {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+  const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY") ?? "";
+
+  switch (requestedModel) {
+    case "gpt-5-mini":
+      return {
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        apiKey: OPENAI_API_KEY,
+        apiUrl: 'https://api.openai.com/v1/responses',
+        useResponsesApi: true
+      };
+
+    case "mistral-medium":
+      return {
+        provider: 'mistral',
+        model: 'mistral-medium-latest',
+        apiKey: MISTRAL_API_KEY,
+        apiUrl: 'https://api.mistral.ai/v1/chat/completions',
+        useResponsesApi: false
+      };
+
+    default:
+      // Modèle par défaut : gpt-4.1-mini (comportement original préservé)
+      return {
+        provider: 'openai',
+        model: 'gpt-4.1-mini',
+        apiKey: OPENAI_API_KEY,
+        apiUrl: 'https://api.openai.com/v1/chat/completions',
+        useResponsesApi: false
+      };
+  }
+}
+
+function parseAIResponse(data: Record<string, unknown>, config: AIConfig): string | null {
+  if (config.useResponsesApi) {
+    // GPT-5 mini (Responses API)
+    const output = data.output as Array<{ type: string; content?: Array<{ type: string; text?: string }> }> | undefined;
+    if (output && Array.isArray(output)) {
+      for (const item of output) {
+        if (item.type === 'message' && item.content) {
+          for (const block of item.content) {
+            if (block.type === 'output_text' && block.text) {
+              return block.text;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  } else {
+    // Chat Completions API (OpenAI standard et Mistral)
+    const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
+    return choices?.[0]?.message?.content ?? null;
+  }
+}
+
+function cleanMistralOutput(text: string): string {
+  // Nettoyage léger pour Mistral uniquement :
+  // 1. Supprimer les balises markdown ** (gras) en préservant le contenu
+  // 2. NE PAS toucher aux --- qui font partie de la structure de la séance
+  // 3. Supprimer les méta-commentaires en fin de texte
+
+  let cleaned = text;
+
+  // Supprimer les ** (gras) en gardant le contenu
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+
+  // Supprimer les * (italique) en gardant le contenu
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+
+  // Supprimer les méta-commentaires typiques de Mistral en fin de texte
+  // Pattern : texte commençant par "---" suivi de notes/commentaires sur la génération
+  const metaPatterns = [
+    /\n---\s*\n\s*(?:Cette séance|J'ai (?:conçu|élaboré|structuré)|Note[s]? :|Remarque[s]? :|N\.B\.|Commentaire[s]? :)[\s\S]*$/i,
+    /\n---\s*\n\s*\*[\s\S]*$/,
+  ];
+
+  for (const pattern of metaPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  return cleaned.trim();
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -22,23 +117,23 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: corsHeaders
     });
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const data: LessonRequest = await req.json();
+    const config = resolveAIConfig(data.aiModel);
 
-    if (!OPENAI_API_KEY) {
-      return new Response('Missing OPENAI_API_KEY', { 
-        status: 500, 
-        headers: corsHeaders 
+    if (!config.apiKey) {
+      const keyName = config.provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY';
+      return new Response(`Missing ${keyName}`, {
+        status: 500,
+        headers: corsHeaders
       });
     }
-
-    const data: LessonRequest = await req.json();
 
     const pedagogies = [
       {
@@ -91,8 +186,18 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
     const isEPS = data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') || data.subject.toLowerCase().includes('éducation physique');
 
-    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
+    // Instruction anti-formatage pour Mistral
+    const mistralFormatInstruction = config.provider === 'mistral'
+      ? `\n\n**INSTRUCTION CRITIQUE DE FORMAT :**
+- NE PAS utiliser de formatage markdown gras (**texte**)
+- NE PAS utiliser de formatage markdown italique (*texte*)
+- Utiliser uniquement du texte brut avec les séparateurs --- pour les sections
+- La réponse doit être lisible directement sans interpréteur markdown
+- NE PAS ajouter de commentaires, notes ou remarques sur ta rédaction en fin de document\n`
+      : '';
 
+    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
+${mistralFormatInstruction}
 ═══════════════════════════════════════════════════════════════
                     CONTEXTE DE LA SÉANCE
 ═══════════════════════════════════════════════════════════════
@@ -221,7 +326,7 @@ ${isEPS ? `
 **STRUCTURE TEMPORELLE EPS (${data.duration} min) :**
 - Échauffement : 12-15 min (obligatoire et spécifique)
 - Corps de séance (apprentissage moteur) : ${Math.floor(parseInt(data.duration) * 0.55)} min
-- Situation complexe/jeu : ${Math.floor(parseInt(data.duration) * 0.2)} min  
+- Situation complexe/jeu : ${Math.floor(parseInt(data.duration) * 0.2)} min
 - Retour au calme + bilan : 8-10 min
 ` : `
 ═══════════════════════════════════════════════════════════════
@@ -253,7 +358,7 @@ ${isEPS ? `
 Génère la séance en respectant EXACTEMENT cette structure Markdown :
 
 # 📚 [Titre accrocheur et explicite de la séance]
-**Niveau :** ${data.level} | **Durée :** ${data.duration} min | **Matière :** ${data.subject}
+Niveau : ${data.level} | Durée : ${data.duration} min | Matière : ${data.subject}
 
 ---
 
@@ -292,8 +397,8 @@ ${isEPS ? `### Aménagement de l'espace
 \`\`\`
 [Schéma textuel de la disposition : terrain, ateliers, zones, circulation]
 \`\`\`
-- **Sécurité :** [Consignes spécifiques, zones interdites, parade]
-- **Matériel sportif :** [Liste exhaustive avec quantités]` : `### Organisation spatiale
+- Sécurité : [Consignes spécifiques, zones interdites, parade]
+- Matériel sportif : [Liste exhaustive avec quantités]` : `### Organisation spatiale
 - [Configuration des tables/espaces selon la pédagogie ${data.pedagogy_type}]
 - [Affichages nécessaires]`}
 
@@ -302,13 +407,13 @@ ${isEPS ? `### Aménagement de l'espace
 ## ⏰ Déroulé détaillé de la séance
 
 ${isEPS ? `
-### 🔥 **Phase 1 : Échauffement** — 12-15 min
-> **Modalité :** Collectif puis vagues/binômes
+### 🔥 Phase 1 : Échauffement — 12-15 min
+> Modalité : Collectif puis vagues/binômes
 
 #### Consignes organisationnelles
-- **Espace :** [Disposition précise des élèves]
-- **Signal de départ/arrêt :** [Coup de sifflet, musique, signal visuel]
-- **Rotations :** [Sens de circulation, regroupements]
+- Espace : [Disposition précise des élèves]
+- Signal de départ/arrêt : [Coup de sifflet, musique, signal visuel]
+- Rotations : [Sens de circulation, regroupements]
 
 #### Déroulement
 | Temps | Exercice | Consignes de réalisation | Critères de réussite |
@@ -318,36 +423,36 @@ ${isEPS ? `
 | 5 min | [Échauffement spécifique APSA] | [Consigne motrice précise] | [Observable] |
 
 #### Interventions enseignant
-- **Relance si passivité :** "[Formulation exacte]"
-- **Correction posturale :** "[Formulation exacte]"
+- Relance si passivité : "[Formulation exacte]"
+- Correction posturale : "[Formulation exacte]"
 
 ---
 
-### 💪 **Phase 2 : Apprentissage moteur** — ${Math.floor(parseInt(data.duration) * 0.55)} min
-> **Modalité :** [Ateliers/Vagues/Opposition]
+### 💪 Phase 2 : Apprentissage moteur — ${Math.floor(parseInt(data.duration) * 0.55)} min
+> Modalité : [Ateliers/Vagues/Opposition]
 
 #### Situation d'apprentissage 1 : [Nom explicite]
-**But pour l'élève :** [Ce qu'il doit réussir à faire]
+But pour l'élève : [Ce qu'il doit réussir à faire]
 
-**Consignes organisationnelles :**
+Consignes organisationnelles :
 - Groupes de [X] élèves
 - Disposition : [description précise]
 - Rotation toutes les [X] min au signal [préciser]
 - Rôles : [joueur/observateur/coach...]
 
-**Consignes de réussite :**
-- **Pour réussir, tu dois :** [action motrice précise]
-- **Critère technique :** [placement, trajectoire, timing]
-- **Tu as réussi si :** [observable mesurable]
-- **Erreur fréquente à éviter :** [description et correction]
+Consignes de réussite :
+- Pour réussir, tu dois : [action motrice précise]
+- Critère technique : [placement, trajectoire, timing]
+- Tu as réussi si : [observable mesurable]
+- Erreur fréquente à éviter : [description et correction]
 
-**Variables didactiques :**
+Variables didactiques :
 | Pour simplifier | Pour complexifier |
 |-----------------|-------------------|
 | [Adaptation 1] | [Adaptation 1] |
 | [Adaptation 2] | [Adaptation 2] |
 
-**Interventions enseignant :**
+Interventions enseignant :
 - Si blocage : "[Question ou aide précise]"
 - Pour les experts : "[Défi supplémentaire]"
 
@@ -356,165 +461,165 @@ ${isEPS ? `
 
 ---
 
-### 🎯 **Phase 3 : Situation complexe / Match** — ${Math.floor(parseInt(data.duration) * 0.2)} min
-> **Modalité :** [Opposition/Coopération]
+### 🎯 Phase 3 : Situation complexe / Match — ${Math.floor(parseInt(data.duration) * 0.2)} min
+> Modalité : [Opposition/Coopération]
 
-**But :** [Application des apprentissages en situation de référence]
+But : [Application des apprentissages en situation de référence]
 
-**Organisation :**
+Organisation :
 - [Équipes, terrains, rotations]
-- **Rôles sociaux :** [Arbitre : règles à faire respecter] [Observateur : critère à observer]
+- Rôles sociaux : [Arbitre : règles à faire respecter] [Observateur : critère à observer]
 
-**Consignes de réussite :**
+Consignes de réussite :
 - [Critère collectif de réussite]
 - [Critère individuel de réussite]
 
-**Fiche d'observation fournie :**
+Fiche d'observation fournie :
 | Joueur | Critère 1 | Critère 2 | Remarques |
 |--------|-----------|-----------|-----------|
 | ... | ✓ / ✗ | ✓ / ✗ | ... |
 
 ---
 
-### 🧘 **Phase 4 : Retour au calme et bilan** — 8-10 min
-> **Modalité :** Collectif assis
+### 🧘 Phase 4 : Retour au calme et bilan — 8-10 min
+> Modalité : Collectif assis
 
-**Récupération (5 min) :**
+Récupération (5 min) :
 - [Étirements spécifiques avec consignes précises]
 - [Exercices respiratoires]
 
-**Bilan collectif (5 min) :**
-- **Question 1 :** "Qu'avez-vous appris à faire aujourd'hui ?" → [Réponse attendue]
-- **Question 2 :** "Qu'est-ce qui vous a aidé à réussir ?" → [Réponse attendue]
-- **Question 3 :** "Quelle difficulté reste à travailler ?" → [Piste pour prochaine séance]
+Bilan collectif (5 min) :
+- Question 1 : "Qu'avez-vous appris à faire aujourd'hui ?" → [Réponse attendue]
+- Question 2 : "Qu'est-ce qui vous a aidé à réussir ?" → [Réponse attendue]
+- Question 3 : "Quelle difficulté reste à travailler ?" → [Piste pour prochaine séance]
 
 ` : `
-### 🚀 **Phase 1 : Entrée dans l'activité** — [X] min
-> **Modalité :** [Individuel/Collectif]
+### 🚀 Phase 1 : Entrée dans l'activité — [X] min
+> Modalité : [Individuel/Collectif]
 
 #### Consignes organisationnelles
-- **Disposition :** [Configuration précise de la classe]
-- **Matériel distribué :** [Quoi, quand, comment]
-- **Signal de début/fin :** [Préciser]
+- Disposition : [Configuration précise de la classe]
+- Matériel distribué : [Quoi, quand, comment]
+- Signal de début/fin : [Préciser]
 
 #### Situation déclenchante
-**Accroche :** [Question, défi, problème, document surprenant - formulation exacte]
+Accroche : [Question, défi, problème, document surprenant - formulation exacte]
 
-**Ce que font les élèves :**
+Ce que font les élèves :
 1. [Action 1 - verbe précis]
 2. [Action 2 - verbe précis]
 3. [Production attendue]
 
-**Consignes de réussite données aux élèves :**
+Consignes de réussite données aux élèves :
 > "[Formulation exacte de la consigne telle que dite aux élèves]"
 - Tu as réussi si : [critère observable]
 - Attention à : [erreur fréquente à éviter]
 
-**Interventions enseignant :**
+Interventions enseignant :
 - Relance si blocage : "[Formulation exacte]"
 - Validation intermédiaire : "[Ce qu'on valide, comment]"
 
 ---
 
-### 🔍 **Phase 2 : Recherche / Investigation** — [X] min
-> **Modalité :** [Individuel puis binômes/groupes]
+### 🔍 Phase 2 : Recherche / Investigation — [X] min
+> Modalité : [Individuel puis binômes/groupes]
 
 #### Consignes organisationnelles
-- **Temps individuel :** [X] min de recherche silencieuse
-- **Mise en binôme/groupe :** [Comment, signal, placement]
-- **Trace écrite :** [Support, contenu attendu]
+- Temps individuel : [X] min de recherche silencieuse
+- Mise en binôme/groupe : [Comment, signal, placement]
+- Trace écrite : [Support, contenu attendu]
 
 #### Tâche proposée
-**Énoncé exact :** "[Formulation précise de la consigne]"
+Énoncé exact : "[Formulation précise de la consigne]"
 
-**Ce que fait l'élève - étapes :**
+Ce que fait l'élève - étapes :
 1. [Étape 1 - action précise]
-2. [Étape 2 - action précise]  
+2. [Étape 2 - action précise]
 3. [Étape 3 - production]
 
-**Consignes de réussite :**
-- **Pour réussir, tu dois :** [action cognitive précise]
-- **Ta réponse est correcte si :** [critères de validité]
-- **Erreur fréquente :** [description] → **Correction :** [comment l'éviter]
+Consignes de réussite :
+- Pour réussir, tu dois : [action cognitive précise]
+- Ta réponse est correcte si : [critères de validité]
+- Erreur fréquente : [description] → Correction : [comment l'éviter]
 
-**Aides graduées (différenciation) :**
+Aides graduées (différenciation) :
 | Niveau d'aide | Formulation |
 |---------------|-------------|
 | Aide 1 (légère) | "[Question de relance]" |
 | Aide 2 (moyenne) | "[Indice méthodologique]" |
 | Aide 3 (forte) | "[Étayage direct]" |
 
-**Interventions enseignant :**
+Interventions enseignant :
 - Circule et observe : [Ce qu'on observe, erreurs typiques]
 - Relance productive : "[Formulation]"
 - Valorisation : "[Ce qu'on valorise explicitement]"
 
 ---
 
-### 🏗️ **Phase 3 : Mise en commun / Structuration** — [X] min
-> **Modalité :** Collectif
+### 🏗️ Phase 3 : Mise en commun / Structuration — [X] min
+> Modalité : Collectif
 
 #### Consignes organisationnelles
-- **Retour en configuration collective :** [Comment]
-- **Supports de mise en commun :** [Tableau, affiche, vidéoprojecteur]
+- Retour en configuration collective : [Comment]
+- Supports de mise en commun : [Tableau, affiche, vidéoprojecteur]
 
 #### Déroulement
-**Étape 1 - Recueil des propositions :**
+Étape 1 - Recueil des propositions :
 - Sollicitation : "[Question exacte posée]"
 - Réponses attendues : [Types de réponses, procédures]
 - Notation au tableau : [Comment on organise]
 
-**Étape 2 - Confrontation et validation :**
+Étape 2 - Confrontation et validation :
 - "[Question de comparaison/justification]"
 - Critères de validation explicités aux élèves
 
-**Étape 3 - Institutionnalisation :**
-> **Trace écrite collective :**
+Étape 3 - Institutionnalisation :
+> Trace écrite collective :
 > [Contenu exact de ce qui est noté/dicté - formulation précise]
 
-**Questions types pour guider :**
+Questions types pour guider :
 1. "[Question pour faire émerger la règle/notion]"
 2. "[Question pour vérifier la compréhension]"
 3. "[Question pour faire le lien avec les connaissances antérieures]"
 
 ---
 
-### 📝 **Phase 4 : Entraînement / Application** — [X] min
-> **Modalité :** Individuel
+### 📝 Phase 4 : Entraînement / Application — [X] min
+> Modalité : Individuel
 
 #### Consignes organisationnelles
-- **Distribution :** [Exercices, support]
-- **Temps imparti :** [Durée, signal de fin]
-- **Attendu :** [Nombre d'exercices, qualité attendue]
+- Distribution : [Exercices, support]
+- Temps imparti : [Durée, signal de fin]
+- Attendu : [Nombre d'exercices, qualité attendue]
 
 #### Exercices proposés
-**Exercice 1 (application directe) :**
+Exercice 1 (application directe) :
 [Énoncé complet]
 - Critère de réussite : [Observable]
 
-**Exercice 2 (transfert) :**
+Exercice 2 (transfert) :
 [Énoncé complet]
 - Critère de réussite : [Observable]
 
-**Exercice 3 (défi/approfondissement) :**
+Exercice 3 (défi/approfondissement) :
 [Énoncé complet]
 - Pour les élèves ayant terminé
 
-**Correction :**
+Correction :
 - [Modalité : auto-correction, correction collective, par les pairs]
 - [Éléments de correction fournis]
 
 ---
 
-### ✅ **Phase 5 : Bilan et clôture** — [X] min
-> **Modalité :** Collectif
+### ✅ Phase 5 : Bilan et clôture — [X] min
+> Modalité : Collectif
 
-**Questions bilan :**
+Questions bilan :
 1. "Qu'avons-nous appris aujourd'hui ?" → [Réponse attendue]
 2. "À quoi cela va-t-il nous servir ?" → [Lien avec la suite]
 3. "Qu'est-ce qui était difficile ?" → [Identifier les obstacles]
 
-**Annonce de la suite :**
+Annonce de la suite :
 - [Lien avec la prochaine séance]
 `}
 
@@ -536,9 +641,9 @@ ${isEPS ? `
 | [Défi 2] | [Description] | "[Consigne exacte]" |
 
 ### ♿ Adaptations inclusives
-- **Troubles DYS :** [Adaptations spécifiques]
-- **Troubles attentionnels :** [Adaptations spécifiques]
-${isEPS ? '- **Handicap moteur :** [Adaptations motrices spécifiques]' : '- **Élèves allophones :** [Adaptations linguistiques]'}
+- Troubles DYS : [Adaptations spécifiques]
+- Troubles attentionnels : [Adaptations spécifiques]
+${isEPS ? '- Handicap moteur : [Adaptations motrices spécifiques]' : '- Élèves allophones : [Adaptations linguistiques]'}
 
 ---
 
@@ -552,9 +657,9 @@ ${isEPS ? '- **Handicap moteur :** [Adaptations motrices spécifiques]' : '- **�
 | [Critère 3] | [Ce qu'on voit/entend] | 🔴 / 🟡 / 🟢 |
 
 ### Modalité d'évaluation
-- **Type :** [Diagnostique/Formative/Sommative]
-- **Outil :** [Grille d'observation / Auto-évaluation / Production]
-${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- **Trace écrite analysée :** [Critères de correction]'}
+- Type : [Diagnostique/Formative/Sommative]
+- Outil : [Grille d'observation / Auto-évaluation / Production]
+${isEPS ? '- Observation motrice : [Critères techniques à observer]' : '- Trace écrite analysée : [Critères de correction]'}
 
 ---
 
@@ -568,10 +673,10 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 | [Difficulté 3] | [Remédiation immédiate] |
 
 ### 🗣️ Formulations clés à utiliser
-- **Pour lancer l'activité :** "[Formulation exacte]"
-- **Pour relancer un élève :** "[Formulation exacte]"
-- **Pour valider une réponse :** "[Formulation exacte]"
-- **Pour institutionnaliser :** "[Formulation exacte]"
+- Pour lancer l'activité : "[Formulation exacte]"
+- Pour relancer un élève : "[Formulation exacte]"
+- Pour valider une réponse : "[Formulation exacte]"
+- Pour institutionnaliser : "[Formulation exacte]"
 
 ### ⏱️ Gestion du temps - Plan B
 - Si retard : [Ce qu'on raccourcit/supprime]
@@ -592,7 +697,7 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 
 ---
 
-> **📚 Ressources complémentaires :** [Sites institutionnels, manuels, outils TICE]
+> 📚 Ressources complémentaires : [Sites institutionnels, manuels, outils TICE]
 
 ═══════════════════════════════════════════════════════════════
               EXIGENCES QUALITÉ FINALES
@@ -610,41 +715,76 @@ ${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alter
 
 Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
+    // Construction de la requête selon le modèle
+    let requestBody: Record<string, unknown>;
+
+    if (config.useResponsesApi) {
+      // GPT-5 mini : Responses API
+      requestBody = {
+        model: config.model,
+        input: prompt,
+        max_output_tokens: 8000,
+        reasoning: { effort: "low" },
+        text: { format: { type: "text" } }
+      };
+    } else if (config.provider === 'mistral') {
+      // Mistral : max_tokens élevé pour éviter la troncature
+      requestBody = {
+        model: config.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 8000
+      };
+    } else {
+      // OpenAI standard (gpt-4.1-mini) : comportement original SANS max_tokens
+      requestBody = {
+        model: config.model,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7
-      })
+      };
+    }
+
+    const response = await fetch(config.apiUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      return new Response('OpenAI API Error', { 
-        status: response.status, 
-        headers: corsHeaders 
+      const errorText = await response.text();
+      console.error(`API Error (${config.provider}):`, errorText);
+      return new Response(`${config.provider} API Error`, {
+        status: response.status,
+        headers: corsHeaders
       });
     }
 
-    const openAIData = await response.json();
-    const content = openAIData.choices?.[0]?.message?.content;
-    
+    const responseData = await response.json();
+    let content = parseAIResponse(responseData, config);
+
     if (!content) {
       return new Response(JSON.stringify({
-        error: 'Réponse invalide de l\'API OpenAI'
+        error: 'Réponse invalide de l\'API'
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
+    // Nettoyage du markdown pour Mistral uniquement
+    if (config.provider === 'mistral') {
+      content = cleanMistralOutput(content);
+    }
+
+    // Log pour debug
+    console.log(`[lessons] Model: ${config.model}, Provider: ${config.provider}, Output length: ${content.length}`);
+
     return new Response(JSON.stringify({
       content,
-      usage: openAIData.usage
+      usage: responseData.usage
     }), {
       status: 200,
       headers: {
@@ -655,9 +795,9 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
   } catch (error) {
     console.error('Lessons function error:', error);
-    return new Response('Internal server error', { 
-      status: 500, 
-      headers: corsHeaders 
+    return new Response('Internal server error', {
+      status: 500,
+      headers: corsHeaders
     });
   }
 };
