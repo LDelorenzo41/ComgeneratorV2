@@ -1,10 +1,180 @@
 // supabase/functions/communication/index.ts
+// VERSION AVEC CHOIX DE MODÈLE IA (GPT-4.1-mini par défaut, GPT-5 mini, Mistral Medium)
+
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
+
+function resolveAIConfig(aiModel, openaiKey, mistralKey) {
+  // Modèle par défaut : gpt-4.1-mini (comportement actuel inchangé)
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4.1-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // Fallback : modèle par défaut si choix non reconnu
+  console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4.1-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false
+  };
+}
+
+/**
+ * Nettoie le texte de sortie (supprime markdown résiduel si nécessaire)
+ */
+function cleanOutputText(text) {
+  if (!text) return text;
+  
+  let cleaned = text.trim();
+  
+  // Supprimer les balises markdown de mise en forme excessive
+  cleaned = cleaned.replace(/\*\*/g, '');
+  cleaned = cleaned.replace(/\*/g, '');
+  cleaned = cleaned.replace(/`{1,3}/g, '');
+  
+  // Supprimer les lignes vides multiples
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  cleaned = cleaned.trim();
+  
+  // Supprimer ponctuation orpheline au début
+  cleaned = cleaned.replace(/^[\s:\-\*]+/, '');
+  
+  return cleaned;
+}
+
+/**
+ * Appelle l'API IA et retourne le contenu
+ */
+async function callAI(aiConfig, prompt, tokenLimit = 2000) {
+  let requestBody;
+
+  if (aiConfig.isResponsesAPI) {
+    // API Responses (GPT-5 mini)
+    requestBody = {
+      model: aiConfig.model,
+      input: prompt,
+      [aiConfig.tokenParamName]: tokenLimit,
+      text: {
+        format: { type: "text" }
+      },
+      reasoning: {
+        effort: "low"
+      }
+    };
+  } else {
+    // API Chat Completions (GPT-4.1-mini, Mistral)
+    requestBody = {
+      model: aiConfig.model,
+      messages: [{ role: 'user', content: prompt }],
+      ...(aiConfig.supportsTemperature && { temperature: 0.7 }),
+      [aiConfig.tokenParamName]: tokenLimit
+    };
+  }
+
+  const response = await fetch(aiConfig.endpoint, {
+    method: 'POST',
+    headers: aiConfig.headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[communication] ${aiConfig.model} API error:`, errorText);
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const aiData = await response.json();
+
+  // Extraire le contenu selon le type d'API
+  let content = null;
+
+  if (aiConfig.isResponsesAPI) {
+    // API Responses (GPT-5 mini)
+    if (aiData?.output && Array.isArray(aiData.output)) {
+      const messageItem = aiData.output.find(item => item.type === 'message');
+      if (messageItem?.content && Array.isArray(messageItem.content)) {
+        const outputText = messageItem.content.find(c => c.type === 'output_text');
+        if (outputText?.text) {
+          content = outputText.text;
+        }
+      }
+    }
+    if (!content && aiData?.output_text) {
+      content = aiData.output_text;
+    }
+  } else {
+    // API Chat Completions
+    if (aiData?.choices?.[0]?.message?.content) {
+      content = aiData.choices[0].message.content;
+    } else if (aiData?.choices?.[0]?.text) {
+      content = aiData.choices[0].text;
+    }
+  }
+
+  return { content, usage: aiData.usage };
+}
+
+// =====================================================
+// HANDLER PRINCIPAL
+// =====================================================
 
 interface CommunicationParams {
   destinataire: string;
   ton: string;
   contenu: string;
   signature?: string | null;
+  aiModel?: string;
 }
 
 const communicationHandler = async (req: Request): Promise<Response> => {
@@ -26,6 +196,7 @@ const communicationHandler = async (req: Request): Promise<Response> => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
       return new Response('Missing OPENAI_API_KEY', { 
@@ -35,7 +206,22 @@ const communicationHandler = async (req: Request): Promise<Response> => {
     }
 
     const body: CommunicationParams = await req.json();
-    const { destinataire, ton, contenu, signature } = body;
+    const { destinataire, ton, contenu, signature, aiModel } = body;
+
+    // Résoudre la configuration API
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError) {
+      return new Response(JSON.stringify({
+        error: configError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[communication] Modèle IA utilisé: ${aiConfig.model}`);
 
     // ⚠️ CAS SPÉCIAL : Commission disciplinaire (prompt complètement différent)
     if (destinataire.toLowerCase() === "commission disciplinaire") {
@@ -112,42 +298,45 @@ ${signature ?
 
 Rédige maintenant le bilan complet en respectant SCRUPULEUSEMENT cette structure et en ANALYSANT vraiment la situation.`;
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          messages: [{ role: "user", content: promptCommission }],
-          temperature: 0.7
-        })
-      });
+      try {
+        // Token limit plus élevé pour les bilans de commission (documents longs)
+        const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 3000;
+        const { content, usage } = await callAI(aiConfig, promptCommission, tokenLimit);
 
-      if (!response.ok) {
-        return new Response('OpenAI API Error', { 
-          status: response.status, 
+        if (!content) {
+          return new Response(JSON.stringify({
+            error: 'Réponse invalide de l\'API. Veuillez réessayer.'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        const cleanedContent = cleanOutputText(content);
+
+        return new Response(JSON.stringify({ 
+          content: cleanedContent,
+          usage 
+        }), {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      } catch (error) {
+        console.error('[communication] Commission API error:', error);
+        return new Response('API Error', { 
+          status: 500, 
           headers: corsHeaders 
         });
       }
-
-      const openAIData = await response.json();
-      const result = openAIData.choices?.[0]?.message?.content ?? '';
-
-      return new Response(JSON.stringify({ 
-        content: result,
-        usage: openAIData.usage 
-      }), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
-      });
     }
 
-    // Pour tous les autres destinataires, on utilise le prompt standard
+    // =====================================================
+    // CAS STANDARD : Tous les autres destinataires
+    // =====================================================
+
     const prompt = `Tu es un enseignant expérimenté qui rédige une communication professionnelle dans le milieu éducatif.
 
 **CONTEXTE DE LA COMMUNICATION :**
@@ -192,48 +381,51 @@ ${signature ?
 
 Rédige maintenant cette communication en respectant scrupuleusement ces instructions.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7
-      })
-    });
+    try {
+      const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2000;
+      const { content, usage } = await callAI(aiConfig, prompt, tokenLimit);
 
-    if (!response.ok) {
-      return new Response('OpenAI API Error', { 
-        status: response.status, 
+      if (!content) {
+        return new Response(JSON.stringify({
+          error: 'Réponse invalide de l\'API. Veuillez réessayer.'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const cleanedContent = cleanOutputText(content);
+
+      return new Response(JSON.stringify({ 
+        content: cleanedContent,
+        usage 
+      }), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
+    } catch (error) {
+      console.error('[communication] Standard API error:', error);
+      return new Response('API Error', { 
+        status: 500, 
         headers: corsHeaders 
       });
     }
 
-    const openAIData = await response.json();
-    const result = openAIData.choices?.[0]?.message?.content ?? '';
-
-    return new Response(JSON.stringify({ 
-      content: result,
-      usage: openAIData.usage 
-    }), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
-    });
-
   } catch (error) {
-    console.error('Communication function error:', error);
+    console.error('[communication] Error:', error);
     return new Response('Internal server error', { 
       status: 500, 
       headers: corsHeaders 
     });
   }
 };
+
+// =====================================================
+// FONCTIONS HELPER - INSTRUCTIONS DESTINATAIRE
+// =====================================================
 
 function getDestinataireInstructions(destinataire: string): string {
   const dest = destinataire.toLowerCase();
@@ -315,60 +507,9 @@ function getDestinataireInstructions(destinataire: string): string {
 - Vouvoiement obligatoire`;
   }
 
-  // Commission disciplinaire - PROMPT SPÉCIAL
+  // Commission disciplinaire - PROMPT SPÉCIAL (géré séparément)
   if (dest === "commission disciplinaire") {
-    return `**ATTENTION : Cette communication nécessite un traitement spécial car c'est une présentation de cas pour commission.**
-
-Tu es un assistant expert en bilans éducatifs / disciplinaires scolaires.
-
-Tu reçois un **texte libre** issu des professeurs, vie scolaire, notes diverses, témoignages, etc., relatif à un élève (comportement, travail, événements déclencheurs possibles). Le texte est désordonné, fragmentaire, incomplet.
-
-Ta tâche : produire une **présentation de cas** claire et professionnelle, utilisable devant une commission. Le bilan doit être structuré, argumenté et pragmatique.
-
-**Étapes à respecter :**
-
-1. **Extraction / structuration**  
-   - Repère les faits disciplinaires : date, heure, lieu, description, témoins  
-   - Détecte un événement déclencheur éventuel  
-   - Relève les comportements récurrents (en cours / hors cours)  
-   - Recueille les données scolaires : notes, retards, absences, remarques d'enseignants  
-   - Recueille les incidents de vie scolaire (cours communs, récréation, couloirs, surveillants)  
-   - Relève les éléments de contexte (familial, personnel, changements récents)  
-   - Relève les témoignages pertinents  
-   - Signale les informations manquantes ou contradictoires  
-
-2. **Présentation structurée pour commission**  
-   **I. Contexte & motif du dossier**  
-   — Classe, niveau, raison de l'ouverture du dossier  
-   **II. Faits & incidents**  
-   — Incident(s) déclencheur(s)  
-   — Autres comportements disciplinaires / antécédents  
-   — Fréquence / chronologie  
-   **III. Scolarité & comportement en cours**  
-   — Évolution des résultats  
-   — Assiduité, retards, participation  
-   — Relations avec les enseignants, perturbations  
-   **IV. Vie scolaire / incidents hors cours**  
-   — Incidents dans les lieux communs  
-   — Relations avec pairs / surveillants  
-   **V. Analyse raisonnée & hypothèses**  
-   — Déclencheurs possibles, moments sensibles  
-   — Hypothèses explicatives (stress, conflit, difficulté scolaire)  
-   — Limites de l'analyse  
-   **VI. Pistes d'action & suggestions**  
-   — Actions immédiates (entretien, médiation…)  
-   — Accompagnements possibles  
-   — Tests / expérimentations (contrat de comportement, suivi périodique)  
-   — Indicateurs de suivi + calendrier de réévaluation  
-   **VII. Conclusion synthétique**  
-   — Points essentiels à retenir  
-   — Recommandation pour la commission  
-
-3. **Ton & précautions**  
-   - Reste objectif, fondé sur les faits  
-   - Formule les hypothèses comme telles, jamais de diagnostics médicaux  
-   - Note les incertitudes  
-   - Usage d'un style clair, adapté à une présentation devant des collègues`;
+    return `**ATTENTION : Cette communication nécessite un traitement spécial car c'est une présentation de cas pour commission.**`;
   }
 
   // Rapport d'incident - Descriptif factuel sans destinataire
@@ -398,6 +539,10 @@ Ta tâche : produire une **présentation de cas** claire et professionnelle, uti
 - Maintiens un ton respectueux et bienveillant
 - Structure claire et professionnelle`;
 }
+
+// =====================================================
+// FONCTIONS HELPER - INSTRUCTIONS TON
+// =====================================================
 
 function getTonInstructions(ton: string): string {
   switch (ton.toLowerCase()) {

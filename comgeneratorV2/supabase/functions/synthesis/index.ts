@@ -1,15 +1,128 @@
-// supabase/functions/synthesis/index.ts - VERSION AMÉLIORÉE
+// supabase/functions/synthesis/index.ts
+// VERSION AVEC CHOIX DE MODÈLE IA (GPT-4o-mini, GPT-5 mini, Mistral Medium)
 
-// @ts-ignore - Deno global disponible en runtime
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
 
-interface SynthesisRequest {
-  extractedText: string;
-  maxChars: number;
-  tone?: 'neutre' | 'encourageant' | 'analytique';
-  outputType?: 'complet' | 'essentiel';
+function resolveAIConfig(aiModel, openaiKey, mistralKey) {
+  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4o-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // Fallback : modèle par défaut si choix non reconnu
+  console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4o-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false
+  };
 }
 
-const synthesisHandler = async (req: Request): Promise<Response> => {
+/**
+ * Nettoie le texte de sortie (supprime markdown, etc.)
+ */
+function cleanOutputText(text) {
+  if (!text) return text;
+  
+  let cleaned = text.trim();
+  
+  // Supprimer les balises markdown
+  cleaned = cleaned.replace(/\*\*/g, '');
+  cleaned = cleaned.replace(/\*/g, '');
+  cleaned = cleaned.replace(/^#{1,6}\s*/gm, '');
+  cleaned = cleaned.replace(/`{1,3}/g, '');
+  
+  // Supprimer les mentions de nombre de caractères
+  cleaned = cleaned.replace(/\s*\(?\[?\d+\s*(?:caractères?|car\.?|chars?|mots?|words?)\]?\)?\.?\s*/gi, '');
+  
+  // Supprimer les lignes de comptage
+  cleaned = cleaned.replace(/^.*(?:total|compte|longueur|length|respect).*:\s*\d+.*$/gmi, '');
+  
+  // Supprimer les lignes vides multiples
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  cleaned = cleaned.trim();
+  
+  // Supprimer ponctuation orpheline au début
+  cleaned = cleaned.replace(/^[\s:\-\*]+/, '');
+  
+  return cleaned;
+}
+
+/**
+ * Renforce l'instruction de limite de caractères pour Mistral
+ */
+function buildPromptWithCharLimit(basePrompt, maxChars, model) {
+  if (model === 'mistral-medium-latest') {
+    const reinforcement = `⚠️ CONTRAINTE CRITIQUE DE LONGUEUR ⚠️
+Ta réponse doit faire MAXIMUM ${maxChars} caractères (espaces compris).
+Cette limite est ABSOLUE et NON-NÉGOCIABLE. 
+Compte tes caractères AVANT de finaliser. Sois concis et va à l'essentiel.
+Si tu dépasses, ta réponse sera inutilisable.
+
+`;
+    return reinforcement + basePrompt;
+  }
+  
+  return basePrompt;
+}
+
+// =====================================================
+// HANDLER PRINCIPAL
+// =====================================================
+
+const synthesisHandler = async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -28,6 +141,7 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
       return new Response('Missing OPENAI_API_KEY', { 
@@ -36,12 +150,14 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
       });
     }
 
+    const params = await req.json();
     const { 
       extractedText, 
       maxChars,
       tone = 'neutre',
-      outputType = 'complet'
-    }: SynthesisRequest = await req.json();
+      outputType = 'complet',
+      aiModel
+    } = params;
 
     if (!extractedText) {
       return new Response(JSON.stringify({
@@ -52,33 +168,78 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // ✅ ADAPTATION DU TON
-    const toneInstructions = getToneInstructions(tone);
+    // Résoudre la configuration API
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError) {
+      return new Response(JSON.stringify({
+        error: configError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
-    // ✅ CHOIX DU PROMPT SELON LE TYPE
-    const prompt = outputType === 'essentiel' 
+    console.log(`[synthesis] Modèle IA utilisé: ${aiConfig.model}`);
+
+    // Construire le prompt de base
+    const toneInstructions = getToneInstructions(tone);
+    const basePrompt = outputType === 'essentiel' 
       ? buildEssentialPrompt(extractedText, maxChars, toneInstructions)
       : buildCompletePrompt(extractedText, maxChars, toneInstructions);
 
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Adapter le prompt selon le modèle (renforcement pour Mistral)
+    const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig.model);
+
+    // ✅ Token limit adapté selon le modèle ET la demande utilisateur
+    let tokenLimit;
+    if (aiConfig.model === 'gpt-5-mini') {
+      tokenLimit = 4000; // Contrainte API Responses
+    } else if (aiConfig.model === 'mistral-medium-latest') {
+      // Mistral est bavard : on réduit la marge pour forcer le respect de maxChars
+      tokenLimit = Math.ceil(maxChars * 1.3);
+    } else {
+      tokenLimit = Math.ceil(maxChars * 2);
+    }
+
+    // ✅ Construction du body selon le type d'API
+    let requestBody;
+
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini) - format différent
+      requestBody = {
+        model: aiConfig.model,
+        input: prompt,
+        [aiConfig.tokenParamName]: tokenLimit,
+        // ✅ OBLIGATOIRE pour GPT-5 mini
+        text: {
+          format: { type: "text" }
+        },
+        reasoning: {
+          effort: "low"
+        }
+      };
+    } else {
+      // API Chat Completions (GPT-4, Mistral) - format standard
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: prompt }],
+        ...(aiConfig.supportsTemperature && { temperature: 0.7 }),
+        [aiConfig.tokenParamName]: tokenLimit
+      };
+    }
+
+    // Appel API
+    const response = await fetch(aiConfig.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: Math.ceil(maxChars * 2)
-      }),
+      headers: aiConfig.headers,
+      body: JSON.stringify(requestBody),
     });
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[synthesis] ${aiConfig.model} API error:`, errorText);
       return new Response(JSON.stringify({
         error: 'Erreur lors de la génération de la synthèse'
       }), {
@@ -87,21 +248,57 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const openAIData = await openAIResponse.json();
-    const content = openAIData.choices?.[0]?.message?.content;
+    const aiData = await response.json();
+    
+    // ✅ Log pour debug
+    console.log('[synthesis] Réponse API brute:', JSON.stringify(aiData, null, 2));
+
+    // ✅ Extraire le contenu selon le type d'API
+    let content = null;
+    
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini) - format avec tableau output
+      if (aiData?.output && Array.isArray(aiData.output)) {
+        const messageItem = aiData.output.find(item => item.type === 'message');
+        if (messageItem?.content && Array.isArray(messageItem.content)) {
+          const outputText = messageItem.content.find(c => c.type === 'output_text');
+          if (outputText?.text) {
+            content = outputText.text;
+          }
+        }
+      }
+      // Fallback
+      if (!content && aiData?.output_text) {
+        content = aiData.output_text;
+      }
+    } else {
+      // API Chat Completions (GPT-4, Mistral) - format standard
+      if (aiData?.choices?.[0]?.message?.content) {
+        content = aiData.choices[0].message.content;
+      } else if (aiData?.choices?.[0]?.text) {
+        content = aiData.choices[0].text;
+      }
+    }
     
     if (!content) {
+      console.error('[synthesis] Format de réponse non reconnu:', JSON.stringify(aiData, null, 2));
       return new Response(JSON.stringify({
-        error: 'Réponse invalide de l\'API OpenAI'
+        error: 'Réponse invalide de l\'API. Veuillez réessayer.'
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
+    // ✅ Nettoyer le contenu
+    content = cleanOutputText(content);
+
+    // Log de la longueur finale
+    console.log(`[synthesis] Longueur finale: ${content.length}/${maxChars} caractères (modèle: ${aiConfig.model})`);
+
     return new Response(JSON.stringify({
       content,
-      usage: openAIData.usage
+      usage: aiData.usage
     }), {
       status: 200,
       headers: {
@@ -111,16 +308,21 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
     });
 
   } catch (error) {
-    console.error('Synthesis function error:', error);
-    return new Response('Internal server error', { 
+    console.error('[synthesis] Error:', error);
+    return new Response(JSON.stringify({
+      error: error.message || 'Une erreur est survenue. Veuillez réessayer.'
+    }), { 
       status: 500, 
-      headers: corsHeaders 
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 };
 
-// ✅ FONCTION POUR ADAPTER LE TON
-function getToneInstructions(tone: 'neutre' | 'encourageant' | 'analytique'): string {
+// =====================================================
+// FONCTIONS HELPER - INSTRUCTIONS DE TON
+// =====================================================
+
+function getToneInstructions(tone) {
   switch (tone) {
     case 'encourageant':
       return `**TON ENCOURAGEANT :**
@@ -149,8 +351,11 @@ function getToneInstructions(tone: 'neutre' | 'encourageant' | 'analytique'): st
   }
 }
 
-// ✅ PROMPT COMPLET (CONSERVÉ DE L'ORIGINAL)
-function buildCompletePrompt(extractedText: string, maxChars: number, toneInstructions: string): string {
+// =====================================================
+// FONCTIONS HELPER - PROMPTS
+// =====================================================
+
+function buildCompletePrompt(extractedText, maxChars, toneInstructions) {
   return `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**
@@ -208,8 +413,7 @@ ${extractedText}
 Rédige maintenant l'appréciation générale en respectant SCRUPULEUSEMENT ces instructions, notamment la limite de ${maxChars} caractères.`;
 }
 
-// ✅ PROMPT ESSENTIEL (CORRIGÉ)
-function buildEssentialPrompt(extractedText: string, maxChars: number, toneInstructions: string): string {
+function buildEssentialPrompt(extractedText, maxChars, toneInstructions) {
   return `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**

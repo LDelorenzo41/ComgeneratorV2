@@ -1,6 +1,102 @@
 // supabase/functions/lessons/index.ts
+// VERSION AVEC CHOIX DE MODÈLE IA (GPT-4.1-mini par défaut, GPT-5 mini, Mistral Medium)
 
-// @ts-ignore - Deno global disponible en runtime
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
+
+function resolveAIConfig(aiModel, openaiKey, mistralKey) {
+  // Modèle par défaut : gpt-4.1-mini (comportement actuel inchangé)
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4.1-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false,
+      isDefault: true // ✅ Flag pour identifier le modèle par défaut
+    };
+  }
+
+  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true,
+      isDefault: false
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false,
+      isDefault: false
+    };
+  }
+
+  // Fallback : modèle par défaut si choix non reconnu
+  console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4.1-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false,
+    isDefault: true
+  };
+}
+
+/**
+ * Nettoie le texte de sortie
+ * - Supprime les méta-commentaires de Mistral
+ */
+function cleanOutputText(text) {
+  if (!text) return text;
+  
+  let cleaned = text.trim();
+  
+  // Supprimer les sections de méta-commentaires de Mistral
+  cleaned = cleaned.replace(/\n---\s*\n[\s\S]*?(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?)[\s\S]*$/gi, '');
+  cleaned = cleaned.replace(/\n\n(?:Notes? d'adaptation|Remarques? contextuelles?|Notes? de rédaction|Analyse du message)[\s\S]*$/gi, '');
+  
+  // Supprimer les lignes vides multiples
+  cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
+  
+  cleaned = cleaned.trim();
+  
+  return cleaned;
+}
+
+// =====================================================
+// HANDLER PRINCIPAL
+// =====================================================
 
 interface LessonRequest {
   subject: string;
@@ -9,6 +105,7 @@ interface LessonRequest {
   pedagogy_type: string;
   duration: string;
   documentContext?: string;
+  aiModel?: string;
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -30,6 +127,7 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
       return new Response('Missing OPENAI_API_KEY', { 
@@ -39,6 +137,21 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     }
 
     const data: LessonRequest = await req.json();
+
+    // Résoudre la configuration API
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(data.aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError) {
+      return new Response(JSON.stringify({
+        error: configError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[lessons] Modèle IA utilisé: ${aiConfig.model}`);
 
     const pedagogies = [
       {
@@ -90,6 +203,11 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
     const isEPS = data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') || data.subject.toLowerCase().includes('éducation physique');
+
+    // Instruction anti-méta-commentaires pour Mistral uniquement
+    const noMetaInstruction = aiConfig.model === 'mistral-medium-latest' 
+      ? `\n\n⚠️ IMPORTANT : Génère UNIQUEMENT la fiche de séance. N'ajoute AUCUNE note, remarque ou commentaire sur ta propre rédaction à la fin.`
+      : '';
 
     const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
 
@@ -607,31 +725,82 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 ✅ La différenciation est CONCRÈTE (pas de formules vagues)
 ${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alternance judicieuse des modalités de travail'}
 ✅ Document exploitable IMMÉDIATEMENT sans interprétation
+${noMetaInstruction}
 
 Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        messages: [{ role: "user", content: prompt }],
+    // ✅ CORRECTION CRITIQUE : Construction du body selon le modèle
+    let requestBody;
+
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini) - nécessite des paramètres spécifiques
+      requestBody = {
+        model: aiConfig.model,
+        input: prompt,
+        max_output_tokens: 8000,
+        text: {
+          format: { type: "text" }
+        },
+        reasoning: {
+          effort: "low"
+        }
+      };
+    } else if (aiConfig.model === 'mistral-medium-latest') {
+      // Mistral - avec max_tokens
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 5500
+      };
+    } else {
+      // ✅ MODÈLE PAR DÉFAUT (gpt-4.1-mini) : COMPORTEMENT ORIGINAL EXACT
+      // PAS de max_tokens - identique au code original !
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.7
-      })
+      };
+    }
+
+    const response = await fetch(aiConfig.endpoint, {
+      method: 'POST',
+      headers: aiConfig.headers,
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[lessons] ${aiConfig.model} API error:`, errorText);
       return new Response('OpenAI API Error', { 
         status: response.status, 
         headers: corsHeaders 
       });
     }
 
-    const openAIData = await response.json();
-    const content = openAIData.choices?.[0]?.message?.content;
+    const aiData = await response.json();
+
+    // ✅ Extraire le contenu selon le type d'API
+    let content = null;
+
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini)
+      if (aiData?.output && Array.isArray(aiData.output)) {
+        const messageItem = aiData.output.find(item => item.type === 'message');
+        if (messageItem?.content && Array.isArray(messageItem.content)) {
+          const outputText = messageItem.content.find(c => c.type === 'output_text');
+          if (outputText?.text) {
+            content = outputText.text;
+          }
+        }
+      }
+      if (!content && aiData?.output_text) {
+        content = aiData.output_text;
+      }
+    } else {
+      // API Chat Completions (comportement original)
+      content = aiData.choices?.[0]?.message?.content;
+    }
     
     if (!content) {
       return new Response(JSON.stringify({
@@ -642,9 +811,13 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
       });
     }
 
+    
+
+    console.log(`[lessons] Séance générée (${content.length} caractères) avec ${aiConfig.model}`);
+
     return new Response(JSON.stringify({
       content,
-      usage: openAIData.usage
+      usage: aiData.usage
     }), {
       status: 200,
       headers: {
@@ -654,7 +827,7 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
     });
 
   } catch (error) {
-    console.error('Lessons function error:', error);
+    console.error('[lessons] Error:', error);
     return new Response('Internal server error', { 
       status: 500, 
       headers: corsHeaders 
@@ -663,3 +836,4 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
