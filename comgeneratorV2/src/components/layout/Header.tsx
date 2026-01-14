@@ -22,7 +22,8 @@ import {
   Send,
   Reply,
   Gift,
-  Megaphone
+  Megaphone,
+  BarChart3
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
@@ -436,12 +437,21 @@ Scénarios pédagogiques
                   {isSettingsDropdownOpen && (
                     <div className="absolute right-0 z-10 bg-white dark:bg-gray-800 shadow-md rounded-md mt-2 w-52">
                       <div className="flex flex-col py-2">
-                        {/* Admin sections */}
+                                                {/* Admin sections */}
                         {isAdmin && (
                           <>
                             <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-600">
                               <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Administration</span>
                             </div>
+                            {/* NOUVEAU: Dashboard */}
+                            <Link
+                              to="/admin/dashboard"
+                              className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => setIsSettingsDropdownOpen(false)}
+                            >
+                              <BarChart3 className="w-4 h-4 mr-2" />
+                              Dashboard
+                            </Link>
                             <Link
                               to="/admin/newsletter"
                               className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -461,6 +471,7 @@ Scénarios pédagogiques
                             <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                           </>
                         )}
+
                         
                         {/* J'ai un code - pour tous les users */}
                         <button
@@ -738,12 +749,21 @@ Scénarios pédagogiques
 
             {/* Section paramètres mobile */}
             <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
-              {/* Admin sections - Mobile */}
+                            {/* Admin sections - Mobile */}
               {isAdmin && (
                 <>
                   <div className="px-3 py-2">
                     <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Administration</span>
                   </div>
+                  {/* NOUVEAU: Dashboard */}
+                  <Link
+                    to="/admin/dashboard"
+                    className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <BarChart3 className="h-5 w-5 mr-2" />
+                    <span>Dashboard</span>
+                  </Link>
                   <Link
                     to="/admin/newsletter"
                     className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
@@ -763,6 +783,7 @@ Scénarios pédagogiques
                   <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
                 </>
               )}
+
               
               {/* J'ai un code - Mobile */}
               <button

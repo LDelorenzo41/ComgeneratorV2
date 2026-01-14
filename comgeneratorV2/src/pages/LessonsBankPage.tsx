@@ -33,7 +33,7 @@ type LessonBank = {
   pedagogy_type: string;
   duration: number;
   content: string;
-  created_at: string;
+  created_at: string | null;
 };
 
 const tagColors = {
@@ -121,6 +121,8 @@ export function LessonsBankPage() {
   const [sortBy, setSortBy] = React.useState<'date' | 'subject' | 'duration'>('date');
   const [filterSubject, setFilterSubject] = React.useState<string>('all');
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set());
+  const [expandedTopics, setExpandedTopics] = React.useState<Set<string>>(new Set());
+
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [exportingId, setExportingId] = React.useState<string | null>(null);
 
@@ -738,6 +740,15 @@ export function LessonsBankPage() {
     }
     setExpandedItems(newExpanded);
   };
+  const toggleTopicExpanded = (id: string) => {
+  const newExpanded = new Set(expandedTopics);
+  if (newExpanded.has(id)) {
+    newExpanded.delete(id);
+  } else {
+    newExpanded.add(id);
+  }
+  setExpandedTopics(newExpanded);
+};
 
   // Filtrage et tri
   const filteredLessons = React.useMemo(() => {
@@ -761,17 +772,18 @@ export function LessonsBankPage() {
 
     // Tri
     filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'date':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'subject':
-          return a.subject.localeCompare(b.subject);
-        case 'duration':
-          return b.duration - a.duration;
-        default:
-          return 0;
-      }
-    });
+  switch (sortBy) {
+    case 'date':
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    case 'subject':
+      return a.subject.localeCompare(b.subject);
+    case 'duration':
+      return b.duration - a.duration;
+    default:
+      return 0;
+  }
+});
+
 
     return filtered;
   }, [lessons, search, filterSubject, sortBy]);
@@ -977,15 +989,32 @@ export function LessonsBankPage() {
                 </div>
 
                 {/* Titre et date */}
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white flex-1 mr-4">
-                    {lesson.topic}
-                  </h2>
-                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {formatDate(lesson.created_at)}
-                  </div>
-                </div>
+<div className="mb-4">
+  <div className="flex justify-between items-start mb-1">
+    <h2 
+      className={`text-xl font-bold text-gray-900 dark:text-white flex-1 mr-4 ${
+        !expandedTopics.has(lesson.id) ? 'line-clamp-3' : ''
+      }`}
+    >
+      {lesson.topic}
+    </h2>
+    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 shrink-0">
+      <Calendar className="w-3 h-3 mr-1" />
+      {lesson.created_at && formatDate(lesson.created_at)}
+
+    </div>
+  </div>
+  {lesson.topic.length > 100 && (
+    <button
+      onClick={() => toggleTopicExpanded(lesson.id)}
+      className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 font-medium flex items-center mt-1"
+    >
+      <Eye className="w-3 h-3 mr-1" />
+      {expandedTopics.has(lesson.id) ? 'Réduire le thème' : 'Voir le thème complet'}
+    </button>
+  )}
+</div>
+
 
                 {/* Contenu avec support tableaux */}
                 <div className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden mb-4">

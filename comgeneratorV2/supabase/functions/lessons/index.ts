@@ -1,12 +1,12 @@
 // supabase/functions/lessons/index.ts
-// VERSION AVEC CHOIX DE MODÈLE IA (GPT-4.1-mini par défaut, GPT-5 mini, Mistral Medium)
+// VERSION CORRIGÉE : SOLUTION FINALE (Nettoyage robuste + Prompt strict Mistral)
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
 // =====================================================
 
 function resolveAIConfig(aiModel, openaiKey, mistralKey) {
-  // Modèle par défaut : gpt-4.1-mini (comportement actuel inchangé)
+  // Modèle par défaut : gpt-4.1-mini
   if (!aiModel || aiModel === 'default') {
     return {
       endpoint: 'https://api.openai.com/v1/chat/completions',
@@ -18,11 +18,11 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       tokenParamName: 'max_tokens',
       supportsTemperature: true,
       isResponsesAPI: false,
-      isDefault: true // ✅ Flag pour identifier le modèle par défaut
+      isDefault: true
     };
   }
 
-  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  // GPT-5 mini (OpenAI)
   if (aiModel === 'gpt-5-mini') {
     return {
       endpoint: 'https://api.openai.com/v1/responses',
@@ -57,7 +57,7 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
     };
   }
 
-  // Fallback : modèle par défaut si choix non reconnu
+  // Fallback
   console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
   return {
     endpoint: 'https://api.openai.com/v1/chat/completions',
@@ -74,24 +74,55 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 }
 
 /**
- * Nettoie le texte de sortie
- * - Supprime les méta-commentaires de Mistral
+ * Nettoie et reformate le texte de sortie (Spécifique Mistral)
+ * - Supprime les en-têtes techniques (# Chat context)
+ * - Répare le Markdown cassé (sauts de ligne manquants)
+ * - Supprime les commentaires de fin
  */
-function cleanOutputText(text) {
+function cleanOutputText(text: string, isMistral: boolean): string {
   if (!text) return text;
+  if (!isMistral) return text.trim(); // Nettoyage uniquement pour Mistral
+
+  let cleaned = text;
+
+  // 1. Supprimer TOUTES les sections techniques avant le vrai contenu
+  // On cherche le marqueur de début du contenu pédagogique
+  const startMarker = "# 📚"; 
+  const startIndex = cleaned.indexOf(startMarker);
+
+  if (startIndex !== -1) {
+    // On garde uniquement à partir du premier "# 📚"
+    cleaned = cleaned.slice(startIndex);
+  } else {
+    // Si pas de "# 📚", on supprime toutes les lignes commençant par "# " (sections techniques)
+    cleaned = cleaned.replace(/^# .*\n+/gm, '');
+  }
+
+  // 2. Supprimer les méta-commentaires de fin (spécifique à Mistral)
+  const metaKeywords = "(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?|Explications?|Note de l'IA|Chat context|PERSONALIZATION INSTRUCTIONS)";
   
-  let cleaned = text.trim();
+  // Cas avec séparateur
+  cleaned = cleaned.replace(new RegExp(`\\n---\\s*\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
+  // Cas sans séparateur
+  cleaned = cleaned.replace(new RegExp(`\\n\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
+
+  // 3. Corriger les problèmes de mise en page (sauts de ligne, listes, tableaux)
   
-  // Supprimer les sections de méta-commentaires de Mistral
-  cleaned = cleaned.replace(/\n---\s*\n[\s\S]*?(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?)[\s\S]*$/gi, '');
-  cleaned = cleaned.replace(/\n\n(?:Notes? d'adaptation|Remarques? contextuelles?|Notes? de rédaction|Analyse du message)[\s\S]*$/gi, '');
-  
-  // Supprimer les lignes vides multiples
-  cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
-  
-  cleaned = cleaned.trim();
-  
-  return cleaned;
+  // Cas A : Ajouter des sauts de ligne avant les titres ## ou ### collés au texte précédent
+  // Capture un caractère non-saut de ligne suivi de ## ou ###
+  cleaned = cleaned.replace(/([^\n])\s*(#{2,3})/g, '$1\n\n$2');
+
+  // Cas B : Corriger les listes mal formatées (collées au texte)
+  cleaned = cleaned.replace(/([^\n])\s+-\s/g, '$1\n- ');
+
+  // Cas C : Séparer les tableaux des paragraphes suivants
+  // Capture la fin d'un tableau (|\n) suivie immédiatement d'un caractère non-espace
+  cleaned = cleaned.replace(/(\|\n)(\S)/g, '$1\n$2');
+
+  // 4. Nettoyer les lignes vides excessives
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
 }
 
 // =====================================================
@@ -204,9 +235,15 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
     const isEPS = data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') || data.subject.toLowerCase().includes('éducation physique');
 
-    // Instruction anti-méta-commentaires pour Mistral uniquement
-    const noMetaInstruction = aiConfig.model === 'mistral-medium-latest' 
-      ? `\n\n⚠️ IMPORTANT : Génère UNIQUEMENT la fiche de séance. N'ajoute AUCUNE note, remarque ou commentaire sur ta propre rédaction à la fin.`
+    // Instruction renforcée pour Mistral
+    const noMetaInstruction = aiConfig.model === 'mistral-medium-latest'
+      ? `\n\n⚠️ INSTRUCTIONS STRICTES POUR LA SORTIE :
+    1. **Ne génère AUCUNE section technique** comme "# Chat context", "# PERSONALIZATION INSTRUCTIONS", ou similaire.
+    2. **Commence directement par le titre de la séance** (ex: "# 📚 [Titre...]").
+    3. **Ne termine pas par des notes ou remarques**.
+    4. **Utilise UNIQUEMENT du Markdown standard** (pas de HTML, pas de balises custom).
+    5. **Respecte EXACTEMENT la structure demandée** sans ajout ni modification.
+    6. **Ne génère AUCUN contenu en dehors de la structure Markdown fournie**.`
       : '';
 
     const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
@@ -729,11 +766,10 @@ ${noMetaInstruction}
 
 Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
-    // ✅ CORRECTION CRITIQUE : Construction du body selon le modèle
+    // Construction du body
     let requestBody;
 
     if (aiConfig.isResponsesAPI) {
-      // API Responses (GPT-5 mini) - nécessite des paramètres spécifiques
       requestBody = {
         model: aiConfig.model,
         input: prompt,
@@ -746,16 +782,14 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
         }
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
-      // Mistral - avec max_tokens
       requestBody = {
         model: aiConfig.model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 5500
+        max_tokens: 10000
       };
     } else {
-      // ✅ MODÈLE PAR DÉFAUT (gpt-4.1-mini) : COMPORTEMENT ORIGINAL EXACT
-      // PAS de max_tokens - identique au code original !
+      // Modèle par défaut
       requestBody = {
         model: aiConfig.model,
         messages: [{ role: 'user', content: prompt }],
@@ -780,11 +814,9 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
     const aiData = await response.json();
 
-    // ✅ Extraire le contenu selon le type d'API
     let content = null;
 
     if (aiConfig.isResponsesAPI) {
-      // API Responses (GPT-5 mini)
       if (aiData?.output && Array.isArray(aiData.output)) {
         const messageItem = aiData.output.find(item => item.type === 'message');
         if (messageItem?.content && Array.isArray(messageItem.content)) {
@@ -798,7 +830,6 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
         content = aiData.output_text;
       }
     } else {
-      // API Chat Completions (comportement original)
       content = aiData.choices?.[0]?.message?.content;
     }
     
@@ -811,18 +842,20 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
       });
     }
 
-    
-
     console.log(`[lessons] Séance générée (${content.length} caractères) avec ${aiConfig.model}`);
 
+    // Détermination explicite du contexte Mistral pour le nettoyage
+    const isMistral = aiConfig.model === 'mistral-medium-latest';
+    const cleanedContent = cleanOutputText(content, isMistral);
+
     return new Response(JSON.stringify({
-      content,
+      content: cleanedContent,
       usage: aiData.usage
     }), {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
       }
     });
 
@@ -836,4 +869,5 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
 
