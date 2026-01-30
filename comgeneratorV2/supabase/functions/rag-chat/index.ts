@@ -1645,6 +1645,39 @@ async function chatHandler(req: Request): Promise<Response> {
     metrics.totalDurationMs = duration;
     
     console.log(`[rag-chat] Completed in ${duration}ms | Tokens: ${totalTokensUsed} | Sources: ${sources.length} | Discipline: ${disciplineDetection.discipline || 'none'} (${disciplineMode})`);
+      // ============================================
+    // LOGGING POUR DASHBOARD ADMIN
+    // ============================================
+    try {
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+      const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+        fetch(`${SUPABASE_URL}/rest/v1/edge_function_logs`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            function_name: 'rag-chat',
+            user_id: user.id,
+            metadata: { 
+              mode: effectiveMode,
+              sources_count: sources.length,
+              duration_ms: duration
+            },
+            tokens_used: totalTokensUsed,
+            success: true
+          })
+        }).catch(() => {});
+      }
+    } catch {}
+    // FIN LOGGING
+
+  
 
     return new Response(
       JSON.stringify({

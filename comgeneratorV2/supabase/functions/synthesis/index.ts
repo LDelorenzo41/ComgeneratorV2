@@ -295,6 +295,52 @@ const synthesisHandler = async (req) => {
 
     // Log de la longueur finale
     console.log(`[synthesis] Longueur finale: ${content.length}/${maxChars} caractères (modèle: ${aiConfig.model})`);
+        // ============================================
+    // LOGGING POUR DASHBOARD ADMIN (ajout non-bloquant)
+    // ============================================
+    try {
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      
+      if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+        // Récupérer user_id depuis le token d'auth si présent
+        let userId = null;
+        const authHeader = req.headers.get('Authorization');
+        if (authHeader) {
+          try {
+            const token = authHeader.replace('Bearer ', '');
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            userId = payload.sub;
+          } catch {}
+        }
+        
+        // Log non-bloquant
+        fetch(`${SUPABASE_URL}/rest/v1/edge_function_logs`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            function_name: 'synthesis',
+            user_id: userId,
+            metadata: { 
+              model: aiConfig.model,
+              output_length: content?.length || 0,
+              max_chars: maxChars,
+              tone,
+              output_type: outputType
+            },
+            tokens_used: aiData.usage?.total_tokens || 0,
+            success: true
+          })
+        }).catch(() => {}); // Ignorer les erreurs de logging
+      }
+    } catch {}
+    // FIN LOGGING
+
 
     return new Response(JSON.stringify({
       content,

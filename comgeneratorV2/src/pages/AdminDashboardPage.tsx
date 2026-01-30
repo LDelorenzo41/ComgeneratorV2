@@ -1,6 +1,6 @@
 // src/pages/AdminDashboardPage.tsx
-// Tableau de bord admin avec KPIs en temps réel
-// VERSION CORRIGÉE: Monétisation + Stockage + Usages
+// Dashboard Admin avec KPIs complets : Monétisation, Stockage, Edge Functions
+// VERSION CORRIGÉE - 2026-01-30
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -24,7 +24,10 @@ import {
   UserCheck,
   Sparkles,
   ShoppingCart,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Bot,
+  FileSearch
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { checkIsAdmin } from '../lib/ragApi';
@@ -102,6 +105,20 @@ interface DashboardData {
     limit_mb: number;
     percent_used: number;
   };
+  edge_functions: {
+    rag_chat: {
+      total: number;
+      today: number;
+      this_week: number;
+      this_month: number;
+    };
+    synthesis: {
+      total: number;
+      today: number;
+      this_week: number;
+      this_month: number;
+    };
+  };
 }
 
 // ============================================================================
@@ -112,7 +129,7 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
-  color: 'blue' | 'green' | 'purple' | 'yellow' | 'red' | 'indigo' | 'pink' | 'orange';
+  color: 'blue' | 'green' | 'purple' | 'yellow' | 'red' | 'indigo' | 'pink' | 'orange' | 'cyan';
   subtitle?: string;
   trend?: { today: number; week: number; month: number };
   badge?: { text: string; color: 'green' | 'yellow' | 'red' };
@@ -158,6 +175,11 @@ const colorClasses = {
     bg: 'bg-orange-100 dark:bg-orange-900/30',
     icon: 'text-orange-600 dark:text-orange-400',
     border: 'border-orange-200 dark:border-orange-800',
+  },
+  cyan: {
+    bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+    icon: 'text-cyan-600 dark:text-cyan-400',
+    border: 'border-cyan-200 dark:border-cyan-800',
   },
 };
 
@@ -265,7 +287,7 @@ function StorageBar({ usedMB, limitMB, percentUsed }: StorageBarProps) {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stockage Supabase</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Plan gratuit : 500 MB</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Plan gratuit : 500 MB (DB + Storage)</p>
           </div>
         </div>
         <div className={`flex items-center gap-2 ${getStatusColor()}`}>
@@ -310,8 +332,8 @@ function StorageBar({ usedMB, limitMB, percentUsed }: StorageBarProps) {
               : 'text-yellow-700 dark:text-yellow-300'
           }`}>
             {percentUsed >= 90 
-              ? '⚠️ Stockage critique ! Pensez à upgrader vers le plan Pro de Supabase.'
-              : '📊 Stockage utilisé à plus de 70%. Surveillez l\'évolution.'
+              ? 'Stockage critique ! Pensez a upgrader vers le plan Pro de Supabase.'
+              : 'Stockage utilise a plus de 70%. Surveillez evolution.'
             }
           </p>
         </div>
@@ -389,9 +411,9 @@ export function AdminDashboardPage() {
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Accès refusé</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Acces refuse</h2>
           <p className="text-gray-600 dark:text-gray-300">
-            Cette page est réservée aux administrateurs.
+            Cette page est reservee aux administrateurs.
           </p>
         </div>
       </div>
@@ -430,7 +452,7 @@ export function AdminDashboardPage() {
                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                Rafraîchir
+                Rafraichir
               </button>
             </div>
           </div>
@@ -456,6 +478,91 @@ export function AdminDashboardPage() {
               />
             )}
 
+            {/* ========== MONETISATION ========== */}
+            <Section 
+              title="Monetisation" 
+              icon={<CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />}
+              color="bg-green-100 dark:bg-green-900/30"
+            >
+              <StatCard
+                title="Revenus totaux"
+                value={`${data.monetization.total_revenue_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} EUR`}
+                icon={<Coins className="w-6 h-6" />}
+                color="green"
+                subtitle={`${data.monetization.total_transactions} transactions au total`}
+              />
+              <StatCard
+                title="Aujourd'hui"
+                value={`${data.monetization.revenue_today_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} EUR`}
+                icon={<ShoppingCart className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_today > 0 
+                  ? { text: `${data.monetization.transactions_today} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Cette semaine"
+                value={`${data.monetization.revenue_this_week_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} EUR`}
+                icon={<TrendingUp className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_this_week > 0 
+                  ? { text: `${data.monetization.transactions_this_week} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Ce mois"
+                value={`${data.monetization.revenue_this_month_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} EUR`}
+                icon={<Calendar className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_this_month > 0 
+                  ? { text: `${data.monetization.transactions_this_month} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Codes promo utilises"
+                value={data.monetization.promo_redemptions}
+                icon={<Gift className="w-6 h-6" />}
+                color="yellow"
+              />
+            </Section>
+
+            {/* ========== USAGE EDGE FUNCTIONS ========== */}
+            {data.edge_functions && (
+              <Section 
+                title="Usage des fonctionnalites IA" 
+                icon={<Zap className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />}
+                color="bg-cyan-100 dark:bg-cyan-900/30"
+              >
+                <StatCard
+                  title="RAG Chat"
+                  value={data.edge_functions.rag_chat.total}
+                  icon={<Bot className="w-6 h-6" />}
+                  color="cyan"
+                  subtitle="Interrogations du chatbot"
+                  trend={{
+                    today: data.edge_functions.rag_chat.today,
+                    week: data.edge_functions.rag_chat.this_week,
+                    month: data.edge_functions.rag_chat.this_month,
+                  }}
+                />
+                <StatCard
+                  title="Syntheses bulletin"
+                  value={data.edge_functions.synthesis.total}
+                  icon={<FileSearch className="w-6 h-6" />}
+                  color="cyan"
+                  subtitle="Creations de syntheses"
+                  trend={{
+                    today: data.edge_functions.synthesis.today,
+                    week: data.edge_functions.synthesis.this_week,
+                    month: data.edge_functions.synthesis.this_month,
+                  }}
+                />
+              </Section>
+            )}
+
             {/* ========== UTILISATEURS ========== */}
             <Section 
               title="Utilisateurs" 
@@ -478,75 +585,24 @@ export function AdminDashboardPage() {
                 value={data.active_users.today}
                 icon={<UserCheck className="w-6 h-6" />}
                 color="green"
-                subtitle={`${data.active_users.this_week} cette semaine • ${data.active_users.this_month} ce mois`}
+                subtitle={`${data.active_users.this_week} cette semaine - ${data.active_users.this_month} ce mois`}
               />
               <StatCard
-                title="Nouveaux cette année"
+                title="Nouveaux cette annee"
                 value={data.users.new_this_year}
                 icon={<Calendar className="w-6 h-6" />}
                 color="purple"
               />
             </Section>
 
-            {/* ========== MONÉTISATION (CORRIGÉE) ========== */}
-            <Section 
-              title="Monétisation" 
-              icon={<CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />}
-              color="bg-green-100 dark:bg-green-900/30"
-            >
-              <StatCard
-                title="Revenus totaux"
-                value={`${data.monetization.total_revenue_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<Coins className="w-6 h-6" />}
-                color="green"
-                subtitle={`${data.monetization.total_transactions} transactions au total`}
-              />
-              <StatCard
-                title="Aujourd'hui"
-                value={`${data.monetization.revenue_today_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<ShoppingCart className="w-6 h-6" />}
-                color="green"
-                badge={data.monetization.transactions_today > 0 
-                  ? { text: `${data.monetization.transactions_today} achat(s)`, color: 'green' } 
-                  : undefined
-                }
-              />
-              <StatCard
-                title="Cette semaine"
-                value={`${data.monetization.revenue_this_week_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<TrendingUp className="w-6 h-6" />}
-                color="green"
-                badge={data.monetization.transactions_this_week > 0 
-                  ? { text: `${data.monetization.transactions_this_week} achat(s)`, color: 'green' } 
-                  : undefined
-                }
-              />
-              <StatCard
-                title="Ce mois"
-                value={`${data.monetization.revenue_this_month_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<Calendar className="w-6 h-6" />}
-                color="green"
-                badge={data.monetization.transactions_this_month > 0 
-                  ? { text: `${data.monetization.transactions_this_month} achat(s)`, color: 'green' } 
-                  : undefined
-                }
-              />
-              <StatCard
-                title="Codes promo utilisés"
-                value={data.monetization.promo_redemptions}
-                icon={<Gift className="w-6 h-6" />}
-                color="yellow"
-              />
-            </Section>
-
             {/* ========== CONTENU ========== */}
             <Section 
-              title="Contenu généré" 
+              title="Contenu genere" 
               icon={<FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
               color="bg-indigo-100 dark:bg-indigo-900/30"
             >
               <StatCard
-                title="Appréciations"
+                title="Appreciations"
                 value={data.content.appreciations.total}
                 icon={<MessageSquare className="w-6 h-6" />}
                 color="indigo"
@@ -557,7 +613,7 @@ export function AdminDashboardPage() {
                 }}
               />
               <StatCard
-                title="Séances pédagogiques"
+                title="Seances pedagogiques"
                 value={data.content.lessons.total}
                 icon={<BookOpen className="w-6 h-6" />}
                 color="purple"
@@ -568,7 +624,7 @@ export function AdminDashboardPage() {
                 }}
               />
               <StatCard
-                title="Scénarios"
+                title="Scenarios"
                 value={data.content.scenarios_bank.total}
                 icon={<Sparkles className="w-6 h-6" />}
                 color="pink"
@@ -583,7 +639,7 @@ export function AdminDashboardPage() {
                 value={data.content.lessons_bank}
                 icon={<Database className="w-6 h-6" />}
                 color="blue"
-                subtitle="Séances sauvegardées"
+                subtitle="Seances sauvegardees"
               />
             </Section>
 
@@ -594,21 +650,21 @@ export function AdminDashboardPage() {
               color="bg-purple-100 dark:bg-purple-900/30"
             >
               <StatCard
-                title="Avec appréciations"
+                title="Avec appreciations"
                 value={data.engagement.users_with_appreciations}
                 icon={<MessageSquare className="w-6 h-6" />}
                 color="purple"
                 subtitle="utilisateurs"
               />
               <StatCard
-                title="Avec séances"
+                title="Avec seances"
                 value={data.engagement.users_with_lessons}
                 icon={<BookOpen className="w-6 h-6" />}
                 color="indigo"
                 subtitle="utilisateurs"
               />
               <StatCard
-                title="Avec scénarios"
+                title="Avec scenarios"
                 value={data.engagement.users_with_scenarios}
                 icon={<Sparkles className="w-6 h-6" />}
                 color="pink"
@@ -631,7 +687,7 @@ export function AdminDashboardPage() {
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <p className="text-sm text-gray-500 dark:text-gray-400">Documents</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{data.rag.total_documents}</p>
-                    <p className="text-xs text-green-600 dark:text-green-400">{data.rag.ready_documents} prêts</p>
+                    <p className="text-xs text-green-600 dark:text-green-400">{data.rag.ready_documents} prets</p>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                     <p className="text-sm text-gray-500 dark:text-gray-400">Chunks</p>
@@ -641,7 +697,7 @@ export function AdminDashboardPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Tokens totaux</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{data.rag.total_tokens.toLocaleString()}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      ≈ {(data.rag.total_tokens * 4 / 1024 / 1024).toFixed(2)} MB estimés
+                      ~ {(data.rag.total_tokens * 4 / 1024 / 1024).toFixed(2)} MB estimes
                     </p>
                   </div>
                 </div>
@@ -657,7 +713,7 @@ export function AdminDashboardPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Abonnés</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Abonnes</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">{data.newsletter.subscribers}</p>
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -665,12 +721,12 @@ export function AdminDashboardPage() {
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{data.newsletter.total_sent}</p>
                   </div>
                   <div className="col-span-2 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Échecs d'envoi</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Echecs d'envoi</p>
                     <p className={`text-2xl font-bold ${data.newsletter.failures > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                       {data.newsletter.failures}
                     </p>
                     {data.newsletter.failures > 0 && (
-                      <p className="text-xs text-red-500 dark:text-red-400">À investiguer</p>
+                      <p className="text-xs text-red-500 dark:text-red-400">A investiguer</p>
                     )}
                   </div>
                 </div>
@@ -682,10 +738,11 @@ export function AdminDashboardPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Données calculées en temps réel • Dernière mise à jour : {lastUpdated?.toLocaleString('fr-FR')}
+          Donnees calculees en temps reel - Derniere mise a jour : {lastUpdated?.toLocaleString('fr-FR')}
         </div>
       </div>
     </div>
   );
 }
+
 
