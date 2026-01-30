@@ -1,5 +1,6 @@
 // src/pages/AdminDashboardPage.tsx
 // Tableau de bord admin avec KPIs en temps réel
+// VERSION CORRIGÉE: Monétisation + Stockage + Usages
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -21,7 +22,9 @@ import {
   HardDrive,
   Clock,
   UserCheck,
-  Sparkles
+  Sparkles,
+  ShoppingCart,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { checkIsAdmin } from '../lib/ragApi';
@@ -71,6 +74,9 @@ interface DashboardData {
     revenue_today_eur: number;
     revenue_this_week_eur: number;
     revenue_this_month_eur: number;
+    transactions_today: number;
+    transactions_this_week: number;
+    transactions_this_month: number;
     promo_redemptions: number;
   };
   engagement: {
@@ -89,6 +95,13 @@ interface DashboardData {
     failures: number;
     total_sent: number;
   };
+  storage: {
+    used_bytes: number;
+    limit_bytes: number;
+    used_mb: number;
+    limit_mb: number;
+    percent_used: number;
+  };
 }
 
 // ============================================================================
@@ -99,9 +112,10 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: React.ReactNode;
-  color: 'blue' | 'green' | 'purple' | 'yellow' | 'red' | 'indigo' | 'pink';
+  color: 'blue' | 'green' | 'purple' | 'yellow' | 'red' | 'indigo' | 'pink' | 'orange';
   subtitle?: string;
   trend?: { today: number; week: number; month: number };
+  badge?: { text: string; color: 'green' | 'yellow' | 'red' };
 }
 
 const colorClasses = {
@@ -140,16 +154,32 @@ const colorClasses = {
     icon: 'text-pink-600 dark:text-pink-400',
     border: 'border-pink-200 dark:border-pink-800',
   },
+  orange: {
+    bg: 'bg-orange-100 dark:bg-orange-900/30',
+    icon: 'text-orange-600 dark:text-orange-400',
+    border: 'border-orange-200 dark:border-orange-800',
+  },
 };
 
-function StatCard({ title, value, icon, color, subtitle, trend }: StatCardProps) {
+function StatCard({ title, value, icon, color, subtitle, trend, badge }: StatCardProps) {
   const colors = colorClasses[color];
   
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border ${colors.border} p-5`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+            {badge && (
+              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                badge.color === 'green' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
+                badge.color === 'yellow' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300' :
+                'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+              }`}>
+                {badge.text}
+              </span>
+            )}
+          </div>
           <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
             {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
           </p>
@@ -200,6 +230,96 @@ function Section({ title, icon, children, color }: SectionProps) {
   );
 }
 
+// Composant barre de progression pour le stockage
+interface StorageBarProps {
+  usedMB: number;
+  limitMB: number;
+  percentUsed: number;
+}
+
+function StorageBar({ usedMB, limitMB, percentUsed }: StorageBarProps) {
+  const getBarColor = () => {
+    if (percentUsed >= 90) return 'bg-red-500';
+    if (percentUsed >= 70) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  const getStatusColor = () => {
+    if (percentUsed >= 90) return 'text-red-600 dark:text-red-400';
+    if (percentUsed >= 70) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-green-600 dark:text-green-400';
+  };
+
+  const getStatusText = () => {
+    if (percentUsed >= 90) return 'Critique';
+    if (percentUsed >= 70) return 'Attention';
+    return 'OK';
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+            <HardDrive className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stockage Supabase</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Plan gratuit : 500 MB</p>
+          </div>
+        </div>
+        <div className={`flex items-center gap-2 ${getStatusColor()}`}>
+          {percentUsed >= 70 && <AlertCircle className="w-4 h-4" />}
+          <span className="font-semibold">{getStatusText()}</span>
+        </div>
+      </div>
+      
+      {/* Barre de progression */}
+      <div className="relative h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
+        <div 
+          className={`absolute left-0 top-0 h-full transition-all duration-500 ${getBarColor()}`}
+          style={{ width: `${Math.min(percentUsed, 100)}%` }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-bold text-white drop-shadow-md">
+            {percentUsed.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+      
+      {/* Détails */}
+      <div className="flex justify-between text-sm">
+        <span className="text-gray-600 dark:text-gray-400">
+          Utilisé: <span className="font-semibold text-gray-900 dark:text-white">{usedMB.toFixed(2)} MB</span>
+        </span>
+        <span className="text-gray-600 dark:text-gray-400">
+          Limite: <span className="font-semibold text-gray-900 dark:text-white">{limitMB} MB</span>
+        </span>
+      </div>
+      
+      {/* Recommandation si proche de la limite */}
+      {percentUsed >= 70 && (
+        <div className={`mt-4 p-3 rounded-lg ${
+          percentUsed >= 90 
+            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' 
+            : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+        }`}>
+          <p className={`text-sm ${
+            percentUsed >= 90 
+              ? 'text-red-700 dark:text-red-300' 
+              : 'text-yellow-700 dark:text-yellow-300'
+          }`}>
+            {percentUsed >= 90 
+              ? '⚠️ Stockage critique ! Pensez à upgrader vers le plan Pro de Supabase.'
+              : '📊 Stockage utilisé à plus de 70%. Surveillez l\'évolution.'
+            }
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
@@ -225,7 +345,7 @@ export function AdminDashboardPage() {
     checkAdminStatus();
   }, []);
 
-    // Récupérer les données du dashboard
+  // Récupérer les données du dashboard
   const fetchDashboardData = async () => {
     try {
       setError(null);
@@ -233,7 +353,6 @@ export function AdminDashboardPage() {
       
       if (rpcError) throw rpcError;
       
-      // Cast sécurisé via unknown
       if (result && typeof result === 'object' && !Array.isArray(result)) {
         setData(result as unknown as DashboardData);
         setLastUpdated(new Date());
@@ -245,7 +364,6 @@ export function AdminDashboardPage() {
       setError(err.message || 'Erreur lors du chargement des données');
     }
   };
-
 
   // Rafraîchir les données
   const handleRefresh = async () => {
@@ -329,6 +447,15 @@ export function AdminDashboardPage() {
         {data && (
           <div className="space-y-8">
             
+            {/* ========== STOCKAGE SUPABASE ========== */}
+            {data.storage && (
+              <StorageBar 
+                usedMB={data.storage.used_mb}
+                limitMB={data.storage.limit_mb}
+                percentUsed={data.storage.percent_used}
+              />
+            )}
+
             {/* ========== UTILISATEURS ========== */}
             <Section 
               title="Utilisateurs" 
@@ -358,6 +485,57 @@ export function AdminDashboardPage() {
                 value={data.users.new_this_year}
                 icon={<Calendar className="w-6 h-6" />}
                 color="purple"
+              />
+            </Section>
+
+            {/* ========== MONÉTISATION (CORRIGÉE) ========== */}
+            <Section 
+              title="Monétisation" 
+              icon={<CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />}
+              color="bg-green-100 dark:bg-green-900/30"
+            >
+              <StatCard
+                title="Revenus totaux"
+                value={`${data.monetization.total_revenue_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
+                icon={<Coins className="w-6 h-6" />}
+                color="green"
+                subtitle={`${data.monetization.total_transactions} transactions au total`}
+              />
+              <StatCard
+                title="Aujourd'hui"
+                value={`${data.monetization.revenue_today_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
+                icon={<ShoppingCart className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_today > 0 
+                  ? { text: `${data.monetization.transactions_today} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Cette semaine"
+                value={`${data.monetization.revenue_this_week_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
+                icon={<TrendingUp className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_this_week > 0 
+                  ? { text: `${data.monetization.transactions_this_week} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Ce mois"
+                value={`${data.monetization.revenue_this_month_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
+                icon={<Calendar className="w-6 h-6" />}
+                color="green"
+                badge={data.monetization.transactions_this_month > 0 
+                  ? { text: `${data.monetization.transactions_this_month} achat(s)`, color: 'green' } 
+                  : undefined
+                }
+              />
+              <StatCard
+                title="Codes promo utilisés"
+                value={data.monetization.promo_redemptions}
+                icon={<Gift className="w-6 h-6" />}
+                color="yellow"
               />
             </Section>
 
@@ -409,40 +587,6 @@ export function AdminDashboardPage() {
               />
             </Section>
 
-            {/* ========== MONÉTISATION ========== */}
-            <Section 
-              title="Monétisation" 
-              icon={<CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />}
-              color="bg-green-100 dark:bg-green-900/30"
-            >
-              <StatCard
-                title="Revenus totaux"
-                value={`${data.monetization.total_revenue_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<Coins className="w-6 h-6" />}
-                color="green"
-                subtitle={`${data.monetization.total_transactions} transactions`}
-              />
-              <StatCard
-                title="Revenus aujourd'hui"
-                value={`${data.monetization.revenue_today_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<TrendingUp className="w-6 h-6" />}
-                color="green"
-              />
-              <StatCard
-                title="Revenus ce mois"
-                value={`${data.monetization.revenue_this_month_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €`}
-                icon={<Calendar className="w-6 h-6" />}
-                color="green"
-                subtitle={`${data.monetization.revenue_this_week_eur.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € cette semaine`}
-              />
-              <StatCard
-                title="Codes promo utilisés"
-                value={data.monetization.promo_redemptions}
-                icon={<Gift className="w-6 h-6" />}
-                color="yellow"
-              />
-            </Section>
-
             {/* ========== ENGAGEMENT ========== */}
             <Section 
               title="Engagement" 
@@ -479,9 +623,9 @@ export function AdminDashboardPage() {
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                    <HardDrive className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                    <Database className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stockage RAG</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">RAG Chatbot</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -538,9 +682,10 @@ export function AdminDashboardPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Données calculées en UTC • Rafraîchissement manuel
+          Données calculées en temps réel • Dernière mise à jour : {lastUpdated?.toLocaleString('fr-FR')}
         </div>
       </div>
     </div>
   );
 }
+
