@@ -75,51 +75,30 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 
 /**
  * Nettoie et reformate le texte de sortie (Spécifique Mistral)
- * - Supprime les en-têtes techniques (# Chat context)
- * - Répare le Markdown cassé (sauts de ligne manquants)
- * - Supprime les commentaires de fin
  */
 function cleanOutputText(text: string, isMistral: boolean): string {
   if (!text) return text;
-  if (!isMistral) return text.trim(); // Nettoyage uniquement pour Mistral
+  if (!isMistral) return text.trim();
 
   let cleaned = text;
 
-  // 1. Supprimer TOUTES les sections techniques avant le vrai contenu
-  // On cherche le marqueur de début du contenu pédagogique
   const startMarker = "# 📚"; 
   const startIndex = cleaned.indexOf(startMarker);
 
   if (startIndex !== -1) {
-    // On garde uniquement à partir du premier "# 📚"
     cleaned = cleaned.slice(startIndex);
   } else {
-    // Si pas de "# 📚", on supprime toutes les lignes commençant par "# " (sections techniques)
     cleaned = cleaned.replace(/^# .*\n+/gm, '');
   }
 
-  // 2. Supprimer les méta-commentaires de fin (spécifique à Mistral)
   const metaKeywords = "(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?|Explications?|Note de l'IA|Chat context|PERSONALIZATION INSTRUCTIONS)";
   
-  // Cas avec séparateur
   cleaned = cleaned.replace(new RegExp(`\\n---\\s*\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
-  // Cas sans séparateur
   cleaned = cleaned.replace(new RegExp(`\\n\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
 
-  // 3. Corriger les problèmes de mise en page (sauts de ligne, listes, tableaux)
-  
-  // Cas A : Ajouter des sauts de ligne avant les titres ## ou ### collés au texte précédent
-  // Capture un caractère non-saut de ligne suivi de ## ou ###
   cleaned = cleaned.replace(/([^\n])\s*(#{2,3})/g, '$1\n\n$2');
-
-  // Cas B : Corriger les listes mal formatées (collées au texte)
   cleaned = cleaned.replace(/([^\n])\s+-\s/g, '$1\n- ');
-
-  // Cas C : Séparer les tableaux des paragraphes suivants
-  // Capture la fin d'un tableau (|\n) suivie immédiatement d'un caractère non-espace
   cleaned = cleaned.replace(/(\|\n)(\S)/g, '$1\n$2');
-
-  // 4. Nettoyer les lignes vides excessives
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
   return cleaned.trim();
@@ -155,6 +134,47 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
       headers: corsHeaders 
     });
   }
+
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[lessons] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -869,5 +889,6 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
 
 

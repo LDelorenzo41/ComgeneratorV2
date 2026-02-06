@@ -1,9 +1,45 @@
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature'
 };
-Deno.serve(async (req)=>{
+
+// Vérification manuelle de la signature Stripe via Web Crypto API
+async function verifyStripeSignature(body: string, signature: string, secret: string): Promise<boolean> {
+  const parts = signature.split(',').reduce((acc: Record<string, string>, part: string) => {
+    const [key, value] = part.split('=');
+    acc[key] = value;
+    return acc;
+  }, {});
+
+  const timestamp = parts['t'];
+  const sig = parts['v1'];
+  if (!timestamp || !sig) return false;
+
+  // Vérifier que l'événement n'est pas trop vieux (5 minutes)
+  const now = Math.floor(Date.now() / 1000);
+  if (now - parseInt(timestamp) > 300) return false;
+
+  // Calculer le HMAC-SHA256
+  const payload = `${timestamp}.${body}`;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signatureBytes = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const computedSig = Array.from(new Uint8Array(signatureBytes))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return computedSig === sig;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders
@@ -25,9 +61,30 @@ Deno.serve(async (req)=>{
     const stripe = new Stripe(stripeKey, {
       apiVersion: '2023-10-16'
     });
-    // Récupération du body
+
+    // Vérification de la signature Stripe
+    const signature = req.headers.get('stripe-signature');
+    if (!signature) {
+      return new Response('Missing stripe-signature header', {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      throw new Error('STRIPE_WEBHOOK_SECRET not found');
+    }
     const body = await req.text();
-    console.log('📝 Body received:', body.substring(0, 200) + '...');
+    const isValid = await verifyStripeSignature(body, signature, webhookSecret);
+    if (!isValid) {
+      console.error('❌ Webhook signature verification failed');
+      return new Response('Webhook signature verification failed', {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+    console.log('✅ Signature verified');
+
     let event;
     try {
       event = JSON.parse(body);
@@ -57,8 +114,7 @@ Deno.serve(async (req)=>{
   } catch (error) {
     console.error('💥 Webhook error:', error);
     return new Response(JSON.stringify({
-      error: 'Webhook handler failed',
-      details: error.message
+      error: 'Webhook handler failed'
     }), {
       status: 500,
       headers: {
@@ -68,6 +124,7 @@ Deno.serve(async (req)=>{
     });
   }
 });
+
 async function handleCheckoutSessionCompleted(session) {
   console.log('🔄 Processing checkout session:', session.id);
   try {
@@ -77,7 +134,7 @@ async function handleCheckoutSessionCompleted(session) {
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
     }
-    // ✅ AJOUT : Vérifier si cette session a déjà été traitée
+    // Vérifier si cette session a déjà été traitée
     console.log('🔍 Checking if session already processed:', session.id);
     const transactionCheckResponse = await fetch(`${supabaseUrl}/rest/v1/transactions?stripe_session_id=eq.${session.id}&select=status,tokens_purchased`, {
       headers: {
@@ -91,7 +148,6 @@ async function handleCheckoutSessionCompleted(session) {
       const existingTransaction = existingTransactions[0];
       if (existingTransaction?.status === 'completed') {
         console.log('⚠️ Session already processed, skipping to avoid duplicate tokens');
-        console.log(`   Already added: ${existingTransaction.tokens_purchased} tokens`);
         return;
       }
     }
@@ -124,14 +180,11 @@ async function handleCheckoutSessionCompleted(session) {
       throw new Error(`Profile not found for user ${userId}`);
     }
     const newTokens = (currentProfile.tokens || 0) + tokens;
-    // ✅ CORRECTION MAJEURE : Logique has_bank_access corrigée
     let newBankAccess;
     if (bankAccess === true) {
-      // Plan AVEC banque → Activer l'accès
       newBankAccess = true;
       console.log('🏦 Plan avec banque → Activation accès banque');
     } else {
-      // Plan SANS banque → Désactiver l'accès (même si l'utilisateur l'avait avant)
       newBankAccess = false;
       console.log('🚫 Plan sans banque → Désactivation accès banque');
     }
@@ -154,9 +207,8 @@ async function handleCheckoutSessionCompleted(session) {
     if (!updateResponse.ok) {
       throw new Error(`Failed to update profile: ${updateResponse.status}`);
     }
-    // 3. ✅ CORRECTION : Créer la transaction avec vérification user_id
+    // 3. Créer la transaction
     try {
-      // Vérifier si l'user_id existe dans profiles (on a déjà currentProfile)
       if (currentProfile) {
         console.log('🆕 Creating new transaction record');
         const createResponse = await fetch(`${supabaseUrl}/rest/v1/transactions`, {
@@ -182,23 +234,16 @@ async function handleCheckoutSessionCompleted(session) {
         } else {
           const errorText = await createResponse.text();
           console.error('❌ Failed to create transaction:', errorText);
-          console.error(`   User ID used: ${userId}`);
-          console.error('   But tokens were added successfully to profile');
         }
-      } else {
-        console.error(`❌ User ${userId} not found in profiles table`);
       }
     } catch (error) {
       console.error('❌ Transaction save error:', error);
-      console.error('   But tokens were added successfully to profile');
     }
 
     console.log('✅ Payment processed successfully!');
     console.log(`   User: ${userId}`);
     console.log(`   Tokens added: ${tokens}`);
     console.log(`   New total: ${newTokens}`);
-    console.log(`   Bank access: ${currentProfile.has_bank_access} → ${newBankAccess}`);
-    console.log(`   Plan type: ${bankAccess ? 'AVEC banque' : 'SANS banque'}`);
   } catch (error) {
     console.error('💥 Error processing checkout session:', error);
     throw error;

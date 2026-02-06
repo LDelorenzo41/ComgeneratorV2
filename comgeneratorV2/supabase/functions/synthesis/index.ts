@@ -139,6 +139,47 @@ const synthesisHandler = async (req) => {
     });
   }
 
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[synthesis] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
+
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
@@ -305,11 +346,11 @@ const synthesisHandler = async (req) => {
       if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
         // Récupérer user_id depuis le token d'auth si présent
         let userId = null;
-        const authHeader = req.headers.get('Authorization');
-        if (authHeader) {
+        const authHeaderLog = req.headers.get('Authorization');
+        if (authHeaderLog) {
           try {
-            const token = authHeader.replace('Bearer ', '');
-            const payload = JSON.parse(atob(token.split('.')[1]));
+            const tokenLog = authHeaderLog.replace('Bearer ', '');
+            const payload = JSON.parse(atob(tokenLog.split('.')[1]));
             userId = payload.sub;
           } catch {}
         }

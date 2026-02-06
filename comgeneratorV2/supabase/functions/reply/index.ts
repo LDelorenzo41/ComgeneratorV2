@@ -70,12 +70,21 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 }
 
 /**
- * Nettoie le texte de sortie (supprime markdown résiduel)
+ * Nettoie le texte de sortie
+ * - Supprime le markdown résiduel
+ * - Supprime les méta-commentaires de Mistral (Notes d'adaptation, etc.)
  */
 function cleanOutputText(text) {
   if (!text) return text;
   
   let cleaned = text.trim();
+  
+  // ✅ Supprimer les sections de méta-commentaires de Mistral
+  // Ces sections commencent généralement par "---" suivi de "Notes", "Remarques", "Adaptation", etc.
+  cleaned = cleaned.replace(/\n---\s*\n[\s\S]*?(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?)[\s\S]*$/gi, '');
+  
+  // Supprimer aussi les variantes sans les tirets
+  cleaned = cleaned.replace(/\n\n(?:Notes? d'adaptation|Remarques? contextuelles?|Notes? de rédaction|Analyse du message)[\s\S]*$/gi, '');
   
   // Supprimer les balises markdown de mise en forme excessive
   cleaned = cleaned.replace(/\*\*/g, '');
@@ -122,6 +131,47 @@ const replyHandler = async (req: Request): Promise<Response> => {
     });
   }
 
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[reply] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
+
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
@@ -150,6 +200,11 @@ const replyHandler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`[reply] Modèle IA utilisé: ${aiConfig.model}`);
+
+    // ✅ Instruction anti-méta-commentaires pour Mistral
+    const noMetaInstruction = aiConfig.model === 'mistral-medium-latest' 
+      ? `\n\n⚠️ IMPORTANT : Rédige UNIQUEMENT la réponse finale. N'ajoute AUCUNE note, remarque, analyse ou commentaire sur ta propre rédaction. Pas de section "Notes d'adaptation" ou similaire.`
+      : '';
 
     const prompt = `Tu es un enseignant expérimenté qui rédige une réponse professionnelle et réfléchie à un message reçu.
 
@@ -215,6 +270,7 @@ ${signature ?
 - Si le message original contient des questions précises, réponds point par point
 - Si le message original mentionne un problème, propose des solutions concrètes
 - Si le message original demande un rendez-vous, donne des créneaux ou modalités
+${noMetaInstruction}
 
 Rédige maintenant cette réponse en respectant scrupuleusement ces instructions et en t'adaptant intelligemment au contexte du message reçu.`;
 
@@ -302,7 +358,7 @@ Rédige maintenant cette réponse en respectant scrupuleusement ces instructions
       });
     }
 
-    // Nettoyer le contenu
+    // ✅ Nettoyer le contenu (supprime les méta-commentaires Mistral)
     content = cleanOutputText(content);
 
     console.log(`[reply] Réponse générée (${content.length} caractères) avec ${aiConfig.model}`);

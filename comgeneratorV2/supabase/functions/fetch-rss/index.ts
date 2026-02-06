@@ -2,208 +2,344 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 import { parse } from 'https://deno.land/x/xml@2.1.3/mod.ts';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts';
 
-const RSS_FEEDS = [
-  {
-    url: 'https://www.cafepedagogique.net/feed/',
-    source: 'Café Pédagogique'
-  },
-  {
-    url: 'https://www.vousnousils.fr/feed',
-    source: 'VousNousIls'
-  },
-  {
-    url: 'https://edubase.eduscol.education.fr/rss/rss.xml?discipline[0]=Éducation%20Physique%20et%20Sportive',
-    source: 'Édubase EPS'
-  }
-];
-
-function cleanHtml(html: string): string {
+// Fonction utilitaire pour nettoyer HTML
+function cleanHtml(html) {
   if (!html) return '';
   try {
-    // Supprimer les balises CDATA si présentes
     html = html.replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1');
-    // Nettoyer le HTML basique
-    return html
-      .replace(/<[^>]*>/g, '') // Supprime les balises HTML
-      .replace(/&nbsp;/g, ' ') // Remplace les espaces insécables
-      .replace(/&amp;/g, '&') // Décode les entités HTML communes
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .trim();
-  } catch (error) {
-    console.error('Erreur lors du nettoyage HTML:', error);
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+  } catch  {
     return html;
   }
 }
 
-function parseDate(dateStr: string): string {
+// Fonction utilitaire pour parser la date
+function parseDate(dateStr) {
   if (!dateStr) return new Date().toISOString();
   try {
-    // Nettoyer la chaîne de date
-    const cleanDate = dateStr
-      .replace(/^[a-z]{3},\s*/i, '') // Enlève le jour de la semaine
-      .replace(/\s+\([^)]+\)/g, '') // Enlève les parenthèses
-      .replace(/\s+[a-z]{3}(\s+|$)/i, ' ') // Enlève les fuseaux horaires textuels
-      .trim();
-
+    const cleanDate = dateStr.replace(/^[a-z]{3},\s*/i, '').replace(/\s+\([^)]+\)/g, '').replace(/\s+[a-z]{3}(\s+|$)/i, ' ').trim();
     const date = new Date(cleanDate);
     return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
-  } catch {
+  } catch  {
     return new Date().toISOString();
   }
 }
 
-async function extractImageFromContent(content: string, link: string): Promise<string | null> {
+// Fonction pour extraire une image
+async function extractImageFromContent(content, link) {
   try {
     const doc = new DOMParser().parseFromString(content, 'text/html');
     if (!doc) return null;
-
-    // Chercher d'abord une image avec media:content
     const mediaContent = doc.querySelector('media\\:content, content');
     if (mediaContent?.getAttribute('url')) {
       return mediaContent.getAttribute('url');
     }
-
-    // Chercher ensuite une image dans le contenu
     const img = doc.querySelector('img');
     if (img?.getAttribute('src')) {
       const src = img.getAttribute('src');
-      // Convertir en URL absolue si nécessaire
       return src.startsWith('http') ? src : new URL(src, new URL(link).origin).href;
     }
-
-    // Si aucune image n'est trouvée, retourner null
     return null;
-  } catch (error) {
-    console.error('Erreur lors de l\'extraction de l\'image:', error);
+  } catch  {
     return null;
   }
 }
 
-async function fetchRSSFeed(feed: { url: string; source: string }) {
+// Fonction pour récupérer un flux RSS avec limite
+async function fetchRSSFeed(feed) {
   try {
     console.log(`Fetching feed from ${feed.url}`);
-    
     const response = await fetch(feed.url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; RSS-Reader/1.0)',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+        Accept: 'application/rss+xml, application/xml, text/xml, */*'
       }
     });
-
+    
     if (!response.ok) {
+      console.warn(`Feed ${feed.name} returned ${response.status}: ${response.statusText}`);
+      if (response.status === 404) {
+        console.warn(`Feed ${feed.name} not found (404), skipping...`);
+        return [];
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
+    
     const xmlText = await response.text();
-    console.log(`Received XML content from ${feed.source}`);
-
+    
+    if (!xmlText || xmlText.trim().length === 0) {
+      console.warn(`Feed ${feed.name} returned empty content`);
+      return [];
+    }
+    
     const parsed = parse(xmlText);
     const channel = parsed.rss?.channel;
+    
     if (!channel) {
-      throw new Error('Format RSS invalide: pas de canal trouvé');
+      console.warn(`Feed ${feed.name} has invalid RSS format`);
+      return [];
     }
-
+    
     const items = Array.isArray(channel.item) ? channel.item : [channel.item];
-    console.log(`Found ${items.length} items in ${feed.source} feed`);
-
-    // Code NOUVEAU avec feed_id
-const articles = await Promise.all(items.filter((item)=>item && typeof item === 'object').map(async (item)=>{
-  const title = Array.isArray(item.title) ? item.title[0] : item.title;
-  const description = Array.isArray(item.description) ? item.description[0] : item.description;
-  const link = Array.isArray(item.link) ? item.link[0] : item.link;
-  const pubDate = Array.isArray(item.pubDate) ? item.pubDate[0] : item.pubDate;
-  const content = Array.isArray(item['content:encoded']) ? item['content:encoded'][0] : item['content:encoded'];
-  const imageUrl = await extractImageFromContent(content || description || '', String(link || ''));
-  
-  return {
-    title: cleanHtml(String(title || '')),
-    description: cleanHtml(String(description || '')),
-    link: String(link || '').trim(),
-    source: feed.name,
-    feed_id: feed.id, // ← LIGNE AJOUTÉE
-    pub_date: parseDate(String(pubDate || '')),
-    image_url: imageUrl
-  };
-}));
-
-    const validArticles = articles.filter(article => article.title && article.link);
-    console.log(`Successfully parsed ${validArticles.length} articles from ${feed.source}`);
+    
+    if (!items || items.length === 0) {
+      console.warn(`Feed ${feed.name} has no items`);
+      return [];
+    }
+    
+    // 🎯 LIMITE : Seulement les 10 articles les plus récents par flux
+    const limitedItems = items
+      .filter((item) => item && typeof item === 'object')
+      .slice(0, 10);
+    
+    const articles = await Promise.all(limitedItems.map(async (item) => {
+      const title = Array.isArray(item.title) ? item.title[0] : item.title;
+      const description = Array.isArray(item.description) ? item.description[0] : item.description;
+      const link = Array.isArray(item.link) ? item.link[0] : item.link;
+      const pubDate = Array.isArray(item.pubDate) ? item.pubDate[0] : item.pubDate;
+      const content = Array.isArray(item['content:encoded']) ? item['content:encoded'][0] : item['content:encoded'];
+      const imageUrl = await extractImageFromContent(content || description || '', String(link || ''));
+      
+      return {
+        title: cleanHtml(String(title || '')),
+        description: cleanHtml(String(description || '')),
+        link: String(link || '').trim(),
+        source: feed.name,
+        feed_id: feed.id,
+        pub_date: parseDate(String(pubDate || '')),
+        image_url: imageUrl
+      };
+    }));
+    
+    const validArticles = articles.filter((a) => a.title && a.link);
+    console.log(`Feed ${feed.name}: ${validArticles.length} valid articles extracted (limited to 10)`);
     return validArticles;
-  } catch (error) {
-    console.error(`Error fetching ${feed.source}:`, error);
+    
+  } catch (err) {
+    console.error(`Error fetching ${feed.name} (${feed.url}):`, err.message);
     return [];
   }
 }
 
+// Headers CORS communs
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Handler principal avec CORS
 Deno.serve(async (req) => {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders
+    });
+  }
+
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[fetch-rss] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
+
   try {
-    // Vérifier que la table articles existe
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? '', 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    // Vérifier que la table existe
-    const { error: tableCheckError } = await supabaseClient
-      .from('articles')
-      .select('count')
-      .limit(1);
-
-    if (tableCheckError) {
-      throw new Error('La table articles n\'existe pas ou n\'est pas accessible');
+    
+    // 1️⃣ Charger SEULEMENT les flux actifs
+    console.log('Fetching active feeds...');
+    const { data: feeds, error: feedsError } = await supabaseClient
+      .from('rss_feeds')
+      .select('id, name, url')
+      .eq('is_active', true);
+      
+    if (feedsError) {
+      console.error('Error fetching feeds:', feedsError);
+      throw feedsError;
     }
-
-    const feedPromises = RSS_FEEDS.map(feed => fetchRSSFeed(feed));
-    const feedResults = await Promise.all(feedPromises);
-    const articles = feedResults.flat();
-
+    
+    if (!feeds || feeds.length === 0) {
+      console.log('No active feeds found');
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Aucun flux actif trouvé',
+        feeds_processed: 0,
+        articles_processed: 0
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+    
+    console.log(`Found ${feeds.length} active feeds`);
+    
+    // 2️⃣ Récupérer les articles (max 10 par flux)
+    const results = await Promise.all(feeds.map((f) => fetchRSSFeed(f)));
+    const articles = results.flat();
+    
+    console.log(`Collected ${articles.length} articles total`);
+    
     if (articles.length === 0) {
-      throw new Error('Aucun article n\'a pu être récupéré');
+      console.log('No articles collected from active feeds');
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Aucun article récupéré',
+        feeds_processed: feeds.length,
+        articles_processed: 0
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
     }
-
-    console.log(`Total articles retrieved: ${articles.length}`);
-
-    // Supprimer les anciens articles
-    const { error: deleteError } = await supabaseClient
+    
+    // 3️⃣ UPSERT : Insérer/Mettre à jour les articles (évite les doublons)
+    console.log('Upserting articles...');
+    const { error: upsertError } = await supabaseClient
+      .from('articles')
+      .upsert(articles, { 
+        onConflict: 'link,feed_id',
+        ignoreDuplicates: false 
+      });
+      
+    if (upsertError) {
+      console.error('Error upserting articles:', upsertError);
+      throw upsertError;
+    }
+    
+    // 4️⃣ Nettoyage automatique : Supprimer les articles de plus de 30 jours
+    console.log('Cleaning articles older than 30 days...');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const { error: cleanupError } = await supabaseClient
       .from('articles')
       .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
-
-    if (deleteError) {
-      throw deleteError;
+      .lt('pub_date', thirtyDaysAgo.toISOString());
+    
+    if (cleanupError) {
+      console.warn('Error cleaning old articles:', cleanupError);
+    } else {
+      console.log('Old articles cleaned successfully');
     }
-
-    // Insérer les nouveaux articles
-    const { error: insertError } = await supabaseClient
+    
+    // 5️⃣ Limiter le nombre total d'articles (sécurité)
+    console.log('Checking total article count...');
+    const { count } = await supabaseClient
       .from('articles')
-      .insert(articles);
-
-    if (insertError) {
-      throw insertError;
+      .select('*', { count: 'exact', head: true });
+    
+    console.log(`Total articles in database: ${count}`);
+    
+    if (count && count > 500) {
+      console.log('Limiting to 500 most recent articles...');
+      
+      // Récupérer les IDs des 500 articles les plus récents
+      const { data: articlesToKeep } = await supabaseClient
+        .from('articles')
+        .select('id')
+        .order('pub_date', { ascending: false })
+        .limit(500);
+      
+      if (articlesToKeep && articlesToKeep.length === 500) {
+        const idsToKeep = articlesToKeep.map(a => a.id);
+        
+        const { error: limitError } = await supabaseClient
+          .from('articles')
+          .delete()
+          .not('id', 'in', `(${idsToKeep.map(id => `'${id}'`).join(',')})`);
+          
+        if (limitError) {
+          console.warn('Error limiting articles:', limitError);
+        } else {
+          console.log('Articles successfully limited to 500 most recent');
+        }
+      }
     }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: `${articles.length} articles mis à jour avec succès (${RSS_FEEDS.length} sources)`
-      }),
-      {
-        headers: { 'Content-Type': 'application/json' }
+    
+    // 6️⃣ Statistiques finales
+    const { count: finalCount } = await supabaseClient
+      .from('articles')
+      .select('*', { count: 'exact', head: true });
+    
+    console.log('RSS update completed successfully');
+    
+    return new Response(JSON.stringify({
+      success: true,
+      message: `Flux RSS mis à jour avec succès`,
+      feeds_processed: feeds.length,
+      articles_processed: articles.length,
+      total_articles_in_db: finalCount || 0,
+      optimizations_applied: [
+        'Limite de 10 articles par flux',
+        'Suppression des articles > 30 jours',
+        'Limitation totale à 500 articles max',
+        'Prévention des doublons via UPSERT'
+      ]
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders
       }
-    );
-  } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
+    });
+    
+  } catch (err) {
+    console.error('Error:', err);
+    return new Response(JSON.stringify({
+      success: false,
+      error: err.message,
+      details: err.toString()
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders
       }
-    );
+    });
   }
 });
