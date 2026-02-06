@@ -20,24 +20,65 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: corsHeaders
     });
   }
+
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[synthesis] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!OPENAI_API_KEY) {
-      return new Response('Missing OPENAI_API_KEY', { 
-        status: 500, 
-        headers: corsHeaders 
+      return new Response('Missing OPENAI_API_KEY', {
+        status: 500,
+        headers: corsHeaders
       });
     }
 
-    const { 
-      extractedText, 
+    const {
+      extractedText,
       maxChars,
       tone = 'neutre',
       outputType = 'complet'
@@ -56,7 +97,7 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
     const toneInstructions = getToneInstructions(tone);
 
     // ✅ CHOIX DU PROMPT SELON LE TYPE
-    const prompt = outputType === 'essentiel' 
+    const prompt = outputType === 'essentiel'
       ? buildEssentialPrompt(extractedText, maxChars, toneInstructions)
       : buildCompletePrompt(extractedText, maxChars, toneInstructions);
 
@@ -89,7 +130,7 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
 
     const openAIData = await openAIResponse.json();
     const content = openAIData.choices?.[0]?.message?.content;
-    
+
     if (!content) {
       return new Response(JSON.stringify({
         error: 'Réponse invalide de l\'API OpenAI'
@@ -112,9 +153,9 @@ const synthesisHandler = async (req: Request): Promise<Response> => {
 
   } catch (error) {
     console.error('Synthesis function error:', error);
-    return new Response('Internal server error', { 
-      status: 500, 
-      headers: corsHeaders 
+    return new Response('Internal server error', {
+      status: 500,
+      headers: corsHeaders
     });
   }
 };
@@ -223,17 +264,17 @@ ${extractedText}
 **INSTRUCTIONS D'ANALYSE CRITIQUE :**
 
 1. **Identification de la tendance GLOBALE dominante :**
-   
+
    ⚠️ **ATTENTION PRIORITAIRE :** Évalue d'abord la VISION D'ENSEMBLE :
    - Combien de matières/commentaires sont POSITIFS vs NÉGATIFS ?
    - Quelle est la TONALITÉ GÉNÉRALE du bulletin ?
    - Y a-t-il des mentions explicites (félicitations, encouragements, mises en garde) ?
-   
+
    **Hiérarchie d'importance :**
    1. **Si > 70% des commentaires sont positifs** → La tendance dominante est LA RÉUSSITE GLOBALE
    2. **Si > 70% des commentaires sont négatifs** → La tendance dominante est LES DIFFICULTÉS GÉNÉRALISÉES
    3. **Si équilibré (40-60%)** → Identifier LE POINT TRANSVERSAL le plus significatif
-   
+
    ⚠️ **NE PAS se focaliser sur 2-3 points mineurs négatifs si l'ensemble est excellent**
    ⚠️ **NE PAS se focaliser sur 2-3 points mineurs positifs si l'ensemble est faible**
 
