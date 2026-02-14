@@ -1,8 +1,9 @@
 // src/pages/SettingsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2 } from 'lucide-react';
+import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2, Cpu } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
+import { AIModelChoice, AI_MODEL_OPTIONS, getAIModelChoice, setAIModelChoice } from '../lib/aiModelConfig';
 
 export function SettingsPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -16,6 +17,10 @@ export function SettingsPage() {
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // États pour le choix du modèle IA
+  const [aiModelChoice, setAiModelChoiceState] = useState<AIModelChoice>("default");
+  const [aiModelMessage, setAiModelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Charger les préférences au montage
   useEffect(() => {
@@ -41,6 +46,9 @@ export function SettingsPage() {
     };
 
     loadPreferences();
+
+    // Charger le choix du modèle IA depuis localStorage
+    setAiModelChoiceState(getAIModelChoice());
   }, [user]);
 
   // Sauvegarder les préférences newsletter
@@ -78,6 +86,23 @@ export function SettingsPage() {
     } finally {
       setIsSavingPreferences(false);
     }
+  };
+
+  // Gérer le changement de modèle IA
+  const handleAIModelChange = (newChoice: AIModelChoice) => {
+    setAiModelChoiceState(newChoice);
+    setAIModelChoice(newChoice);
+    
+    const selectedOption = AI_MODEL_OPTIONS.find(opt => opt.value === newChoice);
+    setAiModelMessage({
+      type: 'success',
+      text: newChoice === 'default' 
+        ? 'Modèle standard activé.' 
+        : `${selectedOption?.label} activé pour les prochaines générations.`
+    });
+
+    // Effacer le message après 3 secondes
+    setTimeout(() => setAiModelMessage(null), 3000);
   };
 
   const handleDeleteAccount = async () => {
@@ -162,6 +187,82 @@ export function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {false && (
+          /* Choix du modèle IA - DÉSACTIVÉ */
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mr-4">
+                <Cpu className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Modèle IA</h3>
+                <p className="text-gray-600 dark:text-gray-300">Choisissez le modèle utilisé pour les générations</p>
+              </div>
+            </div>
+
+            {/* Message de feedback */}
+            {aiModelMessage && (
+              <div className={`mb-6 p-4 rounded-lg flex items-center ${
+                aiModelMessage.type === 'success' 
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+              }`}>
+                <span className={aiModelMessage.type === 'success' 
+                  ? 'text-green-800 dark:text-green-300' 
+                  : 'text-red-800 dark:text-red-300'
+                }>
+                  {aiModelMessage.text}
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {AI_MODEL_OPTIONS.map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    aiModelChoice === option.value
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="aiModel"
+                    value={option.value}
+                    checked={aiModelChoice === option.value}
+                    onChange={() => handleAIModelChange(option.value)}
+                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="ml-4 flex-1">
+                    <div className="flex items-center">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {option.label}
+                      </span>
+                      {option.value === 'default' && (
+                        <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 rounded-full">
+                          Recommandé
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {option.description}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                <strong>Note :</strong> Le modèle standard est optimisé pour ProfAssist. 
+                Les autres modèles sont proposés à titre expérimental et peuvent produire des résultats différents.
+              </p>
+            </div>
+          </div>
+          )}
+
 
           {/* Préférences de communication */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
@@ -398,3 +499,4 @@ export function SettingsPage() {
     </div>
   );
 }
+

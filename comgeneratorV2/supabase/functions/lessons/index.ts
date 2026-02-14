@@ -1,6 +1,112 @@
 // supabase/functions/lessons/index.ts
+// VERSION CORRIGÉE : SOLUTION FINALE (Nettoyage robuste + Prompt strict Mistral)
 
-// @ts-ignore - Deno global disponible en runtime
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
+
+function resolveAIConfig(aiModel, openaiKey, mistralKey) {
+  // Modèle par défaut : gpt-4.1-mini
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4.1-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false,
+      isDefault: true
+    };
+  }
+
+  // GPT-5 mini (OpenAI)
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true,
+      isDefault: false
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false,
+      isDefault: false
+    };
+  }
+
+  // Fallback
+  console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4.1-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false,
+    isDefault: true
+  };
+}
+
+/**
+ * Nettoie et reformate le texte de sortie (Spécifique Mistral)
+ */
+function cleanOutputText(text: string, isMistral: boolean): string {
+  if (!text) return text;
+  if (!isMistral) return text.trim();
+
+  let cleaned = text;
+
+  const startMarker = "# 📚"; 
+  const startIndex = cleaned.indexOf(startMarker);
+
+  if (startIndex !== -1) {
+    cleaned = cleaned.slice(startIndex);
+  } else {
+    cleaned = cleaned.replace(/^# .*\n+/gm, '');
+  }
+
+  const metaKeywords = "(?:Notes?|Remarques?|Adaptation|Contextuelle|Structure|Analyse|Commentaires?|Explications?|Note de l'IA|Chat context|PERSONALIZATION INSTRUCTIONS)";
+  
+  cleaned = cleaned.replace(new RegExp(`\\n---\\s*\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
+  cleaned = cleaned.replace(new RegExp(`\\n\\n\\s*${metaKeywords}[\\s\\S]*$`, 'gi'), '');
+
+  cleaned = cleaned.replace(/([^\n])\s*(#{2,3})/g, '$1\n\n$2');
+  cleaned = cleaned.replace(/([^\n])\s+-\s/g, '$1\n- ');
+  cleaned = cleaned.replace(/(\|\n)(\S)/g, '$1\n$2');
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+}
+
+// =====================================================
+// HANDLER PRINCIPAL
+// =====================================================
 
 interface LessonRequest {
   subject: string;
@@ -9,6 +115,7 @@ interface LessonRequest {
   pedagogy_type: string;
   duration: string;
   documentContext?: string;
+  aiModel?: string;
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -28,8 +135,50 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     });
   }
 
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[lessons] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
+
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
       return new Response('Missing OPENAI_API_KEY', { 
@@ -39,6 +188,21 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     }
 
     const data: LessonRequest = await req.json();
+
+    // Résoudre la configuration API
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(data.aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError) {
+      return new Response(JSON.stringify({
+        error: configError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    console.log(`[lessons] Modèle IA utilisé: ${aiConfig.model}`);
 
     const pedagogies = [
       {
@@ -90,6 +254,17 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
     const pedagogyDescription = pedagogies.find(p => p.value === data.pedagogy_type)?.description ?? data.pedagogy_type;
     const isEPS = data.subject.toLowerCase().includes('eps') || data.subject.toLowerCase().includes('sport') || data.subject.toLowerCase().includes('éducation physique');
+
+    // Instruction renforcée pour Mistral
+    const noMetaInstruction = aiConfig.model === 'mistral-medium-latest'
+      ? `\n\n⚠️ INSTRUCTIONS STRICTES POUR LA SORTIE :
+    1. **Ne génère AUCUNE section technique** comme "# Chat context", "# PERSONALIZATION INSTRUCTIONS", ou similaire.
+    2. **Commence directement par le titre de la séance** (ex: "# 📚 [Titre...]").
+    3. **Ne termine pas par des notes ou remarques**.
+    4. **Utilise UNIQUEMENT du Markdown standard** (pas de HTML, pas de balises custom).
+    5. **Respecte EXACTEMENT la structure demandée** sans ajout ni modification.
+    6. **Ne génère AUCUN contenu en dehors de la structure Markdown fournie**.`
+      : '';
 
     const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
 
@@ -607,31 +782,76 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 ✅ La différenciation est CONCRÈTE (pas de formules vagues)
 ${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alternance judicieuse des modalités de travail'}
 ✅ Document exploitable IMMÉDIATEMENT sans interprétation
+${noMetaInstruction}
 
 Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        messages: [{ role: "user", content: prompt }],
+    // Construction du body
+    let requestBody;
+
+    if (aiConfig.isResponsesAPI) {
+      requestBody = {
+        model: aiConfig.model,
+        input: prompt,
+        max_output_tokens: 8000,
+        text: {
+          format: { type: "text" }
+        },
+        reasoning: {
+          effort: "low"
+        }
+      };
+    } else if (aiConfig.model === 'mistral-medium-latest') {
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 10000
+      };
+    } else {
+      // Modèle par défaut
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.7
-      })
+      };
+    }
+
+    const response = await fetch(aiConfig.endpoint, {
+      method: 'POST',
+      headers: aiConfig.headers,
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[lessons] ${aiConfig.model} API error:`, errorText);
       return new Response('OpenAI API Error', { 
         status: response.status, 
         headers: corsHeaders 
       });
     }
 
-    const openAIData = await response.json();
-    const content = openAIData.choices?.[0]?.message?.content;
+    const aiData = await response.json();
+
+    let content = null;
+
+    if (aiConfig.isResponsesAPI) {
+      if (aiData?.output && Array.isArray(aiData.output)) {
+        const messageItem = aiData.output.find(item => item.type === 'message');
+        if (messageItem?.content && Array.isArray(messageItem.content)) {
+          const outputText = messageItem.content.find(c => c.type === 'output_text');
+          if (outputText?.text) {
+            content = outputText.text;
+          }
+        }
+      }
+      if (!content && aiData?.output_text) {
+        content = aiData.output_text;
+      }
+    } else {
+      content = aiData.choices?.[0]?.message?.content;
+    }
     
     if (!content) {
       return new Response(JSON.stringify({
@@ -642,19 +862,25 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
       });
     }
 
+    console.log(`[lessons] Séance générée (${content.length} caractères) avec ${aiConfig.model}`);
+
+    // Détermination explicite du contexte Mistral pour le nettoyage
+    const isMistral = aiConfig.model === 'mistral-medium-latest';
+    const cleanedContent = cleanOutputText(content, isMistral);
+
     return new Response(JSON.stringify({
-      content,
-      usage: openAIData.usage
+      content: cleanedContent,
+      usage: aiData.usage
     }), {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
       }
     });
 
   } catch (error) {
-    console.error('Lessons function error:', error);
+    console.error('[lessons] Error:', error);
     return new Response('Internal server error', { 
       status: 500, 
       headers: corsHeaders 
@@ -663,3 +889,6 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+

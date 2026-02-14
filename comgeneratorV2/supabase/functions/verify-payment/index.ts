@@ -88,8 +88,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Vérifier si cette session a déjà été traitée
-    const transactionResponse = await fetch(`${supabaseUrl}/rest/v1/transactions?stripe_session_id=eq.${sessionId}&select=status,tokens_purchased`, {
+ // 3. Vérifier si cette session a déjà été traitée
+    const transactionResponse = await fetch(`${supabaseUrl}/rest/v1/transactions?stripe_session_id=eq.${sessionId}&select=id,status,tokens_purchased`, {
       headers: {
         'Authorization': `Bearer ${supabaseServiceKey}`,
         'apikey': supabaseServiceKey,
@@ -98,13 +98,15 @@ Deno.serve(async (req) => {
     });
 
     const transactions = await transactionResponse.json();
-    const transaction = transactions[0];
+    
+    // ✅ FIX: Vérifier TOUTES les transactions, pas seulement la première
+    const completedTransaction = transactions.find(t => t.status === 'completed');
 
-    if (transaction?.status === 'completed') {
+    if (completedTransaction) {
       return new Response(JSON.stringify({
         success: true,
         message: 'Tokens déjà ajoutés pour cette session',
-        tokensAdded: transaction.tokens_purchased,
+        tokensAdded: completedTransaction.tokens_purchased,
         alreadyProcessed: true
       }), {
         headers: {
@@ -113,6 +115,9 @@ Deno.serve(async (req) => {
         }
       });
     }
+
+    // Garder la référence de la transaction pending pour le PATCH plus tard
+    const pendingTransaction = transactions.find(t => t.status === 'pending');
 
     // 4. Récupérer les métadonnées du paiement
     const tokens = parseInt(session.metadata?.tokens || '0');
@@ -182,6 +187,36 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to update profile: ${updateResponse.status}`);
     }
 
+  // 6. ✅ Marquer la transaction comme 'completed'
+    if (pendingTransaction) {
+      try {
+        const markCompleteResponse = await fetch(
+          `${supabaseUrl}/rest/v1/transactions?stripe_session_id=eq.${sessionId}&status=eq.pending`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'apikey': supabaseServiceKey,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+              status: 'completed'
+            })
+          }
+        );
+        if (markCompleteResponse.ok) {
+          console.log('✅ Transaction marked as completed (idempotence protection)');
+        } else {
+          console.error('⚠️ Failed to mark transaction as completed:', await markCompleteResponse.text());
+        }
+      } catch (markError) {
+        console.error('⚠️ Error marking transaction as completed:', markError);
+      }
+    }
+
+
+
     console.log('✅ Payment verification completed successfully');
     console.log(`   Tokens: ${currentProfile.tokens} → ${newTokens}`);
     console.log(`   Bank access: ${currentProfile.has_bank_access} → ${newBankAccess}`);
@@ -214,3 +249,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+

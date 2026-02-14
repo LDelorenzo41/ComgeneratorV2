@@ -1,33 +1,176 @@
 // supabase/functions/generate/index.ts
 
-// Déclarations pour l'environnement Deno
-declare const Deno: {
-  env: {
-    get(key: string): string | undefined;
-  };
-  serve(handler: (req: Request) => Promise<Response>): void;
-};
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
 
-interface GenerateAppreciationParams {
-  subject: string;
-  studentName: string;
-  criteria: Array<{
-    id: string;
-    name: string;
-    value: number;
-    importance: number;
-  }>;
-  personalNotes: string;
-  minLength: number;
-  maxLength: number;
-  tone: 'bienveillant' | 'normal' | 'severe';
-  addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';
+/**
+ * Résout la configuration API en fonction du choix de modèle
+ * @param {string|undefined} aiModel - Le choix de modèle de l'utilisateur
+ * @param {string} openaiKey - Clé API OpenAI
+ * @param {string|undefined} mistralKey - Clé API Mistral (optionnelle)
+ * @returns {{ endpoint: string, headers: object, model: string, tokenParamName: string, supportsTemperature: boolean, isResponsesAPI: boolean }}
+ */
+function resolveAIConfig(aiModel, openaiKey, mistralKey) {
+  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4o-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // Fallback : modèle par défaut si choix non reconnu
+  console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4o-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false
+  };
 }
 
-const generateHandler = async (req: Request): Promise<Response> => {
+
+/**
+ * Parse la réponse de l'IA pour extraire les versions détaillée et synthétique
+ * Gère mieux les balises Markdown (**Version...**) de Mistral
+ */
+function parseAIResponse(content) {
+  if (!content) return null;
+
+  // Essayer le format standard avec "Version synthétique :" (avec tolérance au markdown et ponctuation)
+  // Split sur : (espaces/etoiles/diese) "Version synthétique" (espaces/etoiles/diese/deux-points)
+  let parts = content.split(/[\s\*\#\-_]*Version\s+synthétique[\s\*\#\-_:]*/i);
+  
+  // Si ça échoue, essayer juste "Synthétique :" ou "Résumé :"
+  if (parts.length < 2) {
+    parts = content.split(/[\s\*\#\-_]*(?:Synthétique|Résumé|Summary)[\s\*\#\-_:]+/i);
+  }
+
+  // Si ça échoue, essayer le format avec séparateur "---" ou "***"
+  if (parts.length < 2) {
+    parts = content.split(/\n[\s\*\-]{3,}\n/);
+  }
+
+  if (parts.length >= 2) {
+    let detailed = parts[0];
+    let summary = parts[parts.length - 1];
+    
+    // Nettoyage préventif du label "Version détaillée" au début (même avec Markdown)
+    detailed = detailed.replace(/^[\s\*\#\-_]*(?:Version\s+|Partie\s+)?(?:détaillée|detailed)[\s\*\#\-_:]*/gi, '').trim();
+    
+    return { detailed, summary };
+  }
+
+  // Dernier recours : diviser en deux parties mathématiquement
+  const lines = content.split('\n').filter(l => l.trim());
+  if (lines.length >= 2) {
+    const midPoint = Math.floor(lines.length * 0.7);
+    const detailed = lines.slice(0, midPoint).join('\n').trim();
+    const summary = lines.slice(midPoint).join('\n').trim();
+    return { detailed, summary };
+  }
+
+  // Échec total
+  return null;
+}
+
+
+/**
+ * Nettoie le texte de sortie (supprime markdown, compteurs de caractères, labels, etc.)
+ * CORRIGÉ : Supprime agressivement la ponctuation résiduelle (:) au début
+ */
+function cleanOutputText(text) {
+  if (!text) return text;
+  
+  let cleaned = text.trim();
+  
+  // 1. Supprimer "Version détaillée/synthétique" même s'il y a du gras (**), des titres (#) ou des tirets
+  cleaned = cleaned.replace(/^[\s\*\#\-_]*(?:Version\s+|Partie\s+)?(?:détaillée|detailed)[\s\*\#\-_:]*/gmi, '');
+  cleaned = cleaned.replace(/^[\s\*\#\-_]*(?:Version\s+|Partie\s+)?(?:synthétique|résumé|summary)[\s\*\#\-_:]*/gmi, '');
+  
+  // 2. Supprimer les balises markdown de mise en forme
+  cleaned = cleaned.replace(/\*\*/g, '');
+  cleaned = cleaned.replace(/\*/g, '');
+  cleaned = cleaned.replace(/^#{1,6}\s*/gm, '');
+  cleaned = cleaned.replace(/`{1,3}/g, '');
+  
+  // 3. Supprimer les mentions de nombre de caractères (ex: [350 chars], (400 caractères))
+  cleaned = cleaned.replace(/\s*\(?\[?\d+\s*(?:caractères?|car\.?|chars?|mots?|words?)\]?\)?\.?\s*/gi, '');
+  
+  // 4. Supprimer les lignes qui ne contiennent que des informations de comptage
+  cleaned = cleaned.replace(/^.*(?:total|compte|longueur|length|respect).*:\s*\d+.*$/gmi, '');
+  
+  // 5. Supprimer les lignes vides multiples
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  
+  // 6. Supprimer les espaces en début/fin
+  cleaned = cleaned.trim();
+
+  // 7. ✅ NETTOYAGE ULTIME : Supprimer tout caractère de ponctuation ou espace qui traîne au tout début
+  // Cela élimine les ":" orphelins, les "-", les "*" qui seraient restés après la suppression du titre
+  cleaned = cleaned.replace(/^[\s:\-\*]+/, '');
+  
+  return cleaned;
+}
+
+
+
+
+
+// =====================================================
+// HANDLER PRINCIPAL
+// =====================================================
+
+const generateHandler = async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
   };
 
   if (req.method === 'OPTIONS') {
@@ -35,26 +178,87 @@ const generateHandler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: corsHeaders
     });
   }
 
+  // =====================================================
+  // ✅ SÉCURITÉ : Vérification de l'authentification JWT
+  // =====================================================
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: 'Configuration serveur manquante' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseServiceKey
+    }
+  });
+
+  if (!userResponse.ok) {
+    return new Response(JSON.stringify({ error: 'Token invalide ou expiré' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  const authUser = await userResponse.json();
+  console.log(`[generate] Utilisateur authentifié: ${authUser.id}`);
+  // =====================================================
+  // FIN VÉRIFICATION JWT
+  // =====================================================
+
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
-      return new Response('Missing OPENAI_API_KEY', { 
-        status: 500, 
-        headers: corsHeaders 
+      return new Response('Missing OPENAI_API_KEY', {
+        status: 500,
+        headers: corsHeaders
       });
     }
 
-    const params: GenerateAppreciationParams = await req.json();
-    
+    const params = await req.json();
+
+    // Extraire le choix de modèle (optionnel)
+    const aiModel = params.aiModel;
+
+    // Résoudre la configuration API
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError) {
+      return new Response(JSON.stringify({
+        error: configError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Log du modèle utilisé (pour debug)
+    console.log(`Modèle IA utilisé: ${aiConfig.model}`);
+
     // Validation - reproduction exacte de votre logique
-    const evaluatedCriteriaCount = params.criteria.filter(c => c.value > 0).length;
+    const evaluatedCriteriaCount = params.criteria.filter((c) => c.value > 0).length;
     if (evaluatedCriteriaCount === 0) {
       return new Response(JSON.stringify({
         error: 'Veuillez évaluer au moins un critère avant de générer une appréciation.'
@@ -65,10 +269,10 @@ const generateHandler = async (req: Request): Promise<Response> => {
     }
 
     const criteriaText = formatCriteriaForPrompt(params.criteria);
-    
+
     const toneDescriptions = {
       bienveillant: "bienveillant et encourageant",
-      normal: "neutre et objectif", 
+      normal: "neutre et objectif",
       severe: "strict et exigeant"
     };
 
@@ -244,14 +448,14 @@ ${params.personalNotes || "Aucune observation particulière"}
 
    ---
 
-   **7.3. RÈGLE D’OR**
+   **7.3. RÈGLE D'OR**
 
-   Tu peux conserver les niveaux EXACTS dans la liste des critères (c’est ce que voit le professeur),  
-   mais dans l’appréciation tu dois TOUJOURS :
+   Tu peux conserver les niveaux EXACTS dans la liste des critères (c'est ce que voit le professeur),  
+   mais dans l'appréciation tu dois TOUJOURS :
 
    - transformer le niveau en adjectif grammaticalement correct,
    - choisir parmi : bon / satisfaisant / correct / faible / limité / solide / attentif / sérieux / rigoureux…
-   - ne JAMAIS coller littéralement : “attitude + niveau”, “participation + niveau”, etc.
+   - ne JAMAIS coller littéralement : "attitude + niveau", "participation + niveau", etc.
 
    Ton texte DOIT toujours être du français naturel et professionnel.
 
@@ -293,27 +497,26 @@ ${getToneInstructionsForAppreciation(params.tone)}
 Version détaillée :
 [Rédige ici l'appréciation détaillée respectant STRICTEMENT ${params.minLength}-${params.maxLength} caractères]
 
-Version synthétique :
+
 [Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
 
 ⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom.`;
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: 'system',
-            content: `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
+
+    // ✅ Calculer le nombre de tokens selon le modèle
+    let tokenLimit;
+    if (aiConfig.model === 'gpt-5-mini') {
+      tokenLimit = 4000; // Limite pour GPT-5 mini (API Responses)
+    } else {
+      tokenLimit = Math.floor(params.maxLength * 2.5);
+    }
+
+    // ✅ System prompt pour les modèles Chat
+    const systemPrompt = `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
 
 ⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
 Tu dois rester STRICTEMENT FACTUEL. 
-Tu NE DOIS JAMAIS inventer une cause, une explication, un raisonnement ou un lien qui n’est PAS explicitement présent dans les critères évalués.
-Si aucun lien causal évident n’existe entre les critères évalués, tu dois écrire : 
+Tu NE DOIS JAMAIS inventer une cause, une explication, un raisonnement ou un lien qui n'est PAS explicitement présent dans les critères évalués.
+Si aucun lien causal évident n'existe entre les critères évalués, tu dois écrire : 
 "Aucun critère ne permet d'expliquer clairement ce niveau." 
 Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.
 
@@ -326,42 +529,110 @@ RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposé
 
 RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES. Tu dois faire des liens causaux UNIQUEMENT avec les critères actionnables effectivement évalués. N'INVENTE JAMAIS de causes (révisions, compréhension, etc.) qui ne sont pas dans les critères évalués.
 
-RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
+RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").`;
+
+    // ✅ Construction du body selon le type d'API
+    let requestBody;
+
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini) - format différent
+      // Fusionner system prompt et user prompt en un seul input
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${prompt}`;
+      
+      requestBody = {
+        model: aiConfig.model,
+        input: fullPrompt,
+        [aiConfig.tokenParamName]: tokenLimit,
+        // ✅ CORRECTION GPT-5 MINI (OBLIGATOIRE)
+        text: {
+          format: { type: "text" }
+        },
+        reasoning: {
+          effort: "low"
+        }
+      };
+    } else {
+      // API Chat Completions (GPT-4, Mistral) - format standard
+      requestBody = {
+        model: aiConfig.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
         ],
-        max_tokens: Math.floor(params.maxLength * 2.5),
-        temperature: 0.2
-      })
+        ...(aiConfig.supportsTemperature && { temperature: 0.2 }),
+        [aiConfig.tokenParamName]: tokenLimit
+      };
+    }
+
+    // Appel API
+    const response = await fetch(aiConfig.endpoint, {
+      method: "POST",
+      headers: aiConfig.headers,
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('OpenAI API Error:', error);
-      return new Response('OpenAI API Error', { 
-        status: response.status, 
-        headers: corsHeaders 
+      console.error(`${aiConfig.model} API Error:`, error);
+      return new Response(`${aiConfig.model} API Error`, {
+        status: response.status,
+        headers: corsHeaders
       });
     }
 
-    const openAIData = await response.json();
+    const aiData = await response.json();
+
+    // ✅ Log pour débugger le format de réponse
+    console.log('Réponse API brute:', JSON.stringify(aiData, null, 2));
+
+    // ✅ Extraire le contenu selon le type d'API
+    let content = null;
     
-    if (!openAIData?.choices?.[0]?.message?.content) {
+    if (aiConfig.isResponsesAPI) {
+      // API Responses (GPT-5 mini) - format avec tableau output
+      // Structure: { output: [{ type: "reasoning", ... }, { type: "message", content: [{ type: "output_text", text: "..." }] }] }
+      
+      if (aiData?.output && Array.isArray(aiData.output)) {
+        // Chercher l'élément de type "message"
+        const messageItem = aiData.output.find(item => item.type === 'message');
+        
+        if (messageItem?.content && Array.isArray(messageItem.content)) {
+          // Chercher l'élément de type "output_text" dans content
+          const outputText = messageItem.content.find(c => c.type === 'output_text');
+          if (outputText?.text) {
+            content = outputText.text;
+          }
+        }
+      }
+      // Fallback si structure différente
+      if (!content && aiData?.output_text) {
+        content = aiData.output_text;
+      }
+    } else {
+
+      // API Chat Completions (GPT-4, Mistral) - format standard
+      if (aiData?.choices?.[0]?.message?.content) {
+        content = aiData.choices[0].message.content;
+      } else if (aiData?.choices?.[0]?.text) {
+        content = aiData.choices[0].text;
+      }
+    }
+
+    if (!content) {
+      console.error('Format de réponse non reconnu:', JSON.stringify(aiData, null, 2));
       return new Response(JSON.stringify({
-        error: 'Réponse invalide de l\'API OpenAI. Veuillez réessayer.'
+        error: 'Réponse invalide de l\'API. Veuillez réessayer.'
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-
-    const content = openAIData.choices[0].message.content;
-    const parts = content.split('Version synthétique :');
     
-    if (parts.length !== 2) {
+    // ✅ Utiliser le parser amélioré pour gérer les différents formats
+    const parsed = parseAIResponse(content);
+    
+    if (!parsed) {
+      console.error('Format de réponse non reconnu:', content.substring(0, 500));
       return new Response(JSON.stringify({
         error: 'Format de réponse invalide. Veuillez réessayer.'
       }), {
@@ -370,51 +641,69 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
       });
     }
 
-    let detailed = parts[0].replace('Version détaillée :', '').trim();
-    let summary = parts[1].trim();
-    
+    let { detailed, summary } = parsed;
+
+    // ✅ Nettoyer les sorties avec la fonction améliorée
+    detailed = cleanOutputText(detailed);
+    summary = cleanOutputText(summary);
+
     // ✅ VALIDATION ET CORRECTION AUTOMATIQUE DES LONGUEURS
     const detailedLength = detailed.length;
     const summaryLength = summary.length;
     const expectedSummaryMin = Math.floor(params.maxLength * 0.35);
     const expectedSummaryMax = Math.floor(params.maxLength * 0.45);
 
+    // Correction de la version détaillée si nécessaire
     if (detailedLength > params.maxLength) {
-  console.warn(`Version détaillée trop longue (${detailedLength}/${params.maxLength}), coupe douce`);
-
-  // 1. On coupe à maxLength
-  let cut = detailed.substring(0, params.maxLength);
-
-  // 2. On cherche un point propre avant la fin
-  const lastDot = cut.lastIndexOf('.');
-  const lastSemi = cut.lastIndexOf(';');
-  const lastExcl = cut.lastIndexOf('!');
-  const lastQuest = cut.lastIndexOf('?');
-
-  const cutPoints = [lastDot, lastSemi, lastExcl, lastQuest];
-  const bestCut = Math.max(...cutPoints);
-
-  // 3. Si on a trouvé une fin de phrase → on coupe là
-  if (bestCut > params.maxLength * 0.6) {
-    detailed = cut.substring(0, bestCut + 1).trim();
-  } else {
-    // 4. Sinon coupe au dernier espace pour éviter une coupure de mot
-    const lastSpace = cut.lastIndexOf(' ');
-    detailed = cut.substring(0, lastSpace).trim();
-  }
-}
+      console.warn(`Version détaillée trop longue (${detailedLength}/${params.maxLength}), coupe douce`);
+      let cut = detailed.substring(0, params.maxLength);
+      const lastDot = cut.lastIndexOf('.');
+      const lastSemi = cut.lastIndexOf(';');
+      const lastExcl = cut.lastIndexOf('!');
+      const lastQuest = cut.lastIndexOf('?');
+      const cutPoints = [lastDot, lastSemi, lastExcl, lastQuest];
+      const bestCut = Math.max(...cutPoints);
+      if (bestCut > params.maxLength * 0.6) {
+        detailed = cut.substring(0, bestCut + 1).trim();
+      } else {
+        const lastSpace = cut.lastIndexOf(' ');
+        detailed = cut.substring(0, lastSpace).trim();
+      }
+    }
 
     // Correction de la version synthétique si nécessaire
     if (summaryLength > expectedSummaryMax) {
-      console.warn(`Version synthétique trop longue (${summaryLength}/${expectedSummaryMax}), troncature automatique`);
-      const lastSpace = summary.lastIndexOf(' ', expectedSummaryMax - 3);
-      summary = summary.substring(0, lastSpace > expectedSummaryMax * 0.8 ? lastSpace : expectedSummaryMax - 3) + '...';
+      console.warn(`Version synthétique trop longue (${summaryLength}/${expectedSummaryMax}), coupe douce finale`);
+      let cut = summary.substring(0, expectedSummaryMax).trim();
+      const punctuations = ['.', '!', '?', ';'];
+      let bestCutIndex = -1;
+      punctuations.forEach((p) => {
+        const idx = cut.lastIndexOf(p);
+        if (idx > bestCutIndex) bestCutIndex = idx;
+      });
+      if (bestCutIndex !== -1 && bestCutIndex > expectedSummaryMax * 0.5) {
+        summary = cut.substring(0, bestCutIndex + 1).trim();
+      } else {
+        const lastSpace = cut.lastIndexOf(' ');
+        const shorter = cut.substring(0, lastSpace).trim();
+        let finalCutIndex = -1;
+        punctuations.forEach((p) => {
+          const idx = shorter.lastIndexOf(p);
+          if (idx > finalCutIndex) finalCutIndex = idx;
+        });
+        if (finalCutIndex !== -1) {
+          summary = shorter.substring(0, finalCutIndex + 1).trim();
+        } else {
+          summary = shorter;
+        }
+      }
     }
 
-    const usedTokens: number = openAIData.usage?.total_tokens ?? 0;
+    const usedTokens = aiData.usage?.total_tokens ?? 0;
 
     // Log des longueurs finales pour debug
     console.log('Longueurs finales des appréciations:', {
+      model: aiConfig.model,
       detailed: detailed.length,
       summary: summary.length,
       limitesDetaillees: `${params.minLength}-${params.maxLength}`,
@@ -425,30 +714,27 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
     return new Response(JSON.stringify({
       detailed,
       summary,
-      usedTokens,
+      usedTokens
     }), {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json"
-      }
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Erreur lors de la génération de l\'appréciation:', error);
-    
+
     if (error.response?.status === 401) {
       return new Response(JSON.stringify({
-        error: 'Erreur d\'authentification avec l\'API OpenAI. Votre clé API semble invalide.'
+        error: 'Erreur d\'authentification avec l\'API. Votre clé API semble invalide.'
       }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    
+
     if (error.response?.status === 429) {
       return new Response(JSON.stringify({
-        error: 'Limite de requêtes OpenAI atteinte. Veuillez réessayer dans quelques minutes.'
+        error: 'Limite de requêtes atteinte. Veuillez réessayer dans quelques minutes.'
       }), {
         status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -457,13 +743,13 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
 
     if (error.response?.status === 500) {
       return new Response(JSON.stringify({
-        error: 'Erreur serveur OpenAI. Veuillez réessayer plus tard.'
+        error: 'Erreur serveur. Veuillez réessayer plus tard.'
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    
+
     return new Response(JSON.stringify({
       error: error.message || 'Une erreur est survenue lors de la génération de l\'appréciation. Veuillez réessayer.'
     }), {
@@ -473,20 +759,19 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
   }
 };
 
-// Fonctions helper reproduites exactement
-function formatCriteriaForPrompt(criteria: GenerateAppreciationParams['criteria']) {
-  const evaluatedCriteria = criteria.filter(c => c.value > 0);
-  
+// =====================================================
+// FONCTIONS HELPER (inchangées)
+// =====================================================
+
+function formatCriteriaForPrompt(criteria) {
+  const evaluatedCriteria = criteria.filter((c) => c.value > 0);
   if (evaluatedCriteria.length === 0) {
     throw new Error('Aucun critère n\'a été évalué. Veuillez évaluer au moins un critère.');
   }
-
-  return evaluatedCriteria
-    .map(c => `- ${c.name} : ${valueToLabel(c.value)} (Importance: ${importanceToLabel(c.importance)})`)
-    .join('\n');
+  return evaluatedCriteria.map((c) => `- ${c.name} : ${valueToLabel(c.value)} (Importance: ${importanceToLabel(c.importance)})`).join('\n');
 }
 
-function valueToLabel(value: number): string {
+function valueToLabel(value) {
   switch (value) {
     case 0: return "Non évalué";
     case 1: return "Très insuffisant";
@@ -500,7 +785,7 @@ function valueToLabel(value: number): string {
   }
 }
 
-function importanceToLabel(importance: number): string {
+function importanceToLabel(importance) {
   switch (importance) {
     case 1: return "Normal";
     case 2: return "Important";
@@ -509,7 +794,7 @@ function importanceToLabel(importance: number): string {
   }
 }
 
-function getToneInstructionsForAppreciation(tone: 'bienveillant' | 'normal' | 'severe'): string {
+function getToneInstructionsForAppreciation(tone) {
   switch (tone) {
     case "bienveillant":
       return `   - **Chaleur pédagogique** : Utilise des formulations encourageantes et empathiques
@@ -517,27 +802,24 @@ function getToneInstructionsForAppreciation(tone: 'bienveillant' | 'normal' | 's
    - **Optimisme éducatif** : Présente chaque difficulté comme une opportunité de croissance
    - **Proximité bienveillante** : Adopte un ton paternel/maternel approprié au cadre scolaire
    - **Formulations types** : "Je suis fier(e) de...", "Continue sur cette belle lancée", "Tes efforts portent leurs fruits"`;
-
     case "normal":
       return `   - **Objectivité professionnelle** : Équilibre entre encouragements et axes d'amélioration
    - **Neutralité bienveillante** : Reste factuel tout en maintenant une perspective positive
    - **Clarté pédagogique** : Privilégie les constats précis et les conseils pratiques
    - **Distance professionnelle adaptée** : Ton respectueux sans familiarité excessive
    - **Formulations types** : "Les résultats montrent...", "Il convient de...", "Les progrès sont visibles en..."`;
-
     case "severe":
       return `   - **Exigence constructive** : Maintiens des standards élevés tout en restant encourageant
    - **Fermeté bienveillante** : Sois direct sur les manques sans décourager
    - **Autorité pédagogique** : Affirme clairement les attentes et les objectifs
    - **Rigueur motivante** : Les exigences sont présentées comme des défis stimulants
    - **Formulations types** : "Des efforts soutenus sont nécessaires...", "Les progrès attendus concernent...", "Une implication plus soutenue permettrait..."`;
-
     default:
       return `   - Adapte le ton en maintenant la bienveillance éducative et le professionnalisme`;
   }
 }
 
-function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel', studentName: string): string {
+function getAddressModeInstructions(addressMode, studentName) {
   switch (addressMode) {
     case "tutoiement":
       return `Tu DOIS ABSOLUMENT utiliser le TUTOIEMENT dans TOUTE l'appréciation :
@@ -545,37 +827,31 @@ function getAddressModeInstructions(addressMode: 'tutoiement' | 'vouvoiement' | 
 - Exemples corrects : "Tu montres", "Ton travail", "Tu dois", "Tes efforts"
 - INTERDIT : "vous", "votre", "vos", "l'élève", "il/elle"
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
-
     case "vouvoiement":
       return `Tu DOIS ABSOLUMENT utiliser le VOUVOIEMENT dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "vous", "votre", "vos"
 - Exemples corrects : "Vous montrez", "Votre travail", "Vous devez", "Vos efforts"
 - INTERDIT : "tu", "te", "ton", "ta", "tes", "l'élève", "il/elle"
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
-
     case "impersonnel":
       return `Tu DOIS ABSOLUMENT utiliser une FORMULATION IMPERSONNELLE dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "l'élève", "il", "elle", "son", "sa", "ses", le prénom de l'élève
 - Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts", "${studentName} démontre"
 - INTERDIT : "tu", "te", "ton", "ta", "tes", "vous", "votre", "vos"
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
-
     default:
       return `Utilise le tutoiement par défaut.`;
   }
 }
 
-function getSystemAddressModeMessage(addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel'): string {
+function getSystemAddressModeMessage(addressMode) {
   switch (addressMode) {
     case "tutoiement":
       return `Tu dois IMPÉRATIVEMENT utiliser le TUTOIEMENT (tu/te/ton/ta/tes) dans chaque phrase de l'appréciation. L'utilisation de "vous", "votre", "l'élève" ou "il/elle" est une ERREUR CRITIQUE.`;
-
     case "vouvoiement":
       return `Tu dois IMPÉRATIVEMENT utiliser le VOUVOIEMENT (vous/votre/vos) dans chaque phrase de l'appréciation. L'utilisation de "tu", "te", "l'élève" ou "il/elle" est une ERREUR CRITIQUE.`;
-
     case "impersonnel":
       return `Tu dois IMPÉRATIVEMENT utiliser une FORMULATION IMPERSONNELLE (l'élève/il/elle/son/sa/ses ou le prénom) dans chaque phrase de l'appréciation. L'utilisation de "tu", "te", "vous" ou "votre" est une ERREUR CRITIQUE.`;
-
     default:
       return `Utilise le tutoiement par défaut.`;
   }

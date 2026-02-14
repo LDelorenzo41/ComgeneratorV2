@@ -95,6 +95,27 @@ serve(async (req)=>{
       bankAccess: true,
       productType: 'principal_400k_bank'
     });
+    // --- PRICES LIVE ---
+    productMapping.set('price_1S18JyJGrTMDgKmmVfoX4hBp', {
+      tokens: 300000,
+      bankAccess: false,
+      productType: 'professor_200k'
+    });
+    productMapping.set('price_1S18MyJGrTMDgKmmk1f5yilN', {
+      tokens: 300000,
+      bankAccess: true,
+      productType: 'professor_200k_bank'
+    });
+    productMapping.set('price_1S18OQJGrTMDgKmm22WgoKSl', {
+      tokens: 600000,
+      bankAccess: false,
+      productType: 'principal_400k'
+    });
+    productMapping.set('price_1S18Q7JGrTMDgKmmK8YSWNTF', {
+      tokens: 600000,
+      bankAccess: true,
+      productType: 'principal_400k_bank'
+    });
     console.log('🗺️ MAPPING COMPLET:');
     console.log('   Taille du mapping:', productMapping.size);
     console.log('   Price IDs disponibles:', Array.from(productMapping.keys()));

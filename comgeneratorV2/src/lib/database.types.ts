@@ -611,12 +611,17 @@ export type Database = {
     Views: {
       [_ in never]: never
     }
-    Functions: {
+        Functions: {
       delete_user_account: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
       fetch_rss_articles: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      // NOUVEAU: Dashboard Admin
+      get_admin_dashboard: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
@@ -629,6 +634,7 @@ export type Database = {
         Returns: Json
       }
     }
+
     Enums: {
       [_ in never]: never
     }

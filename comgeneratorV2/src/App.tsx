@@ -17,6 +17,9 @@ import { SynthesePage } from './pages/SynthesePage';
 import { LessonGeneratorPage } from './pages/LessonGeneratorPage';
 import { AuthHandler } from './pages/AuthHandler';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+// Import de la page Admin Dashboard
+import { AdminDashboardPage } from './pages/AdminDashboardPage';
+
 
 // Import de la nouvelle page banque de séances
 import LessonsBankPage from './pages/LessonsBankPage';
@@ -220,7 +223,7 @@ function App() {
                   </EmailConfirmationGuard>
                 } />
 
-                {/* Route admin newsletter */}
+                                {/* Route admin newsletter */}
                 <Route path="/admin/newsletter" element={
                   <EmailConfirmationGuard>
                     <AdminNewsletterPage />
@@ -233,6 +236,14 @@ function App() {
                     <AdminCampaignsPage />
                   </EmailConfirmationGuard>
                 } />
+
+                {/* Route admin dashboard - NOUVEAU */}
+                <Route path="/admin/dashboard" element={
+                  <EmailConfirmationGuard>
+                    <AdminDashboardPage />
+                  </EmailConfirmationGuard>
+                } />
+
                 
                 {/* Chatbot - uniquement si activé */}
                 {FEATURES.CHATBOT_ENABLED && (
