@@ -188,7 +188,8 @@ export function SettingsPage() {
             </div>
           </div>
 
-          {/* Choix du modèle IA */}
+          {false && (
+          /* Choix du modèle IA - DÉSACTIVÉ */
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
             <div className="flex items-center mb-6">
               <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mr-4">
@@ -260,6 +261,8 @@ export function SettingsPage() {
               </p>
             </div>
           </div>
+          )}
+
 
           {/* Préférences de communication */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
