@@ -50,7 +50,7 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 8,
+  ragTopK: 15,
   ragSimilarityThreshold: 0.40,
 };
 
