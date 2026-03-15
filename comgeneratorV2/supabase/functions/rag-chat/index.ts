@@ -102,6 +102,7 @@ interface ChatRequest {
   useAI?: boolean;
   levels?: string[];
   subjects?: string[];
+  folderIds?: string[];
   debug?: boolean;
 }
 
@@ -613,9 +614,10 @@ async function getAllowedDocumentsProgressive(
     useProfAssistCorpus: boolean;
     levels?: string[];
     subjects?: string[];
+    folderIds?: string[];
   }
 ): Promise<FilterResult> {
-  const { documentId, usePersonalCorpus, useProfAssistCorpus, levels, subjects } = options;
+  const { documentId, usePersonalCorpus, useProfAssistCorpus, levels, subjects, folderIds } = options;
   
   if (!usePersonalCorpus && !useProfAssistCorpus) {
     return { 
@@ -641,6 +643,10 @@ async function getAllowedDocumentsProgressive(
         query = query.eq('scope', 'global');
       } else if (usePersonalCorpus) {
         query = query.eq('scope', 'user').eq('user_id', userId);
+      }
+      // Filtrer par dossier si spécifié (uniquement pour les documents personnels)
+      if (folderIds?.length && usePersonalCorpus) {
+        query = query.in('folder_id', folderIds);
       }
     }
     return query;
@@ -1400,6 +1406,7 @@ async function chatHandler(req: Request): Promise<Response> {
       useAI = false,
       levels,
       subjects,
+      folderIds,
       debug = false,
     } = body;
 
@@ -1431,6 +1438,7 @@ async function chatHandler(req: Request): Promise<Response> {
       useProfAssistCorpus,
       levels,
       subjects,
+      folderIds,
     });
 
     const { docsMap, relaxationLevel } = filterResult;

@@ -2,15 +2,17 @@
 // Upload de documents avec option admin pour documents globaux
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User } from 'lucide-react';
-import { uploadAndIngestDocument, uploadAndIngestGlobalDocument } from '../../lib/ragApi';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User, FolderOpen } from 'lucide-react';
+import { uploadAndIngestDocument, uploadAndIngestGlobalDocument, moveDocumentToFolder } from '../../lib/ragApi';
 import { formatFileSize, MAX_FILE_SIZE } from '../../lib/rag.types';
+import type { RagFolder } from '../../lib/rag.types';
 import { isPDF, convertPDFToTextFile } from '../../lib/pdfExtractor';
 import { supabase } from '../../lib/supabase';
 
 interface DocumentUploaderProps {
   onUploadComplete: (documentId: string, chunksCreated: number) => void;
   onError?: (error: string) => void;
+  folders?: RagFolder[];
 }
 
 type UploadStatus = 'idle' | 'converting' | 'uploading' | 'processing' | 'complete' | 'error';
@@ -19,6 +21,7 @@ type UploadScope = 'user' | 'global';
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   onUploadComplete,
   onError,
+  folders = [],
 }) => {
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -27,6 +30,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [uploadScope, setUploadScope] = useState<UploadScope>('user');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
 
   // Vérifier si l'utilisateur est admin
   useEffect(() => {
@@ -135,6 +139,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         );
       }
 
+      // Déplacer dans le dossier sélectionné si applicable
+      if (selectedFolderId && uploadScope === 'user') {
+        try {
+          await moveDocumentToFolder(result.documentId, selectedFolderId);
+        } catch {
+          // Non bloquant - le document est uploadé, juste pas dans le dossier
+          console.warn('Failed to move document to folder');
+        }
+      }
+
       setStatus('complete');
       setProgress(100);
       onUploadComplete(result.documentId, result.chunksCreated);
@@ -233,6 +247,25 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             <Globe className="w-4 h-4" />
             ProfAssist
           </button>
+        </div>
+      )}
+
+      {/* Sélection du dossier (visible quand upload user et qu'il y a des dossiers) */}
+      {uploadScope === 'user' && folders.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <span className="text-xs text-gray-600 dark:text-gray-400">Dossier :</span>
+          <select
+            value={selectedFolderId}
+            onChange={e => setSelectedFolderId(e.target.value)}
+            disabled={isProcessing}
+            className="flex-1 text-sm px-2 py-1 rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+          >
+            <option value="">Non classé</option>
+            {folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
         </div>
       )}
 

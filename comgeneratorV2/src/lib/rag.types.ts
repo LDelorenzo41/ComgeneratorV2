@@ -11,6 +11,16 @@ export interface CorpusSelection {
   usePersonalCorpus: boolean;
   useProfAssistCorpus: boolean;
   useAI: boolean;
+  folderIds?: string[];
+}
+
+// Dossier pour organiser les documents personnels
+export interface RagFolder {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Valeurs par défaut
@@ -102,6 +112,7 @@ export interface RagDocument {
   subjects?: string[] | null;
   document_type?: DocumentType | null;
   language?: string | null;
+  folder_id?: string | null;
 }
 
 export interface SourceChunk {
