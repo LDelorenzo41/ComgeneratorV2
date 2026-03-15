@@ -195,7 +195,8 @@ async function extractTextWithOCR(
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d')!;
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (page.render({ canvasContext: ctx, canvas, viewport } as any) as any).promise;
 
     // OCR sur l'image du canvas
     const { data: { text } } = await worker.recognize(canvas);
