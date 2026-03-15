@@ -29,7 +29,21 @@ CREATE POLICY "Users can insert own folders" ON rag_folders
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own folders" ON rag_folders
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own folders" ON rag_folders
   FOR DELETE USING (auth.uid() = user_id);
+
+-- 5. Trigger to auto-update updated_at on rag_folders
+CREATE OR REPLACE FUNCTION update_rag_folders_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_rag_folders_updated_at
+  BEFORE UPDATE ON rag_folders
+  FOR EACH ROW
+  EXECUTE FUNCTION update_rag_folders_updated_at();
