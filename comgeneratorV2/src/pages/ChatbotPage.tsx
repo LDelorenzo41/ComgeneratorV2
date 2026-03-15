@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X, 
-  BookOpen, Database, MessageCircle, Shield, Zap, Gift, Globe, User, HardDrive, Upload, Target, Search, ToggleLeft, Filter,
+  Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X,
+  BookOpen, Database, Shield, Gift, Globe, User, HardDrive, Upload, ToggleLeft, Filter,
   ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
@@ -353,7 +353,6 @@ const BetaUsageCard: React.FC<{ betaStats: BetaUsageStats; isLoading: boolean }>
   };
 
   const storageAvailable = Math.max(0, betaStats.storageTokensLimit - betaStats.storageTokensUsed);
-  const monthlyAvailable = Math.max(0, betaStats.monthlyTokensLimit - betaStats.monthlyTokensUsed);
 
   return (
     <div className="bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-pink-200 dark:border-pink-800 mb-6">

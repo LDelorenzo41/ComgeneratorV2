@@ -4,7 +4,6 @@ import React from 'react';
 // ⭐ NOUVEAUX IMPORTS POUR PDF
 import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { createWorker } from 'tesseract.js';
 // FIN NOUVEAUX IMPORTS
 import { ResizableBox } from 'react-resizable';
 import 'react-resizable/css/styles.css';
@@ -19,11 +18,10 @@ import rehypeRaw from 'rehype-raw';
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
 // ✅ IMPORT MODIFIÉ - Utilisation de secureApi au lieu d'OpenAI direct
-import { secureApi, type LessonParams } from '../lib/secureApi';
+import { secureApi } from '../lib/secureApi';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
@@ -45,7 +43,6 @@ import {
   AlertCircle,
   CreditCard,
   Lock,
-  ShoppingCart,
   Upload,
   FileText,
   Video,
