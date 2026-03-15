@@ -134,6 +134,7 @@ interface LessonRequest {
 interface RagChunk {
   id: string;
   content: string;
+  documentId: string;
   documentTitle: string;
   score: number;
 }
@@ -147,7 +148,7 @@ interface RagSource {
 const RAG_CONFIG = {
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 8,
+  ragTopK: 15,
   ragSimilarityThreshold: 0.40,
 };
 
@@ -196,6 +197,7 @@ async function searchRagChunks(
     return (data || []).map((item: any) => ({
       id: item.id,
       content: item.content,
+      documentId: item.document_id || '',
       documentTitle: item.document_title,
       score: item.similarity,
     }));
@@ -304,6 +306,24 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
       try {
         const serviceClient = await createServiceClient();
 
+        // Si un dossier est sélectionné, récupérer les document_ids autorisés
+        let allowedDocIds: Set<string> | null = null;
+
+        if (data.folderIds?.length) {
+          const { data: folderDocs } = await serviceClient
+            .from('rag_documents')
+            .select('id')
+            .eq('user_id', authUser.id)
+            .in('folder_id', data.folderIds);
+
+          if (folderDocs && folderDocs.length > 0) {
+            allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
+            console.log(`[lessons] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+          } else {
+            console.log('[lessons] No documents found in selected folders');
+          }
+        }
+
         const searchTerms = [
           data.subject,
           data.level,
@@ -316,26 +336,23 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
         const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
 
+        // Chercher plus de chunks quand un filtre dossier est actif,
+        // car le filtrage post-recherche peut en éliminer beaucoup
+        const searchTopK = allowedDocIds ? RAG_CONFIG.ragTopK * 5 : RAG_CONFIG.ragTopK;
+
         let chunks = await searchRagChunks(
           serviceClient,
           authUser.id,
           embedding,
-          RAG_CONFIG.ragTopK
+          searchTopK
         );
 
-        // Filtrer par dossier si folderIds est spécifié
-        if (data.folderIds?.length && chunks.length > 0) {
-          const { data: folderDocs } = await serviceClient
-            .from('rag_documents')
-            .select('title')
-            .eq('user_id', authUser.id)
-            .in('folder_id', data.folderIds);
-
-          if (folderDocs) {
-            const allowedTitles = new Set(folderDocs.map((d: any) => d.title));
-            chunks = chunks.filter(c => allowedTitles.has(c.documentTitle));
-            console.log(`[lessons] After folder filter: ${chunks.length} chunks`);
-          }
+        // Filtrer par document_id si un dossier est sélectionné
+        if (allowedDocIds && chunks.length > 0) {
+          chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
+          console.log(`[lessons] After folder filter: ${chunks.length} chunks from selected folders`);
+          // Garder les meilleurs après filtrage
+          chunks = chunks.slice(0, RAG_CONFIG.ragTopK);
         }
 
         if (chunks.length > 0) {
@@ -1063,6 +1080,12 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+
+
+
+
 
 
 
