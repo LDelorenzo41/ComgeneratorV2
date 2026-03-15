@@ -40,6 +40,8 @@ export interface LessonParams {
   pedagogy_type: string;
   duration: string;
   documentContext?: string;
+  useRag?: boolean;
+  folderIds?: string[];
 }
 
 export interface SynthesisParams {
@@ -61,6 +63,7 @@ export interface ScenarioParams {
   useRag: boolean;
   documentsContent?: string;
   documentNames?: string[];
+  folderIds?: string[];
 }
 
 // Classe pour gérer les appels sécurisés aux Edge Functions

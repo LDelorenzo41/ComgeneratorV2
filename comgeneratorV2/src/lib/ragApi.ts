@@ -4,7 +4,7 @@
 // + Double quota bêta: stockage permanent + import mensuel
 
 import { supabase } from './supabase';
-import type { RagDocument, ChatResponse, CorpusSelection, SearchFilters } from './rag.types';
+import type { RagDocument, RagFolder, ChatResponse, CorpusSelection, SearchFilters } from './rag.types';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -374,12 +374,16 @@ export async function sendChatMessage(request: {
     topK: request.topK,
   };
 
-  // 🆕 Ajouter les filtres uniquement s'ils sont définis et non vides
+  // Ajouter les filtres uniquement s'ils sont définis et non vides
   if (request.filters?.levels && request.filters.levels.length > 0) {
     backendRequest.levels = request.filters.levels;
   }
   if (request.filters?.subjects && request.filters.subjects.length > 0) {
     backendRequest.subjects = request.filters.subjects;
+  }
+  // Ajouter les folderIds si définis
+  if (request.corpusSelection.folderIds && request.corpusSelection.folderIds.length > 0) {
+    backendRequest.folderIds = request.corpusSelection.folderIds;
   }
 
   const response = await callEdgeFunction<ChatResponse | { error: string }>('rag-chat', backendRequest);
@@ -546,6 +550,94 @@ export async function getBetaUsageStats(): Promise<BetaUsageStats> {
     resetDate,
   };
 }
+
+// ============================================================================
+// FOLDERS (Dossiers personnels)
+// ============================================================================
+
+/**
+ * Récupère tous les dossiers de l'utilisateur
+ */
+export async function getFolders(): Promise<RagFolder[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await (supabase as any)
+    .from('rag_folders')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('name', { ascending: true });
+
+  if (error) throw new Error('Erreur lors de la récupération des dossiers');
+  return data || [];
+}
+
+/**
+ * Crée un nouveau dossier
+ */
+export async function createFolder(name: string): Promise<RagFolder> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Non authentifié');
+
+  const { data, error } = await (supabase as any)
+    .from('rag_folders')
+    .insert({ user_id: user.id, name: name.trim() })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Un dossier avec ce nom existe déjà');
+    }
+    throw new Error('Erreur lors de la création du dossier');
+  }
+  return data;
+}
+
+/**
+ * Renomme un dossier
+ */
+export async function renameFolder(folderId: string, name: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('rag_folders')
+    .update({ name: name.trim(), updated_at: new Date().toISOString() })
+    .eq('id', folderId);
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Un dossier avec ce nom existe déjà');
+    }
+    throw new Error('Erreur lors du renommage du dossier');
+  }
+}
+
+/**
+ * Supprime un dossier (les documents deviennent "non classés")
+ */
+export async function deleteFolder(folderId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('rag_folders')
+    .delete()
+    .eq('id', folderId);
+
+  if (error) throw new Error('Erreur lors de la suppression du dossier');
+}
+
+/**
+ * Déplace un document dans un dossier (ou hors dossier si folderId = null)
+ */
+export async function moveDocumentToFolder(documentId: string, folderId: string | null): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('rag_documents')
+    .update({ folder_id: folderId })
+    .eq('id', documentId);
+
+  if (error) throw new Error('Erreur lors du déplacement du document');
+}
+
+
+
+
 
 
 

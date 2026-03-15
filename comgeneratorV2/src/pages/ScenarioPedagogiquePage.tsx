@@ -15,6 +15,9 @@ import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { supabase } from '../lib/supabase';
 import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
+import { getFolders } from '../lib/ragApi';
+import type { RagFolder } from '../lib/rag.types';
+import { FolderSelector } from '../components/chatbot/FolderSelector';
 import {
   Map,
   Copy,
@@ -110,6 +113,8 @@ export function ScenarioPedagogiquePage() {
   const [parsedRows, setParsedRows] = React.useState<SeanceRow[]>([]);
   const [copied, setCopied] = React.useState(false);
   const [useRag, setUseRag] = React.useState(false);
+  const [folders, setFolders] = React.useState<RagFolder[]>([]);
+  const [selectedFolderIds, setSelectedFolderIds] = React.useState<string[]>([]);
   const [isEditing, setIsEditing] = React.useState(false);
   const [editableRows, setEditableRows] = React.useState<SeanceRow[]>([]);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -163,6 +168,12 @@ export function ScenarioPedagogiquePage() {
 
     checkBankAccess();
   }, [user]);
+
+  // Charger les dossiers personnels
+  React.useEffect(() => {
+    getFolders().then(setFolders).catch(console.error);
+  }, []);
+
   // Vérification si l'utilisateur a déjà utilisé le code SCENARIO2026
   React.useEffect(() => {
     const checkScenarioPromoCode = async () => {
@@ -567,6 +578,7 @@ export function ScenarioPedagogiquePage() {
         useRag: data.useRag,
         documentsContent,
         documentNames: uploadedFiles.map(f => f.name),
+        folderIds: selectedFolderIds.length > 0 ? selectedFolderIds : undefined,
       });
 
       const content = result.content;
@@ -1279,7 +1291,7 @@ export function ScenarioPedagogiquePage() {
                   <div className="flex items-center space-x-3">
                     <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Utiliser les corpus documentaires « Perso » et « ProfAssist » (cf. mon chatbot)</p>
+                      <p className="font-medium text-gray-900 dark:text-white">Utiliser mon corpus documentaire personnel (cf. mon chatbot)</p>
                     
                     </div>
                   </div>
@@ -1291,8 +1303,21 @@ export function ScenarioPedagogiquePage() {
                 </div>
                 
                 {useRag && (
-                  <div className="mt-3 pl-8 text-sm text-indigo-700 dark:text-indigo-300">
-                    ✓ La génération utilisera les textes officiels présents dans le corpus documentaire. Ce corpus est en cours de construction. Si aucun contenu pertinent n’est trouvé, l’IA générera le scénario à partir de ses propres connaissances.
+                  <div className="mt-3 pl-8 space-y-3">
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      ✓ La génération utilisera les documents de votre corpus personnel. Si aucun contenu pertinent n’est trouvé, l’IA générera le scénario à partir de ses propres connaissances.
+                    </p>
+                    {folders.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2">Filtrer par dossier (optionnel) :</p>
+                        <FolderSelector
+                          folders={folders}
+                          selectedFolderIds={selectedFolderIds}
+                          onChange={setSelectedFolderIds}
+                          compact
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1314,7 +1339,7 @@ export function ScenarioPedagogiquePage() {
                       <li>• <strong>Documents ajoutés :</strong> +{uploadedFiles.length} fichier(s) = consommation accrue</li>
                     )}
                     {useRag && (
-                      <li>• <strong>RAG activé :</strong> enrichissement par les programmes officiels = consommation accrue</li>
+                      <li>• <strong>Corpus activé :</strong> enrichissement par vos documents personnels = consommation accrue</li>
                     )}
                   </ul>
                   <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
@@ -1570,6 +1595,12 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
+
+
+
+
+
 
 
 

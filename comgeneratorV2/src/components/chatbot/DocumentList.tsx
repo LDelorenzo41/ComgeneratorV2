@@ -1,16 +1,17 @@
 // src/components/chatbot/DocumentList.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  FileText, Trash2, RefreshCw, AlertCircle, CheckCircle2, 
+import {
+  FileText, Trash2, RefreshCw, AlertCircle, CheckCircle2,
   Clock, Loader2, Globe, User, Lock, RotateCcw, ChevronDown, ChevronRight,
-  BookOpen, GraduationCap, Filter, X, Info
+  BookOpen, GraduationCap, Filter, X, Info, FolderOpen
 } from 'lucide-react';
-import type { RagDocument, DocumentType } from '../../lib/rag.types';
+import type { RagDocument, RagFolder, DocumentType } from '../../lib/rag.types';
 import { formatFileSize, getStatusLabel, getStatusColor, DOCUMENT_TYPES, LEVEL_LABELS } from '../../lib/rag.types';
-import { deleteDocument, checkIsAdmin, reanalyzeDocument } from '../../lib/ragApi';
+import { deleteDocument, checkIsAdmin, reanalyzeDocument, moveDocumentToFolder } from '../../lib/ragApi';
 
 interface DocumentListProps {
   documents: RagDocument[];
+  folders?: RagFolder[];
   onRefresh: () => void;
   isLoading?: boolean;
 }
@@ -22,7 +23,7 @@ interface SubjectGroup {
   byType: Record<string, RagDocument[]>;
 }
 
-export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh, isLoading = false }) => {
+export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders = [], onRefresh, isLoading = false }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -336,8 +337,15 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
 
   // Document utilisateur classique
   const UserDocumentItem: React.FC<{ doc: RagDocument }> = ({ doc }) => {
-    const canDelete = true;
-    
+    const handleMoveToFolder = async (folderId: string | null) => {
+      try {
+        await moveDocumentToFolder(doc.id, folderId);
+        onRefresh();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Erreur lors du déplacement');
+      }
+    };
+
     return (
       <div className="flex items-center p-2 rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <div className="flex-shrink-0 mr-3">
@@ -357,6 +365,20 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
         </div>
 
         <div className="flex items-center gap-2">
+          {folders.length > 0 && (
+            <select
+              value={doc.folder_id || ''}
+              onChange={e => handleMoveToFolder(e.target.value || null)}
+              className="text-xs px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              title="Déplacer dans un dossier"
+            >
+              <option value="">Non classé</option>
+              {folders.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          )}
+
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(doc.status)}`}>
             {getStatusIcon(doc.status)}
             {getStatusLabel(doc.status)}
@@ -384,12 +406,12 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
       {/* Header avec stats */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-600 dark:text-gray-400">
-          {globalDocs.length > 0 && (
+          {isAdmin && globalDocs.length > 0 && (
             <span className="text-purple-600 dark:text-purple-400">
               {globalDocs.length} officiel{globalDocs.length > 1 ? 's' : ''}
             </span>
           )}
-          {globalDocs.length > 0 && userDocs.length > 0 && ' • '}
+          {isAdmin && globalDocs.length > 0 && userDocs.length > 0 && ' • '}
           {userDocs.length > 0 && (
             <span>{userDocs.length} perso{userDocs.length > 1 ? 's' : ''}</span>
           )}
@@ -404,7 +426,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
       </div>
 
       <div className="space-y-4 max-h-[500px] overflow-y-auto">
-        {/* Mes documents - EN PREMIER */}
+        {/* Mes documents - EN PREMIER, groupés par dossier */}
         {userDocs.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -413,16 +435,60 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
                 Mes documents
               </h4>
             </div>
-            <div className="space-y-2">
-              {userDocs.map((doc) => (
-                <UserDocumentItem key={doc.id} doc={doc} />
-              ))}
+            <div className="space-y-3">
+              {folders.length > 0 ? (
+                <>
+                  {folders.map(folder => {
+                    const folderDocs = userDocs.filter(d => d.folder_id === folder.id);
+                    if (folderDocs.length === 0) return null;
+                    return (
+                      <div key={folder.id}>
+                        <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                          <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
+                          <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{folder.name}</span>
+                          <span className="text-xs text-gray-400">({folderDocs.length})</span>
+                        </div>
+                        <div className="space-y-2">
+                          {folderDocs.map(doc => (
+                            <UserDocumentItem key={doc.id} doc={doc} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Non classés */}
+                  {(() => {
+                    const unfiledDocs = userDocs.filter(d => !d.folder_id);
+                    if (unfiledDocs.length === 0) return null;
+                    return (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5 px-1">
+                          <FolderOpen className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 italic">Non classés</span>
+                          <span className="text-xs text-gray-400">({unfiledDocs.length})</span>
+                        </div>
+                        <div className="space-y-2">
+                          {unfiledDocs.map(doc => (
+                            <UserDocumentItem key={doc.id} doc={doc} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div className="space-y-2">
+                  {userDocs.map((doc) => (
+                    <UserDocumentItem key={doc.id} doc={doc} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Corpus ProfAssist - Organisé par matière */}
-        {globalDocs.length > 0 && (
+        {/* Corpus ProfAssist - Admin uniquement */}
+        {isAdmin && globalDocs.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-4 h-4 text-purple-500" />
@@ -491,7 +557,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
           </div>
         )}
 
-        {globalDocs.length > 0 && userDocs.length === 0 && (
+        {userDocs.length === 0 && (
           <div className="text-center py-4 border-t border-gray-200 dark:border-gray-700">
             <User className="w-6 h-6 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -505,6 +571,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, onRefresh
 };
 
 export default DocumentList;
+
+
+
 
 
 

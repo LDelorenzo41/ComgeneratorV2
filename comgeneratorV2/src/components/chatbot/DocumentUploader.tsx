@@ -2,31 +2,37 @@
 // Upload de documents avec option admin pour documents globaux
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User } from 'lucide-react';
-import { uploadAndIngestDocument, uploadAndIngestGlobalDocument } from '../../lib/ragApi';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User, FolderOpen, AlertTriangle } from 'lucide-react';
+import { uploadAndIngestDocument, uploadAndIngestGlobalDocument, moveDocumentToFolder } from '../../lib/ragApi';
 import { formatFileSize, MAX_FILE_SIZE } from '../../lib/rag.types';
+import type { RagFolder } from '../../lib/rag.types';
 import { isPDF, convertPDFToTextFile } from '../../lib/pdfExtractor';
 import { supabase } from '../../lib/supabase';
 
 interface DocumentUploaderProps {
   onUploadComplete: (documentId: string, chunksCreated: number) => void;
   onError?: (error: string) => void;
+  folders?: RagFolder[];
 }
 
-type UploadStatus = 'idle' | 'converting' | 'uploading' | 'processing' | 'complete' | 'error';
+type UploadStatus = 'idle' | 'converting' | 'ocr' | 'uploading' | 'processing' | 'complete' | 'error';
 type UploadScope = 'user' | 'global';
 
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   onUploadComplete,
   onError,
+  folders = [],
 }) => {
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [wasOCR, setWasOCR] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [uploadScope, setUploadScope] = useState<UploadScope>('user');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
 
   // Vérifier si l'utilisateur est admin
   useEffect(() => {
@@ -71,21 +77,31 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
     try {
       let fileToUpload = file;
+      setWasOCR(false);
+      setOcrStatus(null);
 
       // Si c'est un PDF, extraire le texte côté client
       if (isPDF(file)) {
         setStatus('converting');
         setProgress(10);
         console.log('Converting PDF to text with pdf.js...');
-        
+
         try {
-          fileToUpload = await convertPDFToTextFile(file);
-          console.log(`PDF converted successfully: ${fileToUpload.size} bytes`);
+          const result = await convertPDFToTextFile(file, (statusText, progressValue) => {
+            if (statusText.includes('OCR')) {
+              setStatus('ocr');
+              setOcrStatus(statusText);
+              setProgress(10 + progressValue * 20);
+            }
+          });
+          fileToUpload = result.file;
+          setWasOCR(result.wasOCR);
+          console.log(`PDF converted successfully: ${fileToUpload.size} bytes (OCR: ${result.wasOCR})`);
           setProgress(30);
         } catch (pdfError) {
           throw new Error(
-            pdfError instanceof Error 
-              ? pdfError.message 
+            pdfError instanceof Error
+              ? pdfError.message
               : 'Erreur lors de la conversion du PDF.'
           );
         }
@@ -135,6 +151,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         );
       }
 
+      // Déplacer dans le dossier sélectionné si applicable
+      if (selectedFolderId && uploadScope === 'user') {
+        try {
+          await moveDocumentToFolder(result.documentId, selectedFolderId);
+        } catch {
+          // Non bloquant - le document est uploadé, juste pas dans le dossier
+          console.warn('Failed to move document to folder');
+        }
+      }
+
       setStatus('complete');
       setProgress(100);
       onUploadComplete(result.documentId, result.chunksCreated);
@@ -143,6 +169,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         setStatus('idle');
         setProgress(0);
         setFileName(null);
+        // On garde wasOCR pour afficher l'avertissement même après reset
       }, 2000);
 
     } catch (err) {
@@ -179,6 +206,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const getStatusMessage = () => {
     switch (status) {
       case 'converting': return 'Conversion du PDF...';
+      case 'ocr': return ocrStatus || 'OCR en cours...';
       case 'uploading': return 'Upload en cours...';
       case 'processing': return uploadScope === 'global' ? 'Indexation globale...' : 'Traitement du document...';
       case 'complete': return 'Terminé !';
@@ -190,6 +218,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const getStatusIcon = () => {
     switch (status) {
       case 'converting':
+      case 'ocr':
       case 'uploading':
       case 'processing':
         return <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />;
@@ -202,7 +231,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   };
 
-  const isProcessing = ['converting', 'uploading', 'processing'].includes(status);
+  const isProcessing = ['converting', 'ocr', 'uploading', 'processing'].includes(status);
 
   return (
     <div className="w-full space-y-3">
@@ -233,6 +262,25 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             <Globe className="w-4 h-4" />
             ProfAssist
           </button>
+        </div>
+      )}
+
+      {/* Sélection du dossier (visible quand upload user et qu'il y a des dossiers) */}
+      {uploadScope === 'user' && folders.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <span className="text-xs text-gray-600 dark:text-gray-400">Dossier :</span>
+          <select
+            value={selectedFolderId}
+            onChange={e => setSelectedFolderId(e.target.value)}
+            disabled={isProcessing}
+            className="flex-1 text-sm px-2 py-1 rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50"
+          >
+            <option value="">Non classé</option>
+            {folders.map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -313,10 +361,23 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
+
+      {wasOCR && status !== 'error' && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Ce PDF a été détecté comme un scan (image). Le texte a été extrait par OCR.
+            Pour un résultat optimal, préférez un PDF texte natif.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
 export default DocumentUploader;
+
+
+
 
 

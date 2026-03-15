@@ -25,11 +25,13 @@ interface ScenarioRequest {
   useRag: boolean;
   documentsContent?: string;
   documentNames?: string[];
+  folderIds?: string[];
 }
 
 interface RagChunk {
   id: string;
   content: string;
+  documentId: string;
   documentTitle: string;
   score: number;
 }
@@ -48,7 +50,7 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 8,
+  ragTopK: 15,
   ragSimilarityThreshold: 0.40,
 };
 
@@ -338,6 +340,7 @@ async function searchRagChunks(
     return (data || []).map((item: any) => ({
       id: item.id,
       content: item.content,
+      documentId: item.document_id || '',
       documentTitle: item.document_title,
       score: item.similarity,
     }));
@@ -402,7 +405,25 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
-      
+
+      // Si un dossier est sélectionné, récupérer les document_ids autorisés
+      let allowedDocIds: Set<string> | null = null;
+
+      if (data.folderIds?.length) {
+        const { data: folderDocs } = await serviceClient
+          .from('rag_documents')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('folder_id', data.folderIds);
+
+        if (folderDocs && folderDocs.length > 0) {
+          allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
+          console.log(`[scenario] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+        } else {
+          console.log('[scenario] No documents found in selected folders');
+        }
+      }
+
       const searchTerms = [
         data.matiere,
         data.niveau,
@@ -414,18 +435,28 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         'compétences',
         cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
       ].filter(Boolean).join(' ');
-      
+
       console.log(`[scenario] RAG search query: ${searchTerms}`);
-      
+
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
-      
-      const chunks = await searchRagChunks(
+
+      // Chercher plus de chunks quand un filtre dossier est actif
+      const searchTopK = allowedDocIds ? CONFIG.ragTopK * 5 : CONFIG.ragTopK;
+
+      let chunks = await searchRagChunks(
         serviceClient,
         user.id,
         embedding,
-        CONFIG.ragTopK
+        searchTopK
       );
-      
+
+      // Filtrer par document_id si un dossier est sélectionné
+      if (allowedDocIds && chunks.length > 0) {
+        chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
+        console.log(`[scenario] After folder filter: ${chunks.length} chunks from selected folders`);
+        chunks = chunks.slice(0, CONFIG.ragTopK);
+      }
+
       if (chunks.length > 0) {
         console.log(`[scenario] Found ${chunks.length} relevant chunks`);
         
@@ -616,4 +647,7 @@ Génère maintenant le scénario pédagogique complet :`;
 };
 
 Deno.serve(scenarioHandler);
+
+
+
 
