@@ -452,6 +452,161 @@ function expandQueryWithSynonyms(query: string): string {
   return query;
 }
 
+// ============================================================================
+// CORRECTION FUZZY (fautes de frappe)
+// ============================================================================
+
+/**
+ * Vocabulaire éducatif de référence pour la correction fuzzy.
+ * Mots fréquents dans le contexte scolaire français.
+ */
+const EDUCATION_VOCABULARY: string[] = [
+  // Sport / EPS
+  'terrain', 'natation', 'athletisme', 'gymnase', 'course', 'relais',
+  'endurance', 'vitesse', 'lancer', 'saut', 'dribble', 'arbitre',
+  'echauffement', 'match', 'equipe', 'exercice', 'entrainement',
+  'parcours', 'obstacle', 'jeux', 'ballon', 'raquette', 'piscine',
+  // Mathématiques
+  'fraction', 'geometrie', 'calcul', 'multiplication', 'division',
+  'addition', 'soustraction', 'nombre', 'equation', 'triangle',
+  'rectangle', 'cercle', 'mesure', 'perimetre', 'surface', 'volume',
+  'symetrie', 'proportionnalite', 'statistiques', 'probabilite',
+  // Français
+  'grammaire', 'conjugaison', 'orthographe', 'vocabulaire', 'lecture',
+  'ecriture', 'redaction', 'dictee', 'syntaxe', 'adjectif', 'verbe',
+  'adverbe', 'pronom', 'determinant', 'complement', 'sujet', 'accord',
+  'phrase', 'paragraphe', 'texte', 'poesie', 'recit', 'conte',
+  // Sciences
+  'experience', 'electricite', 'magnetisme', 'photosynthese',
+  'digestion', 'respiration', 'reproduction', 'ecosysteme',
+  'biodiversite', 'energie', 'matiere', 'vivant', 'cellule',
+  'molecule', 'atome', 'temperature', 'circuit',
+  // Pédagogie
+  'sequence', 'seance', 'evaluation', 'competence', 'objectif',
+  'differentiation', 'remediation', 'programme', 'progression',
+  'apprentissage', 'activite', 'consigne', 'situation', 'dispositif',
+  'autonomie', 'cooperation', 'manipulation', 'observation',
+  'classement', 'comparaison', 'hypothese', 'validation',
+  // Niveaux / Organisation
+  'maternelle', 'elementaire', 'college', 'lycee', 'primaire',
+  'trimestre', 'semestre', 'periode', 'emploi', 'planning',
+  // Disciplines
+  'histoire', 'geographie', 'musique', 'arts', 'sciences',
+  'technologie', 'informatique', 'anglais', 'allemand', 'espagnol',
+  'education', 'civique', 'morale', 'philosophie',
+  // DDC / Danse
+  'danse', 'creation', 'choregraphie', 'mouvement', 'espace',
+  'rythme', 'improvisation', 'composition', 'spectacle', 'corps',
+  'expression', 'gestuelle', 'posture', 'deplacement',
+];
+
+/**
+ * Distance de Levenshtein entre deux chaînes
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const la = a.length;
+  const lb = b.length;
+  if (la === 0) return lb;
+  if (lb === 0) return la;
+
+  // Optimisation : une seule ligne de la matrice
+  let prev = Array.from({ length: lb + 1 }, (_, i) => i);
+  let curr = new Array(lb + 1);
+
+  for (let i = 1; i <= la; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1,      // deletion
+        curr[j - 1] + 1,  // insertion
+        prev[j - 1] + cost // substitution
+      );
+    }
+    [prev, curr] = [curr, prev];
+  }
+
+  return prev[lb];
+}
+
+/**
+ * Tente de corriger un mot en trouvant le mot le plus proche
+ * dans le vocabulaire éducatif. Retourne le mot original si
+ * aucune correction convaincante n'est trouvée.
+ *
+ * Seuils :
+ * - mots de 4-5 lettres : distance max 1
+ * - mots de 6-8 lettres : distance max 2
+ * - mots de 9+ lettres  : distance max 3
+ */
+function fuzzyCorrectWord(word: string): { corrected: string; wasFixed: boolean } {
+  const normalized = word.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // Ne pas corriger les mots trop courts ou les acronymes
+  if (normalized.length < 4 || /^[A-Z]{2,}$/.test(word)) {
+    return { corrected: word, wasFixed: false };
+  }
+
+  // Si le mot est déjà dans le vocabulaire, pas de correction
+  if (EDUCATION_VOCABULARY.includes(normalized)) {
+    return { corrected: word, wasFixed: false };
+  }
+
+  // Seuil dynamique selon la longueur du mot
+  const maxDistance = normalized.length <= 5 ? 1 : normalized.length <= 8 ? 2 : 3;
+
+  let bestMatch = '';
+  let bestDistance = maxDistance + 1;
+
+  for (const vocabWord of EDUCATION_VOCABULARY) {
+    // Optimisation : ignorer si la différence de longueur est > maxDistance
+    if (Math.abs(vocabWord.length - normalized.length) > maxDistance) continue;
+
+    const dist = levenshteinDistance(normalized, vocabWord);
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      bestMatch = vocabWord;
+    }
+    if (dist === 1) break; // Distance 1 = correction quasi-certaine
+  }
+
+  if (bestMatch && bestDistance <= maxDistance) {
+    return { corrected: bestMatch, wasFixed: true };
+  }
+
+  return { corrected: word, wasFixed: false };
+}
+
+/**
+ * Corrige les fautes de frappe dans une requête complète.
+ * Retourne la requête corrigée et la liste des corrections appliquées.
+ */
+function fuzzyCorrectQuery(query: string): { corrected: string; corrections: string[] } {
+  const words = query.split(/(\s+|[.,;:!?'"()\[\]{}])/); // Préserve les espaces et ponctuation
+  const corrections: string[] = [];
+
+  const correctedWords = words.map(token => {
+    // Ne pas toucher aux espaces/ponctuation
+    if (/^[\s.,;:!?'"()\[\]{}]+$/.test(token) || token.length < 4) {
+      return token;
+    }
+
+    const { corrected, wasFixed } = fuzzyCorrectWord(token);
+    if (wasFixed) {
+      corrections.push(`${token}→${corrected}`);
+      return corrected;
+    }
+    return token;
+  });
+
+  return {
+    corrected: correctedWords.join(''),
+    corrections,
+  };
+}
+
 /**
  * Normalise une chaîne pour la comparaison
  */
@@ -1401,10 +1556,54 @@ async function generateResponse(
   history: any[],
   apiKey: string
 ): Promise<{ answer: string; tokensUsed: number }> {
+  const allowAI = mode === 'corpus_plus_ai';
+
+  // Aucun résultat trouvé dans les documents
   if (rerankResults.length === 0) {
+    // En mode corpus_only, pas de fallback possible
+    if (!allowAI) {
+      return {
+        answer: "Je n'ai pas trouvé d'information pertinente dans les documents disponibles pour répondre à cette question.",
+        tokensUsed: 0,
+      };
+    }
+
+    // En mode corpus_plus_ai, utiliser le LLM avec ses connaissances
+    console.log(`[Fallback IA] No corpus results, using AI knowledge for query`);
+
+    const fallbackPrompt = `Tu es un assistant pédagogique expert pour les enseignants français.
+
+CONTEXTE : Aucun document du corpus de l'utilisateur ne contient d'information directement pertinente pour cette question. Tu dois répondre en utilisant tes connaissances générales.
+
+INSTRUCTIONS :
+1. Réponds à la question de l'utilisateur en utilisant tes connaissances pédagogiques et disciplinaires.
+2. Structure ta réponse avec des titres (##) et des puces (-) pour faciliter la lecture.
+3. Sois précis, professionnel et adapté à un public enseignant français.
+4. Si tu n'es pas certain d'une information, indique-le.
+
+Réponds en français.`;
+
+    const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CONFIG.chatModel,
+        messages: [
+          { role: 'system', content: fallbackPrompt },
+          ...history.slice(-CONFIG.maxHistoryMessages),
+          { role: 'user', content: query },
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    const fallbackData = await fallbackResponse.json();
     return {
-      answer: "Je n'ai pas trouvé d'information pertinente dans les documents disponibles pour répondre à cette question.",
-      tokensUsed: 0,
+      answer: fallbackData.choices?.[0]?.message?.content || 'Erreur lors de la génération de la réponse.',
+      tokensUsed: fallbackData.usage?.total_tokens || 0,
     };
   }
 
@@ -1413,7 +1612,6 @@ async function generateResponse(
   const balanced = limitChunksPerDocument(deduplicated);
   const context = buildStructuredContext(balanced);
 
-  const allowAI = mode === 'corpus_plus_ai';
   const numSources = balanced.length;
 
   const systemPrompt = `Tu es un assistant pédagogique expert pour les enseignants français.
@@ -1427,8 +1625,8 @@ INSTRUCTIONS STRICTES :
 3. Si plusieurs sources traitent du même sujet, SYNTHÉTISE-les de manière cohérente.
 4. Structure ta réponse avec des titres (##) et des puces (-) pour faciliter la lecture.
 5. Sois complet : utilise l'ensemble des informations disponibles dans les sources.
-${allowAI 
-  ? `6. Si les sources sont insuffisantes pour répondre complètement, tu PEUX compléter avec tes connaissances, en le signalant clairement avec "💡 Complément IA :".` 
+${allowAI
+  ? `6. Si les sources sont insuffisantes pour répondre complètement, tu PEUX compléter avec tes connaissances, en le signalant clairement avec "💡 Complément IA :".`
   : `6. Si l'information demandée n'est pas dans les sources, indique-le clairement. Ne fabrique JAMAIS d'information.`}
 
 Réponds en français, de manière professionnelle et adaptée à un public enseignant.`;
@@ -1675,17 +1873,26 @@ async function chatHandler(req: Request): Promise<Response> {
 
     metrics.queryLength = message.length;
 
+    // ========== STEP 0: Correction fuzzy des fautes de frappe ==========
+    const { corrected: correctedMessage, corrections } = fuzzyCorrectQuery(message);
+    const effectiveMessage = corrections.length > 0 ? correctedMessage : message;
+
+    if (corrections.length > 0) {
+      console.log(`[Fuzzy] Corrections applied: ${corrections.join(', ')}`);
+      console.log(`[Fuzzy] Corrected query: "${correctedMessage}"`);
+    }
+
     // ========== NEW V6.2: Détection de discipline ==========
-    const disciplineDetection = detectDiscipline(message);
+    const disciplineDetection = detectDiscipline(effectiveMessage);
     metrics.disciplineDetected = disciplineDetection.discipline;
     metrics.disciplineConfidence = disciplineDetection.confidence;
-    
+
     if (disciplineDetection.discipline) {
       console.log(`[Discipline] Detected: ${disciplineDetection.discipline} (confidence: ${disciplineDetection.confidence.toFixed(2)})`);
     }
 
     // ========== STEP 1: Analyse HyDE adaptative ==========
-    const hydeDecision = analyzeQueryForHyDE(message);
+    const hydeDecision = analyzeQueryForHyDE(effectiveMessage);
     metrics.hydeUsed = hydeDecision.shouldUse;
     metrics.hydeReason = hydeDecision.reason;
     
@@ -1791,25 +1998,25 @@ async function chatHandler(req: Request): Promise<Response> {
     }
 
     // ========== STEP 3: Query Processing (HyDE adaptatif + synonymes) ==========
-    const queryKeywords = extractKeywordsWithSynonyms(message);
+    const queryKeywords = extractKeywordsWithSynonyms(effectiveMessage);
     console.log(`[Keywords] ${queryKeywords.length} keywords (with synonyms): ${queryKeywords.slice(0, 10).join(', ')}`);
 
-    let queryForEmbedding = message;
+    let queryForEmbedding = effectiveMessage;
 
     if (hydeDecision.shouldUse) {
-      const hydeResult = await generateHyDE(message, OPENAI_API_KEY);
+      const hydeResult = await generateHyDE(effectiveMessage, OPENAI_API_KEY);
       queryForEmbedding = hydeResult.hydeText;
       totalTokensUsed += hydeResult.tokensUsed;
       console.log(`[HyDE] Generated (${hydeResult.tokensUsed} tokens): "${hydeResult.hydeText.substring(0, 100)}..."`);
     } else {
       // Si pas de HyDE, enrichir l'embedding avec les synonymes
-      queryForEmbedding = expandQueryWithSynonyms(message);
-      if (queryForEmbedding !== message) {
+      queryForEmbedding = expandQueryWithSynonyms(effectiveMessage);
+      if (queryForEmbedding !== effectiveMessage) {
         console.log(`[Synonyms] Expanded: "${queryForEmbedding.substring(0, 120)}..."`);
       }
     }
 
-    const searchTerms = extractSearchTerms(message);
+    const searchTerms = extractSearchTerms(effectiveMessage);
     console.log(`[FTS] Search terms: "${searchTerms}"`);
 
     // ========== STEP 4: Adaptive Hybrid Retrieval (V6.2: avec discipline routing) ==========
@@ -1901,7 +2108,7 @@ async function chatHandler(req: Request): Promise<Response> {
     // ========== STEP 6: Reranking ==========
     const candidatesForRerank = boostedResults.slice(0, 30);
     const rerankResults = await rerankWithCohere(
-      message,
+      effectiveMessage,
       candidatesForRerank,
       CONFIG.rerankTopK
     );
@@ -1939,7 +2146,7 @@ async function chatHandler(req: Request): Promise<Response> {
 
     // ========== STEP 8: Response Generation ==========
     const { answer, tokensUsed } = await generateResponse(
-      message,
+      effectiveMessage,
       rerankResults,
       effectiveMode,
       history || [],
