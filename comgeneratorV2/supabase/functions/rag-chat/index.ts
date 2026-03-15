@@ -335,6 +335,123 @@ const DISCIPLINE_PATTERNS: Record<string, {
   }
 };
 
+// ============================================================================
+// SYNONYMES ÉDUCATIFS (pour expansion de requête)
+// ============================================================================
+
+const EDUCATION_SYNONYMS: Record<string, string[]> = {
+  // Pédagogie & didactique
+  'sequence': ['seance', 'progression', 'unite', 'module'],
+  'seance': ['sequence', 'cours', 'activite', 'session'],
+  'evaluation': ['controle', 'examen', 'devoir', 'test', 'notation', 'bilan'],
+  'competence': ['capacite', 'aptitude', 'savoir-faire', 'acquis'],
+  'objectif': ['attendu', 'but', 'finalite', 'visee'],
+  'differentiation': ['adaptation', 'personnalisation', 'remediation', 'individualisation'],
+  'remediation': ['soutien', 'aide', 'accompagnement', 'differentiation'],
+  'programme': ['referentiel', 'curriculum', 'socle', 'attendus'],
+  'socle': ['programme', 'referentiel', 'competences', 'attendus'],
+
+  // Niveaux scolaires
+  'cycle': ['niveau', 'classe', 'annee'],
+  'primaire': ['elementaire', 'cp', 'ce1', 'ce2', 'cm1', 'cm2'],
+  'college': ['6eme', '5eme', '4eme', '3eme', 'secondaire'],
+  'lycee': ['seconde', 'premiere', 'terminale', 'secondaire'],
+  'maternelle': ['petite section', 'moyenne section', 'grande section'],
+
+  // Élèves & inclusion
+  'eleve': ['apprenant', 'enfant', 'etudiant'],
+  'inclusion': ['accessibilite', 'adaptation', 'handicap', 'ulis', 'segpa'],
+  'difficulte': ['besoin', 'trouble', 'obstacle', 'blocage'],
+  'trouble': ['dys', 'dyslexie', 'dyspraxie', 'tdah', 'tsa'],
+  'motivation': ['engagement', 'interet', 'implication', 'participation'],
+
+  // Pratiques pédagogiques
+  'projet': ['tache complexe', 'situation probleme', 'realisation'],
+  'groupe': ['equipe', 'binome', 'collectif', 'cooperatif', 'collaboratif'],
+  'autonomie': ['independance', 'autoregulation', 'initiative'],
+  'oral': ['prise de parole', 'expose', 'debat', 'presentation'],
+  'ecrit': ['redaction', 'production', 'expression ecrite', 'trace ecrite'],
+
+  // Numérique éducatif
+  'numerique': ['digital', 'tice', 'informatique', 'tablette', 'ordinateur'],
+  'outil': ['ressource', 'support', 'materiel', 'logiciel', 'application'],
+
+  // Organisation scolaire
+  'conseil': ['reunion', 'concertation', 'equipe pedagogique'],
+  'parcours': ['peac', 'parcours citoyen', 'parcours avenir', 'parcours sante'],
+  'interdisciplinaire': ['transversal', 'pluridisciplinaire', 'epi', 'croisement'],
+};
+
+/**
+ * Extrait les mots-clés significatifs d'une requête (sans stop words)
+ */
+function extractKeywords(query: string): string[] {
+  const stopWords = new Set([
+    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'mais',
+    'donc', 'car', 'ni', 'que', 'qui', 'quoi', 'dont', 'ou', 'ce', 'cette',
+    'ces', 'mon', 'ton', 'son', 'notre', 'votre', 'leur', 'je', 'tu', 'il',
+    'elle', 'nous', 'vous', 'ils', 'elles', 'on', 'se', 'sa', 'ses', 'aux',
+    'est', 'sont', 'etre', 'avoir', 'fait', 'faire', 'dit', 'dire', 'peut',
+    'peux', 'sur', 'sous', 'dans', 'pour', 'par', 'avec', 'sans', 'chez',
+    'entre', 'vers', 'plus', 'moins', 'tres', 'tout', 'tous', 'toute',
+    'toutes', 'autre', 'autres', 'meme', 'aussi', 'bien', 'encore', 'alors',
+    'ainsi', 'comme', 'comment', 'pourquoi', 'quand', 'si', 'ne', 'pas',
+    'quel', 'quelle', 'quels', 'quelles',
+    'propose', 'donne', 'montre', 'presente', 'fais', 'decris',
+    'document', 'fichier', 'information',
+  ]);
+
+  return query
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/\s+/)
+    .map(word => word.replace(/[^a-z0-9-]/g, ''))
+    .filter(word => word.length >= 3 && !stopWords.has(word));
+}
+
+/**
+ * Extrait les mots-clés et ajoute leurs synonymes éducatifs
+ */
+function extractKeywordsWithSynonyms(query: string): string[] {
+  const baseKeywords = extractKeywords(query);
+  const allKeywords = new Set(baseKeywords);
+
+  for (const keyword of baseKeywords) {
+    if (EDUCATION_SYNONYMS[keyword]) {
+      for (const synonym of EDUCATION_SYNONYMS[keyword]) {
+        const normalized = synonym
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, '');
+        allKeywords.add(normalized);
+      }
+    }
+  }
+
+  return Array.from(allKeywords);
+}
+
+/**
+ * Expand une requête avec les synonymes éducatifs pour l'embedding
+ */
+function expandQueryWithSynonyms(query: string): string {
+  const keywords = extractKeywords(query);
+  const expansions: string[] = [];
+
+  for (const keyword of keywords) {
+    if (EDUCATION_SYNONYMS[keyword]) {
+      expansions.push(...EDUCATION_SYNONYMS[keyword].slice(0, 4));
+    }
+  }
+
+  const unique = [...new Set(expansions)].slice(0, 8);
+  if (unique.length > 0) {
+    return `${query} (${unique.join(', ')})`;
+  }
+  return query;
+}
+
 /**
  * Normalise une chaîne pour la comparaison
  */
@@ -1366,6 +1483,149 @@ async function deductTokens(
 }
 
 // ============================================================================
+// STEP 8b: RECHERCHE COMPLÉMENTAIRE PAR TITRE DE DOCUMENT
+// ============================================================================
+
+/**
+ * Recherche des documents par titre pour rattraper les cas où la recherche
+ * vectorielle a raté un document dont le titre correspond à la requête.
+ * Ex: "séquence natation cycle 3" → trouve "Sequence_Natation_C3.pdf"
+ */
+async function searchByDocumentTitle(
+  supabase: any,
+  keywords: string[],
+  allowedDocIds: string[],
+  existingDocumentIds: Set<string>,
+  maxResults: number = 8
+): Promise<RetrievedChunk[]> {
+  if (keywords.length === 0 || allowedDocIds.length === 0) return [];
+
+  try {
+    // Récupérer les documents autorisés avec leur titre
+    const { data: docs, error } = await supabase
+      .from('rag_documents')
+      .select('id, title, keywords, subjects')
+      .in('id', allowedDocIds)
+      .eq('status', 'ready');
+
+    if (error || !docs || docs.length === 0) return [];
+
+    // Filtrer les documents dont le titre ou les keywords matchent
+    const normalizedKeywords = keywords.map(kw =>
+      kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    );
+
+    const matchingDocs = docs.filter((doc: any) => {
+      if (existingDocumentIds.has(doc.id)) return false;
+
+      // Match par titre
+      if (doc.title) {
+        const normalizedTitle = doc.title
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        if (normalizedKeywords.some(kw => normalizedTitle.includes(kw))) return true;
+      }
+
+      // Match par keywords stockés sur le document
+      if (doc.keywords && Array.isArray(doc.keywords)) {
+        const normalizedDocKw = doc.keywords.map((k: string) =>
+          k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        );
+        if (normalizedKeywords.some(kw =>
+          normalizedDocKw.some((dk: string) => dk.includes(kw) || kw.includes(dk))
+        )) return true;
+      }
+
+      return false;
+    });
+
+    if (matchingDocs.length === 0) return [];
+
+    console.log(`[TitleSearch] Found ${matchingDocs.length} matching documents by title/keywords`);
+
+    // Récupérer les chunks de ces documents
+    const matchingDocIds = matchingDocs.map((d: any) => d.id);
+    const { data: chunks, error: chunksError } = await supabase
+      .from('rag_chunks')
+      .select('id, content, document_id, chunk_index, metadata')
+      .in('document_id', matchingDocIds)
+      .order('chunk_index', { ascending: true })
+      .limit(maxResults);
+
+    if (chunksError || !chunks) return [];
+
+    return chunks.map((c: any, index: number) => ({
+      id: c.id || `title_${c.document_id}_${index}`,
+      documentId: c.document_id,
+      documentTitle: matchingDocs.find((d: any) => d.id === c.document_id)?.title || '',
+      chunkIndex: c.chunk_index ?? index,
+      content: c.content,
+      score: 0.5, // Score neutre, sera reranké par Cohere
+      source: 'fts' as const,
+    }));
+  } catch (err) {
+    console.warn('[TitleSearch] Error:', err);
+    return [];
+  }
+}
+
+// ============================================================================
+// STEP 8c: BOOST PAR MÉTADONNÉES DOCUMENT
+// ============================================================================
+
+/**
+ * Calcule un boost basé sur les métadonnées du document (summary, keywords, titre)
+ * Permet de favoriser les documents contextuellement pertinents
+ */
+function calculateMetadataBoost(
+  queryKeywords: string[],
+  docInfo: {
+    title?: string | null;
+    summary?: string | null;
+    keywords?: string[] | null;
+  }
+): number {
+  if (queryKeywords.length === 0) return 0;
+
+  let boost = 0;
+
+  const normalize = (text: string) =>
+    text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Boost par titre (max +0.4)
+  if (docInfo.title) {
+    const normalizedTitle = normalize(docInfo.title);
+    const matchingInTitle = queryKeywords.filter(kw => normalizedTitle.includes(kw));
+    if (matchingInTitle.length > 0) {
+      boost += Math.min(0.4, matchingInTitle.length * 0.2);
+    }
+  }
+
+  // Boost par summary (max +0.2)
+  if (docInfo.summary) {
+    const normalizedSummary = normalize(docInfo.summary);
+    const matchingInSummary = queryKeywords.filter(kw => normalizedSummary.includes(kw));
+    if (matchingInSummary.length > 0) {
+      boost += Math.min(0.2, matchingInSummary.length * 0.08);
+    }
+  }
+
+  // Boost par keywords du document (max +0.3)
+  if (docInfo.keywords && docInfo.keywords.length > 0) {
+    const normalizedDocKw = docInfo.keywords.map(k => normalize(k));
+    const matchingKw = queryKeywords.filter(kw =>
+      normalizedDocKw.some(dk => dk.includes(kw) || kw.includes(dk))
+    );
+    if (matchingKw.length > 0) {
+      boost += Math.min(0.3, matchingKw.length * 0.15);
+    }
+  }
+
+  return boost;
+}
+
+// ============================================================================
 // MAIN HANDLER
 // ============================================================================
 
@@ -1530,14 +1790,23 @@ async function chatHandler(req: Request): Promise<Response> {
       );
     }
 
-    // ========== STEP 3: Query Processing (HyDE adaptatif) ==========
+    // ========== STEP 3: Query Processing (HyDE adaptatif + synonymes) ==========
+    const queryKeywords = extractKeywordsWithSynonyms(message);
+    console.log(`[Keywords] ${queryKeywords.length} keywords (with synonyms): ${queryKeywords.slice(0, 10).join(', ')}`);
+
     let queryForEmbedding = message;
-    
+
     if (hydeDecision.shouldUse) {
       const hydeResult = await generateHyDE(message, OPENAI_API_KEY);
       queryForEmbedding = hydeResult.hydeText;
       totalTokensUsed += hydeResult.tokensUsed;
       console.log(`[HyDE] Generated (${hydeResult.tokensUsed} tokens): "${hydeResult.hydeText.substring(0, 100)}..."`);
+    } else {
+      // Si pas de HyDE, enrichir l'embedding avec les synonymes
+      queryForEmbedding = expandQueryWithSynonyms(message);
+      if (queryForEmbedding !== message) {
+        console.log(`[Synonyms] Expanded: "${queryForEmbedding.substring(0, 120)}..."`);
+      }
     }
 
     const searchTerms = extractSearchTerms(message);
@@ -1545,9 +1814,9 @@ async function chatHandler(req: Request): Promise<Response> {
 
     // ========== STEP 4: Adaptive Hybrid Retrieval (V6.2: avec discipline routing) ==========
     const embedding = await createEmbedding(queryForEmbedding, OPENAI_API_KEY);
-    
+
     // V6.2: Préparer le filtre discipline si confiance suffisante
-    const disciplineFilter = disciplineDetection.discipline && 
+    const disciplineFilter = disciplineDetection.discipline &&
       disciplineDetection.confidence >= CONFIG.disciplineRouting.minConfidence
       ? {
           discipline: disciplineDetection.discipline,
@@ -1555,7 +1824,7 @@ async function chatHandler(req: Request): Promise<Response> {
           confidence: disciplineDetection.confidence,
         }
       : undefined;
-    
+
     const { vectorResults, ftsResults, threshold, passes, rawVectorCount, disciplineMode } = await adaptiveRetrieval(
       serviceClient,
       user.id,
@@ -1574,13 +1843,63 @@ async function chatHandler(req: Request): Promise<Response> {
 
     console.log(`[Retrieval] Vector: ${vectorResults.length} (raw: ${rawVectorCount}, threshold: ${threshold}) | FTS: ${ftsResults.length} | Passes: ${passes} | DisciplineMode: ${disciplineMode}`);
 
-    // ========== STEP 5: Weighted RRF Fusion ==========
-    const fusedResults = fuseWithWeightedRRF(vectorResults, ftsResults, docsMap);
+    // ========== STEP 4b: Recherche complémentaire par titre ==========
+    const existingDocIds = new Set([
+      ...vectorResults.map(r => r.documentId),
+      ...ftsResults.map(r => r.documentId),
+    ]);
+
+    const titleResults = await searchByDocumentTitle(
+      serviceClient,
+      queryKeywords,
+      allowedDocIds,
+      existingDocIds,
+      8
+    );
+
+    if (titleResults.length > 0) {
+      console.log(`[TitleSearch] Added ${titleResults.length} extra chunks from title/keyword matching`);
+    }
+
+    // ========== STEP 5: Weighted RRF Fusion (inclut les résultats titre) ==========
+    const allFtsResults = [...ftsResults, ...titleResults];
+    const fusedResults = fuseWithWeightedRRF(vectorResults, allFtsResults, docsMap);
     metrics.fusedResultsCount = fusedResults.length;
-    console.log(`[Fusion] ${fusedResults.length} unique chunks after weighted RRF`);
+    console.log(`[Fusion] ${fusedResults.length} unique chunks after weighted RRF (incl. ${titleResults.length} title-matched)`);
+
+    // ========== STEP 5b: Récupérer métadonnées et appliquer boost ==========
+    const uniqueDocIds = [...new Set(fusedResults.map(r => r.documentId))];
+    const { data: docsMetadata } = await serviceClient
+      .from('rag_documents')
+      .select('id, title, summary, keywords')
+      .in('id', uniqueDocIds);
+
+    const docMetaMap = new Map<string, { title: string | null; summary: string | null; keywords: string[] | null }>();
+    if (docsMetadata) {
+      for (const d of docsMetadata) {
+        docMetaMap.set(d.id, { title: d.title, summary: d.summary, keywords: d.keywords });
+      }
+    }
+
+    // Appliquer le boost par métadonnées sur les scores fusionnés
+    const boostedResults = fusedResults.map(chunk => {
+      const docMeta = docMetaMap.get(chunk.documentId);
+      const boost = docMeta ? calculateMetadataBoost(queryKeywords, docMeta) : 0;
+      return {
+        ...chunk,
+        score: chunk.score + boost,
+      };
+    });
+
+    // Re-trier après boost
+    boostedResults.sort((a, b) => b.score - a.score);
+
+    if (boostedResults.some((r, i) => fusedResults[i]?.id !== r.id)) {
+      console.log(`[Boost] Ranking changed after metadata boost`);
+    }
 
     // ========== STEP 6: Reranking ==========
-    const candidatesForRerank = fusedResults.slice(0, 30);
+    const candidatesForRerank = boostedResults.slice(0, 30);
     const rerankResults = await rerankWithCohere(
       message,
       candidatesForRerank,
