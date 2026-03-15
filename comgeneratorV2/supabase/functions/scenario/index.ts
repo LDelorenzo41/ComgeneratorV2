@@ -31,6 +31,7 @@ interface ScenarioRequest {
 interface RagChunk {
   id: string;
   content: string;
+  documentId: string;
   documentTitle: string;
   score: number;
 }
@@ -339,6 +340,7 @@ async function searchRagChunks(
     return (data || []).map((item: any) => ({
       id: item.id,
       content: item.content,
+      documentId: item.document_id || '',
       documentTitle: item.document_title,
       score: item.similarity,
     }));
@@ -403,7 +405,25 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
-      
+
+      // Si un dossier est sélectionné, récupérer les document_ids autorisés
+      let allowedDocIds: Set<string> | null = null;
+
+      if (data.folderIds?.length) {
+        const { data: folderDocs } = await serviceClient
+          .from('rag_documents')
+          .select('id')
+          .eq('user_id', user.id)
+          .in('folder_id', data.folderIds);
+
+        if (folderDocs && folderDocs.length > 0) {
+          allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
+          console.log(`[scenario] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+        } else {
+          console.log('[scenario] No documents found in selected folders');
+        }
+      }
+
       const searchTerms = [
         data.matiere,
         data.niveau,
@@ -415,31 +435,26 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         'compétences',
         cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
       ].filter(Boolean).join(' ');
-      
+
       console.log(`[scenario] RAG search query: ${searchTerms}`);
-      
+
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
-      
+
+      // Chercher plus de chunks quand un filtre dossier est actif
+      const searchTopK = allowedDocIds ? CONFIG.ragTopK * 5 : CONFIG.ragTopK;
+
       let chunks = await searchRagChunks(
         serviceClient,
         user.id,
         embedding,
-        CONFIG.ragTopK
+        searchTopK
       );
 
-      // Filtrer par dossier si folderIds est spécifié
-      if (data.folderIds?.length && chunks.length > 0) {
-        const { data: folderDocs } = await serviceClient
-          .from('rag_documents')
-          .select('title')
-          .eq('user_id', user.id)
-          .in('folder_id', data.folderIds);
-
-        if (folderDocs) {
-          const allowedTitles = new Set(folderDocs.map((d: any) => d.title));
-          chunks = chunks.filter(c => allowedTitles.has(c.documentTitle));
-          console.log(`[scenario] After folder filter: ${chunks.length} chunks`);
-        }
+      // Filtrer par document_id si un dossier est sélectionné
+      if (allowedDocIds && chunks.length > 0) {
+        chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
+        console.log(`[scenario] After folder filter: ${chunks.length} chunks from selected folders`);
+        chunks = chunks.slice(0, CONFIG.ragTopK);
       }
 
       if (chunks.length > 0) {

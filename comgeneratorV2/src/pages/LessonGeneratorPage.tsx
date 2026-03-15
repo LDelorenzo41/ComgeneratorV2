@@ -1231,7 +1231,10 @@ export function LessonGeneratorPage() {
                   <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore grandement la qualité de la séance. Attention, son analyse peut consommer <strong>jusqu'à 4000 tokens supplémentaires</strong>.
+                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité mais son contenu est limité à ~4000 tokens. Pour exploiter un document complet, <strong>ingérez-le dans votre corpus RAG</strong> (Mon chatbot → Documents → Créer un dossier) puis activez "Utiliser mon corpus documentaire personnel" ci-dessous.
+              </li>
+              <li>
+                  <strong>Corpus personnel :</strong> Activez l'option en bas de page pour que la génération s'appuie sur vos documents ingérés. Sélectionnez un dossier spécifique pour cibler les sources pertinentes.
               </li>
           </ul>
       </div>

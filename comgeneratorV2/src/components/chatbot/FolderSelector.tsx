@@ -42,6 +42,7 @@ export const FolderSelector: React.FC<FolderSelectorProps> = ({
             const isSelected = selectedFolderIds.includes(folder.id);
             return (
               <button
+                type="button"
                 key={folder.id}
                 onClick={() => toggleFolder(folder.id)}
                 disabled={disabled}
