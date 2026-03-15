@@ -105,6 +105,17 @@ function cleanOutputText(text: string, isMistral: boolean): string {
 }
 
 // =====================================================
+// HELPERS - SUPABASE CLIENT (pour RAG)
+// =====================================================
+
+async function createServiceClient() {
+  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  return createClient(supabaseUrl, serviceRoleKey);
+}
+
+// =====================================================
 // HANDLER PRINCIPAL
 // =====================================================
 
@@ -116,6 +127,82 @@ interface LessonRequest {
   duration: string;
   documentContext?: string;
   aiModel?: string;
+  useRag?: boolean;
+  folderIds?: string[];
+}
+
+interface RagChunk {
+  id: string;
+  content: string;
+  documentTitle: string;
+  score: number;
+}
+
+interface RagSource {
+  document_name: string;
+  chunk_content: string;
+  similarity: number;
+}
+
+const RAG_CONFIG = {
+  embeddingModel: 'text-embedding-3-large',
+  embeddingDimensions: 1536,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.40,
+};
+
+async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: RAG_CONFIG.embeddingModel,
+      input: text,
+      dimensions: RAG_CONFIG.embeddingDimensions,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erreur embedding: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  return data.data[0].embedding;
+}
+
+async function searchRagChunks(
+  supabase: any,
+  userId: string,
+  embedding: number[],
+  topK: number
+): Promise<RagChunk[]> {
+  try {
+    const { data, error } = await supabase.rpc('match_rag_chunks', {
+      p_query_embedding: `[${embedding.join(',')}]`,
+      p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
+      p_match_count: topK,
+      p_user_id: userId,
+      p_document_id: null,
+    });
+
+    if (error) {
+      console.error('[lessons] RAG search error:', error);
+      return [];
+    }
+
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      content: item.content,
+      documentTitle: item.document_title,
+      score: item.similarity,
+    }));
+  } catch (err) {
+    console.error('[lessons] RAG search exception:', err);
+    return [];
+  }
 }
 
 const lessonsHandler = async (req: Request): Promise<Response> => {
@@ -203,6 +290,92 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`[lessons] Modèle IA utilisé: ${aiConfig.model}`);
+
+    // =====================================================
+    // SECTION RAG (optionnelle)
+    // =====================================================
+
+    let ragContext = '';
+    let ragSources: RagSource[] = [];
+
+    if (data.useRag) {
+      console.log(`[lessons] RAG mode enabled, searching documents...`);
+
+      try {
+        const serviceClient = await createServiceClient();
+
+        const searchTerms = [
+          data.subject,
+          data.level,
+          data.topic,
+          'programmes officiels',
+          'compétences',
+        ].filter(Boolean).join(' ');
+
+        console.log(`[lessons] RAG search query: ${searchTerms}`);
+
+        const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
+
+        let chunks = await searchRagChunks(
+          serviceClient,
+          authUser.id,
+          embedding,
+          RAG_CONFIG.ragTopK
+        );
+
+        // Filtrer par dossier si folderIds est spécifié
+        if (data.folderIds?.length && chunks.length > 0) {
+          const { data: folderDocs } = await serviceClient
+            .from('rag_documents')
+            .select('title')
+            .eq('user_id', authUser.id)
+            .in('folder_id', data.folderIds);
+
+          if (folderDocs) {
+            const allowedTitles = new Set(folderDocs.map((d: any) => d.title));
+            chunks = chunks.filter(c => allowedTitles.has(c.documentTitle));
+            console.log(`[lessons] After folder filter: ${chunks.length} chunks`);
+          }
+        }
+
+        if (chunks.length > 0) {
+          console.log(`[lessons] Found ${chunks.length} relevant chunks`);
+
+          ragSources = chunks.map((chunk: RagChunk) => ({
+            document_name: chunk.documentTitle || 'Document',
+            chunk_content: chunk.content,
+            similarity: chunk.score,
+          }));
+
+          ragContext = `
+═══════════════════════════════════════════════════════════════
+            RESSOURCES DE VOTRE CORPUS DOCUMENTAIRE
+═══════════════════════════════════════════════════════════════
+
+Les extraits suivants proviennent du corpus documentaire personnel de l'enseignant.
+Appuie-toi sur ces ressources pour enrichir et contextualiser la séance :
+- Formuler des objectifs alignés sur les contenus fournis
+- Utiliser le vocabulaire et les références des documents
+- Intégrer les éléments pertinents dans les activités
+
+${chunks.map((chunk, i) => `
+┌─────────────────────────────────────────────────────────────┐
+│ SOURCE ${i + 1} : ${chunk.documentTitle}
+│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
+└─────────────────────────────────────────────────────────────┘
+${chunk.content}
+`).join('\n')}
+
+⚠️ CONSIGNE : Intègre ces ressources dans la conception de la séance lorsqu'elles sont pertinentes.
+`;
+        } else {
+          console.log('[lessons] No relevant RAG chunks found');
+        }
+      } catch (ragError) {
+        console.error('[lessons] RAG error (non-blocking):', ragError);
+        // RAG errors are non-blocking - lesson generation continues without RAG
+      }
+    }
 
     const pedagogies = [
       {
@@ -294,7 +467,7 @@ CONTENU DU DOCUMENT :
 ${data.documentContext}
 ---
 ` : ''}
-
+${ragContext}
 ═══════════════════════════════════════════════════════════════
         EXIGENCES PÉDAGOGIQUES NON NÉGOCIABLES
 ═══════════════════════════════════════════════════════════════
@@ -870,7 +1043,8 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 
     return new Response(JSON.stringify({
       content: cleanedContent,
-      usage: aiData.usage
+      usage: aiData.usage,
+      ...(ragSources.length > 0 && { sources: ragSources }),
     }), {
       status: 200,
       headers: {
@@ -889,6 +1063,9 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+
 
 
 

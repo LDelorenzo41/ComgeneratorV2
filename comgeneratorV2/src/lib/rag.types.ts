@@ -11,6 +11,16 @@ export interface CorpusSelection {
   usePersonalCorpus: boolean;
   useProfAssistCorpus: boolean;
   useAI: boolean;
+  folderIds?: string[];
+}
+
+// Dossier pour organiser les documents personnels
+export interface RagFolder {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Valeurs par défaut
@@ -102,6 +112,7 @@ export interface RagDocument {
   subjects?: string[] | null;
   document_type?: DocumentType | null;
   language?: string | null;
+  folder_id?: string | null;
 }
 
 export interface SourceChunk {
@@ -179,6 +190,10 @@ export function getScopeColor(scope: DocumentScope): string {
     ? 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30' 
     : 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30';
 }
+
+
+
+
 
 
 

@@ -25,6 +25,7 @@ interface ScenarioRequest {
   useRag: boolean;
   documentsContent?: string;
   documentNames?: string[];
+  folderIds?: string[];
 }
 
 interface RagChunk {
@@ -419,13 +420,28 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
       
-      const chunks = await searchRagChunks(
+      let chunks = await searchRagChunks(
         serviceClient,
         user.id,
         embedding,
         CONFIG.ragTopK
       );
-      
+
+      // Filtrer par dossier si folderIds est spécifié
+      if (data.folderIds?.length && chunks.length > 0) {
+        const { data: folderDocs } = await serviceClient
+          .from('rag_documents')
+          .select('title')
+          .eq('user_id', user.id)
+          .in('folder_id', data.folderIds);
+
+        if (folderDocs) {
+          const allowedTitles = new Set(folderDocs.map((d: any) => d.title));
+          chunks = chunks.filter(c => allowedTitles.has(c.documentTitle));
+          console.log(`[scenario] After folder filter: ${chunks.length} chunks`);
+        }
+      }
+
       if (chunks.length > 0) {
         console.log(`[scenario] Found ${chunks.length} relevant chunks`);
         
@@ -616,4 +632,5 @@ Génère maintenant le scénario pédagogique complet :`;
 };
 
 Deno.serve(scenarioHandler);
+
 

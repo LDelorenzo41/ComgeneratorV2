@@ -5,12 +5,15 @@ import {
 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { sendChatMessage } from '../../lib/ragApi';
-import type { ChatUIMessage, RagDocument, CorpusSelection, SearchFilters } from '../../lib/rag.types';
+import type { ChatUIMessage, RagDocument, RagFolder, CorpusSelection, SearchFilters } from '../../lib/rag.types';
 import { DEFAULT_CORPUS_SELECTION, AVAILABLE_LEVELS, AVAILABLE_SUBJECTS } from '../../lib/rag.types';
+import { FolderSelector } from './FolderSelector';
 
 interface ChatInterfaceProps {
   documents: RagDocument[];
   onNeedDocuments?: () => void;
+  isAdmin?: boolean;
+  folders?: RagFolder[];
 }
 
 // Composant Switch réutilisable
@@ -66,7 +69,7 @@ const FilterTag: React.FC<{
   </button>
 );
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedDocuments }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedDocuments, isAdmin = false, folders = [] }) => {
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -74,6 +77,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
   const [corpusSelection, setCorpusSelection] = useState<CorpusSelection>(DEFAULT_CORPUS_SELECTION);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
@@ -161,9 +165,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
         filters.subjects = selectedSubjects;
       }
 
+      const selectionWithFolders: CorpusSelection = {
+        ...corpusSelection,
+        folderIds: selectedFolderIds.length > 0 ? selectedFolderIds : undefined,
+      };
+
       const response = await sendChatMessage({
         message: userMessage.content,
-        corpusSelection,
+        corpusSelection: selectionWithFolders,
         conversationId: conversationId || undefined,
         filters: Object.keys(filters).length > 0 ? filters : undefined,
       });
@@ -236,14 +245,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
               disabled={!hasPersonalDocs}
             />
             
-            <ToggleSwitch
-              enabled={corpusSelection.useProfAssistCorpus}
-              onChange={(v) => updateCorpusSelection('useProfAssistCorpus', v)}
-              label="Corpus ProfAssist"
-              icon={<Building2 className="w-4 h-4" />}
-              colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 ring-purple-300 dark:ring-purple-700"
-              disabled={!hasProfAssistDocs}
-            />
+            {isAdmin && (
+              <ToggleSwitch
+                enabled={corpusSelection.useProfAssistCorpus}
+                onChange={(v) => updateCorpusSelection('useProfAssistCorpus', v)}
+                label="Corpus ProfAssist"
+                icon={<Building2 className="w-4 h-4" />}
+                colorClass="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 ring-purple-300 dark:ring-purple-700"
+                disabled={!hasProfAssistDocs}
+              />
+            )}
             
             <ToggleSwitch
               enabled={corpusSelection.useAI}
@@ -280,12 +291,23 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
           )}
         </p>
                 {/* Message pour le Corpus ProfAssist en construction */}
-        {corpusSelection.useProfAssistCorpus && (
+        {isAdmin && corpusSelection.useProfAssistCorpus && (
           <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
             Corpus en cours de construction. Consultez la liste des documents actuellement disponibles.
           </p>
         )}
 
+        {/* Sélection de dossiers - visible quand le corpus perso est activé */}
+        {corpusSelection.usePersonalCorpus && folders.length > 0 && (
+          <div className="mt-2">
+            <FolderSelector
+              folders={folders}
+              selectedFolderIds={selectedFolderIds}
+              onChange={setSelectedFolderIds}
+              compact
+            />
+          </div>
+        )}
 
         {/* Filtres avancés */}
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
@@ -447,6 +469,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
 };
 
 export default ChatInterface;
+
+
+
+
+
+
 
 
 

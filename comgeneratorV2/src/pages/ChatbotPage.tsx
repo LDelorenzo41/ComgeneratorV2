@@ -10,15 +10,16 @@ import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import DocumentUploader from '../components/chatbot/DocumentUploader';
 import { DocumentList } from '../components/chatbot/DocumentList';
+import { FolderManager } from '../components/chatbot/FolderManager';
 import { ChatInterface } from '../components/chatbot/ChatInterface';
-import { getDocuments, getRagStats, getBetaUsageStats, BetaUsageStats, RagStats } from '../lib/ragApi';
-import type { RagDocument } from '../lib/rag.types';
+import { getDocuments, getRagStats, getBetaUsageStats, checkIsAdmin, getFolders, BetaUsageStats, RagStats } from '../lib/ragApi';
+import type { RagDocument, RagFolder } from '../lib/rag.types';
 import { ChatbotFloatingSwitch } from '../components/chatbot/ChatbotFloatingButton';
 
 type TabType = 'chat' | 'documents';
 
 // Modal d'information sur le chatbot
-const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void; isAdmin?: boolean }> = ({ isOpen, onClose, isAdmin = false }) => {
   if (!isOpen) return null;
 
   return (
@@ -57,27 +58,29 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </p>
           </div>
 
-          {/* Corpus global vs personnel */}
+          {/* Corpus documentaire */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Database className="w-5 h-5 text-purple-500" />
+              <Database className="w-5 h-5 text-blue-500" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Deux types de documents
+                {isAdmin ? 'Deux types de documents' : 'Votre corpus documentaire'}
               </h3>
             </div>
             <div className="grid gap-3">
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-semibold text-purple-700 dark:text-purple-400">
-                    Corpus ProfAssist
-                  </h4>
+              {isAdmin && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-semibold text-purple-700 dark:text-purple-400">
+                      Corpus ProfAssist
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Programmes officiels, textes réglementaires et ressources nationales.
+                    Ces documents sont <strong>inclus pour tous</strong> et ne comptent pas dans votre quota.
+                  </p>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Programmes officiels, textes réglementaires et ressources nationales. 
-                  Ces documents sont <strong>inclus pour tous</strong> et ne comptent pas dans votre quota.
-                </p>
-              </div>
+              )}
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center gap-2 mb-2">
                   <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -86,7 +89,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                   </h4>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Vos progressions, projets pédagogiques et documents personnels. 
+                  Vos progressions, projets pédagogiques et documents personnels.
                   Ces documents sont <strong>privés</strong> et comptent dans votre quota bêta.
                 </p>
               </div>
@@ -126,7 +129,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               </h3>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-              Utilisez les <strong>3 switches</strong> pour choisir les sources à interroger. Vous pouvez les combiner librement :
+              Utilisez les <strong>switches</strong> pour choisir les sources à interroger. Vous pouvez les combiner librement :
             </p>
             <div className="grid gap-3">
               {/* Switch Corpus perso */}
@@ -141,20 +144,21 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                   Active la recherche dans <strong>vos documents personnels</strong> (progressions, projets, fiches...).
                 </p>
               </div>
-              
-              {/* Switch Corpus ProfAssist */}
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-semibold text-purple-700 dark:text-purple-400">
-                    Corpus ProfAssist
-                  </h4>
+
+              {isAdmin && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-semibold text-purple-700 dark:text-purple-400">
+                      Corpus ProfAssist
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Active la recherche dans les <strong>documents officiels</strong> (programmes, textes réglementaires, guides...).
+                  </p>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Active la recherche dans les <strong>documents officiels</strong> (programmes, textes réglementaires, guides...).
-                </p>
-              </div>
-              
+              )}
+
               {/* Switch IA */}
               <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
                 <div className="flex items-center gap-2 mb-2">
@@ -168,7 +172,7 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                 </p>
               </div>
             </div>
-            
+
             {/* Exemples de combinaisons */}
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
               <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -177,15 +181,11 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                 <div className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">•</span>
-                  <span><strong>Perso + ProfAssist</strong> : Recherche dans tous vos documents, réponse strictement basée sur les sources</span>
+                  <span><strong>Corpus perso</strong> : Recherche uniquement dans vos documents personnels</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">•</span>
-                  <span><strong>ProfAssist + IA</strong> : Recherche dans les textes officiels + compléments IA</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500 mt-0.5">•</span>
-                  <span><strong>Perso seul</strong> : Recherche uniquement dans vos documents personnels</span>
+                  <span><strong>Corpus perso + IA</strong> : Recherche dans vos documents + compléments IA si nécessaire</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-green-500 mt-0.5">•</span>
@@ -280,10 +280,12 @@ const ChatbotInfoModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
                   <Upload className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
                   <span><strong>100 000 tokens d'import/mois</strong> : volume total d'imports autorisé chaque mois (réinitialisé le 1er du mois)</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-pink-500 mt-1">📚</span>
-                  <span>Corpus ProfAssist inclus <strong>gratuitement et sans limite</strong></span>
-                </li>
+                {isAdmin && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-pink-500 mt-1">📚</span>
+                    <span>Corpus ProfAssist inclus <strong>gratuitement et sans limite</strong></span>
+                  </li>
+                )}
               </ul>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-pink-200 dark:border-pink-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -466,6 +468,8 @@ export const ChatbotPage: React.FC = () => {
     resetDate: null 
   });
   const [isLoadingBeta, setIsLoadingBeta] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [folders, setFolders] = useState<RagFolder[]>([]);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
 
   useEffect(() => {
@@ -505,17 +509,29 @@ export const ChatbotPage: React.FC = () => {
     }
   }, []);
 
+  const loadFolders = useCallback(async () => {
+    try {
+      const data = await getFolders();
+      setFolders(data);
+    } catch (error) {
+      console.error('Error loading folders:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadDocuments();
     loadStats();
     loadBetaStats();
-  }, [loadDocuments, loadStats, loadBetaStats]);
+    loadFolders();
+    checkIsAdmin().then(setIsAdmin);
+  }, [loadDocuments, loadStats, loadBetaStats, loadFolders]);
 
   const handleUploadComplete = useCallback(() => {
     loadDocuments();
     loadStats();
     loadBetaStats();
-  }, [loadDocuments, loadStats, loadBetaStats]);
+    loadFolders();
+  }, [loadDocuments, loadStats, loadBetaStats, loadFolders]);
 
   // Séparer les documents pour l'affichage dans l'onglet Chat
   const globalDocs = documents.filter(d => d.scope === 'global' && d.status === 'ready');
@@ -566,13 +582,15 @@ export const ChatbotPage: React.FC = () => {
 
         {/* Stats avec distinction global/user */}
         <div className="flex flex-wrap gap-3 mt-4">
-          {/* Documents globaux */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-            <Globe className="w-4 h-4 text-purple-500" />
-            <span className="text-sm text-purple-700 dark:text-purple-300">
-              {stats.globalDocuments} ProfAssist{stats.globalDocuments > 1 ? 's' : ''}
-            </span>
-          </div>
+          {/* Documents globaux - admin uniquement */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <Globe className="w-4 h-4 text-purple-500" />
+              <span className="text-sm text-purple-700 dark:text-purple-300">
+                {stats.globalDocuments} ProfAssist{stats.globalDocuments > 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
           {/* Documents utilisateur */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
             <User className="w-4 h-4 text-blue-500" />
@@ -608,24 +626,14 @@ export const ChatbotPage: React.FC = () => {
             
             {/* Partie extensible */}
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isAboutExpanded ? 'max-h-[1000px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-              <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
-                En parallèle, ProfAssist met à disposition un corpus de documents de référence commun à tous les utilisateurs.
-              </p>
               <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
                 Vous pouvez consulter à tout moment la liste des documents actuellement intégrés dans l'onglet « Documents », pour garder une vision claire de la base utilisée par le chatbot.
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
-                Les contenus officiels seront enrichis progressivement, et les mécanismes de recherche et de restitution des réponses continueront d'évoluer au fil des usages et des retours terrain.
-              </p>
-              <div className="text-sm text-amber-700 dark:text-amber-400 mt-3 leading-relaxed">
-                <p>👉 Un document vous semble indispensable ?</p>
-                <p>👉 Un texte officiel volumineux que vous préférez ne pas importer dans votre espace personnel ?</p>
-              </div>
-              <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
-                N'hésitez pas à nous contacter : les documents jugés prioritaires par les utilisateurs pourront être ajoutés en priorité au corpus ProfAssist, afin d'optimiser votre espace de stockage personnel.
+                Les mécanismes de recherche et de restitution des réponses continueront d'évoluer au fil des usages et des retours terrain.
               </p>
               <p className="text-sm text-amber-700 dark:text-amber-400 mt-2 leading-relaxed">
-                Vos retours sont précieux : demandes d'ajout de documents, remarques d'usage, signalement d'incohérences ou suggestions d'amélioration.
+                Vos retours sont précieux : remarques d'usage, signalement d'incohérences ou suggestions d'amélioration.
               </p>
               <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-3">
                 ProfAssist se construit avec vous, pour coller au plus près de vos pratiques professionnelles.
@@ -735,13 +743,20 @@ export const ChatbotPage: React.FC = () => {
             {/* Tab content */}
             {activeTab === 'documents' ? (
               <div className="space-y-4">
+                <FolderManager
+                  folders={folders}
+                  documents={documents}
+                  onRefresh={() => { loadFolders(); loadDocuments(); }}
+                />
                 <DocumentUploader
                   onUploadComplete={handleUploadComplete}
                   onError={(error) => console.error('Upload error:', error)}
+                  folders={folders}
                 />
                 <DocumentList
                   documents={documents}
-                  onRefresh={loadDocuments}
+                  folders={folders}
+                  onRefresh={() => { loadDocuments(); loadFolders(); }}
                   isLoading={isLoadingDocs}
                 />
               </div>
@@ -795,8 +810,8 @@ export const ChatbotPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Corpus ProfAssist - EN SECOND */}
-                    {globalDocs.length > 0 && (
+                    {/* Corpus ProfAssist - Admin uniquement */}
+                    {isAdmin && globalDocs.length > 0 && (
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Globe className="w-3.5 h-3.5 text-purple-500" />
@@ -846,18 +861,28 @@ export const ChatbotPage: React.FC = () => {
             <ChatInterface
               documents={documents}
               onNeedDocuments={() => setActiveTab('documents')}
+              isAdmin={isAdmin}
+              folders={folders}
             />
           </div>
         </div>
       </div>
 
       {/* Modal d'information */}
-      <ChatbotInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} />
+      <ChatbotInfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} isAdmin={isAdmin} />
     </div>
   );
 };
 
 export default ChatbotPage;
+
+
+
+
+
+
+
+
 
 
 
