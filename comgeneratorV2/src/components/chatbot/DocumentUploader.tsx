@@ -2,7 +2,7 @@
 // Upload de documents avec option admin pour documents globaux
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User, FolderOpen } from 'lucide-react';
+import { Upload, Loader2, AlertCircle, CheckCircle2, Globe, User, FolderOpen, AlertTriangle } from 'lucide-react';
 import { uploadAndIngestDocument, uploadAndIngestGlobalDocument, moveDocumentToFolder } from '../../lib/ragApi';
 import { formatFileSize, MAX_FILE_SIZE } from '../../lib/rag.types';
 import type { RagFolder } from '../../lib/rag.types';
@@ -15,7 +15,7 @@ interface DocumentUploaderProps {
   folders?: RagFolder[];
 }
 
-type UploadStatus = 'idle' | 'converting' | 'uploading' | 'processing' | 'complete' | 'error';
+type UploadStatus = 'idle' | 'converting' | 'ocr' | 'uploading' | 'processing' | 'complete' | 'error';
 type UploadScope = 'user' | 'global';
 
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
@@ -28,6 +28,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [wasOCR, setWasOCR] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [uploadScope, setUploadScope] = useState<UploadScope>('user');
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
@@ -75,21 +77,31 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
     try {
       let fileToUpload = file;
+      setWasOCR(false);
+      setOcrStatus(null);
 
       // Si c'est un PDF, extraire le texte côté client
       if (isPDF(file)) {
         setStatus('converting');
         setProgress(10);
         console.log('Converting PDF to text with pdf.js...');
-        
+
         try {
-          fileToUpload = await convertPDFToTextFile(file);
-          console.log(`PDF converted successfully: ${fileToUpload.size} bytes`);
+          const result = await convertPDFToTextFile(file, (statusText, progressValue) => {
+            if (statusText.includes('OCR')) {
+              setStatus('ocr');
+              setOcrStatus(statusText);
+              setProgress(10 + progressValue * 20);
+            }
+          });
+          fileToUpload = result.file;
+          setWasOCR(result.wasOCR);
+          console.log(`PDF converted successfully: ${fileToUpload.size} bytes (OCR: ${result.wasOCR})`);
           setProgress(30);
         } catch (pdfError) {
           throw new Error(
-            pdfError instanceof Error 
-              ? pdfError.message 
+            pdfError instanceof Error
+              ? pdfError.message
               : 'Erreur lors de la conversion du PDF.'
           );
         }
@@ -157,6 +169,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         setStatus('idle');
         setProgress(0);
         setFileName(null);
+        // On garde wasOCR pour afficher l'avertissement même après reset
       }, 2000);
 
     } catch (err) {
@@ -193,6 +206,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const getStatusMessage = () => {
     switch (status) {
       case 'converting': return 'Conversion du PDF...';
+      case 'ocr': return ocrStatus || 'OCR en cours...';
       case 'uploading': return 'Upload en cours...';
       case 'processing': return uploadScope === 'global' ? 'Indexation globale...' : 'Traitement du document...';
       case 'complete': return 'Terminé !';
@@ -204,6 +218,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const getStatusIcon = () => {
     switch (status) {
       case 'converting':
+      case 'ocr':
       case 'uploading':
       case 'processing':
         return <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />;
@@ -216,7 +231,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   };
 
-  const isProcessing = ['converting', 'uploading', 'processing'].includes(status);
+  const isProcessing = ['converting', 'ocr', 'uploading', 'processing'].includes(status);
 
   return (
     <div className="w-full space-y-3">
@@ -344,6 +359,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       {status === 'error' && error && (
         <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {wasOCR && status !== 'error' && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Ce PDF a été détecté comme un scan (image). Le texte a été extrait par OCR.
+            Pour un résultat optimal, préférez un PDF texte natif.
+          </p>
         </div>
       )}
     </div>
