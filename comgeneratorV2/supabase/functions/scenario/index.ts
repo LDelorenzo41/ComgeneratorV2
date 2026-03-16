@@ -153,14 +153,21 @@ function cleanScenarioOutput(text: string, isMistral: boolean): string {
     cleaned = lines.slice(tableStartIdx).join('\n');
   }
 
-  // 3. Normaliser les lignes du tableau : s'assurer qu'elles finissent par |
+  // 3. Normaliser les lignes du tableau
   cleaned = cleaned.split('\n').map(line => {
     const trimmed = line.trim();
-    // Si la ligne commence par | mais ne finit pas par |, on l'ajoute
-    if (trimmed.startsWith('|') && !trimmed.endsWith('|')) {
-      return trimmed + ' |';
-    }
-    return line;
+    if (!trimmed.startsWith('|')) return line;
+
+    // S'assurer que la ligne finit par |
+    let normalized = trimmed.endsWith('|') ? trimmed : trimmed + ' |';
+
+    // Nettoyer le bold/italic markdown dans la première cellule (ex: **Séance 1** → Séance 1)
+    normalized = normalized.replace(
+      /^\|\s*\*{1,3}([^|*]+)\*{1,3}\s*/,
+      '| $1 '
+    );
+
+    return normalized;
   }).join('\n');
 
   if (isMistral) {
