@@ -1,10 +1,6 @@
 // src/pages/LessonGeneratorPage.tsx - VERSION MIGRÉE VERS EDGE FUNCTION
 
 import React from 'react';
-// ⭐ NOUVEAUX IMPORTS POUR PDF
-import * as pdfjsLib from 'pdfjs-dist';
-import workerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
-// FIN NOUVEAUX IMPORTS
 import { ResizableBox } from 'react-resizable';
 import 'react-resizable/css/styles.css';
 import { useForm } from 'react-hook-form';
@@ -12,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-// ✅ AJOUT IMPORT REHYPE-RAW
 import rehypeRaw from 'rehype-raw';
 
 import jsPDF from 'jspdf';
@@ -20,8 +15,8 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
-// ✅ IMPORT MODIFIÉ - Utilisation de secureApi au lieu d'OpenAI direct
 import { secureApi } from '../lib/secureApi';
+import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
@@ -46,11 +41,16 @@ import {
   Upload,
   FileText,
   Video,
-  Database
+  Database,
+  BookMarked,
+  Info
 } from 'lucide-react';
 
-// ⭐ CONFIGURATION PDFJS
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+interface RagSource {
+  document_name: string;
+  chunk_content: string;
+  similarity: number;
+}
 
 const pedagogies = [
   {
@@ -863,11 +863,14 @@ export function LessonGeneratorPage() {
   const [folders, setFolders] = React.useState<RagFolder[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = React.useState<string[]>([]);
 
-  // ⭐ NOUVEAUX ÉTATS POUR PDF
-  const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
+  // États pour le document uploadé
+  const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
   const [extractedText, setExtractedText] = React.useState<string>('');
   const [isExtracting, setIsExtracting] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // États pour les sources RAG
+  const [ragSources, setRagSources] = React.useState<RagSource[]>([]);
 
   // Charger les dossiers
   React.useEffect(() => {
@@ -918,59 +921,42 @@ export function LessonGeneratorPage() {
     }
   });
 
-  // ⭐ NOUVELLE FONCTION : Extraction de texte du PDF
-  const extractTextFromPDF = async (pdf: pdfjsLib.PDFDocumentProxy): Promise<string> => {
+  // Gestion de l'upload de document (PDF, DOCX, TXT)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Vérifier la taille (10 MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Le fichier est trop volumineux (max 10 MB).');
+      return;
+    }
+
     try {
       setIsExtracting(true);
-      let fullText = '';
-      
-      // Extraire le texte de toutes les pages
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n\n';
-      }
-      
-      // Nettoyer et limiter le texte
-      const cleanedText = fullText
+      setUploadedFile(file);
+      const text = await extractTextFromFile(file);
+      // Nettoyer et limiter le texte à 4000 caractères
+      const cleanedText = text
         .replace(/\s+/g, ' ')
         .trim()
-        .substring(0, 4000); // Limiter à 4000 caractères
-      
+        .substring(0, 4000);
       setExtractedText(cleanedText);
-      return cleanedText;
-    } catch (error) {
-      console.error('Erreur lors de l\'extraction du texte:', error);
-      return '';
+      if (text.length > 4000) {
+        console.warn(`Document tronqué : ${text.length} → 4000 caractères`);
+      }
+    } catch (error: any) {
+      console.error('Erreur lors du chargement du document:', error);
+      alert(error.message || 'Erreur lors du chargement du document. Veuillez réessayer.');
+      setUploadedFile(null);
     } finally {
       setIsExtracting(false);
     }
   };
 
-  // ⭐ NOUVELLE FONCTION : Gestion de l'upload PDF
-  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      setPdfDoc(pdf);
-      
-      // Extraction automatique du texte
-      await extractTextFromPDF(pdf);
-    } catch (error) {
-      console.error('Erreur lors du chargement du PDF:', error);
-      alert('Erreur lors du chargement du PDF. Veuillez réessayer.');
-    }
-  };
-
-  // ⭐ NOUVELLE FONCTION : Réinitialiser le PDF
-  const resetPDF = () => {
-    setPdfDoc(null);
+  // Réinitialiser le document
+  const resetFile = () => {
+    setUploadedFile(null);
     setExtractedText('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -989,6 +975,7 @@ export function LessonGeneratorPage() {
     setLoading(true);
     setError(null);
     setGeneratedContent('');
+    setRagSources([]);
 
     try {
       // ✅ REMPLACEMENT - Appel à secureApi avec documentContext optionnel
@@ -1007,6 +994,11 @@ export function LessonGeneratorPage() {
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setGeneratedContent(content);
+
+      // Capturer les sources RAG si disponibles
+      if (result.sources && result.sources.length > 0) {
+        setRagSources(result.sources);
+      }
 
       // ✅ MODIFICATION - Usage récupéré depuis result.usage
       const usedTokens: number = result.usage?.total_tokens ?? 0;
@@ -1346,11 +1338,11 @@ export function LessonGeneratorPage() {
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                   <FileText className="w-4 h-4 inline mr-2" />
-                  📎 Document de référence (optionnel)
+                  Document de référence (optionnel)
                 </label>
-                {pdfDoc && (
+                {uploadedFile && (
                   <button
-                    onClick={resetPDF}
+                    onClick={resetFile}
                     className="text-sm text-red-600 dark:text-red-400 hover:underline"
                   >
                     Supprimer le document
@@ -1358,31 +1350,31 @@ export function LessonGeneratorPage() {
                 )}
               </div>
 
-              {!pdfDoc ? (
+              {!uploadedFile ? (
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-xl p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
                   <div className="text-center">
                     <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      Uploadez un PDF de référence (bulletin officiel, programme, manuel, exemples d'exercices...)
+                      Uploadez un document de référence (bulletin officiel, programme, manuel, exemples d'exercices...)
                       pour optimiser la génération de séance
                     </p>
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="application/pdf"
-                      onChange={handlePDFUpload}
+                      accept="application/pdf,.docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                      onChange={handleFileUpload}
                       disabled={tokenCount === 0}
                       className="hidden"
-                      id="pdf-upload"
+                      id="file-upload"
                     />
                     <label
-                      htmlFor="pdf-upload"
+                      htmlFor="file-upload"
                       className={`inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all duration-200 ${
                         tokenCount === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                       }`}
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Sélectionner un PDF
+                      Sélectionner un fichier (PDF, DOCX, TXT)
                     </label>
                   </div>
                 </div>
@@ -1394,7 +1386,7 @@ export function LessonGeneratorPage() {
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">
-                        Document chargé ({pdfDoc.numPages} page{pdfDoc.numPages > 1 ? 's' : ''})
+                        {uploadedFile.name} ({formatFileSize(uploadedFile.size)})
                       </h4>
                       {isExtracting ? (
                         <div className="flex items-center text-sm text-green-700 dark:text-green-300">
@@ -1403,7 +1395,7 @@ export function LessonGeneratorPage() {
                         </div>
                       ) : (
                         <p className="text-sm text-green-700 dark:text-green-300">
-                          ✓ Texte extrait ({extractedText.length} caractères) - Ce contenu sera utilisé pour enrichir la génération
+                          Texte extrait ({extractedText.length} caractères) - Ce contenu sera utilisé pour enrichir la génération
                         </p>
                       )}
                     </div>
@@ -1512,6 +1504,44 @@ export function LessonGeneratorPage() {
               isSaving={savingToBank}
               tokensAvailable={tokenCount ?? 0}
             />
+
+            {/* Sources RAG */}
+            {ragSources.length > 0 && (
+              <div className="mt-8 border-t-2 border-gray-200 dark:border-gray-600 pt-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <BookMarked className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">Sources et Références</h4>
+                </div>
+
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-2">
+                    <Info className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      Ces documents de votre corpus personnel ont été utilisés pour enrichir la séance générée.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {ragSources.map((source, index) => (
+                    <div key={index} className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-4 shadow-sm">
+                      <div className="flex items-start justify-between mb-2">
+                        <h5 className="font-semibold text-gray-900 dark:text-white flex items-center">
+                          <FileText className="w-4 h-4 text-indigo-500 mr-2" />
+                          {source.document_name}
+                        </h5>
+                        <span className="text-xs bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full">
+                          Pertinence: {(source.similarity * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+                        {source.chunk_content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
