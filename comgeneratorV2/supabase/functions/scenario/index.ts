@@ -153,7 +153,57 @@ function cleanScenarioOutput(text: string, isMistral: boolean): string {
     cleaned = lines.slice(tableStartIdx).join('\n');
   }
 
-  // 3. Normaliser les lignes du tableau
+  // 3. Fusionner les lignes de tableau cassées (GPT-5 mini peut insérer des \n dans les cellules)
+  //    Une ligne qui ne commence pas par | mais qu'on est dans le tableau → continuation de la ligne précédente
+  {
+    const tableLines = cleaned.split('\n');
+    const merged: string[] = [];
+    let inTableZone = false;
+
+    for (let i = 0; i < tableLines.length; i++) {
+      const trimmed = tableLines[i].trim();
+
+      // Détection de la zone tableau (commence par | et contient "séance")
+      if (!inTableZone && trimmed.startsWith('|') && /s[ée]ance/i.test(trimmed)) {
+        inTableZone = true;
+      }
+
+      if (inTableZone && trimmed !== '') {
+        // Ligne séparateur (|---|---|...) → garder telle quelle
+        if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+          merged.push(trimmed);
+          continue;
+        }
+
+        // Ligne qui commence par | → nouvelle ligne de tableau
+        if (trimmed.startsWith('|')) {
+          merged.push(trimmed);
+          continue;
+        }
+
+        // Ligne qui NE commence PAS par | mais on est dans le tableau
+        // → c'est une continuation de la ligne précédente, on fusionne
+        if (merged.length > 0 && merged[merged.length - 1].startsWith('|')) {
+          // Ajouter un espace avant le texte de continuation
+          merged[merged.length - 1] = merged[merged.length - 1] + ' ' + trimmed;
+          continue;
+        }
+      }
+
+      // Hors du tableau ou ligne vide → garder normalement
+      merged.push(tableLines[i]);
+
+      // Détecter la fin du tableau (ligne non-vide, hors tableau, après des lignes |)
+      if (inTableZone && trimmed !== '' && !trimmed.startsWith('|') && !trimmed.startsWith('#')) {
+        // On est sorti du tableau
+        inTableZone = false;
+      }
+    }
+
+    cleaned = merged.join('\n');
+  }
+
+  // 4. Normaliser les lignes du tableau
   cleaned = cleaned.split('\n').map(line => {
     const trimmed = line.trim();
     if (!trimmed.startsWith('|')) return line;
@@ -171,7 +221,7 @@ function cleanScenarioOutput(text: string, isMistral: boolean): string {
   }).join('\n');
 
   if (isMistral) {
-    // 4. Supprimer les méta-commentaires après les Notes pédagogiques
+    // 5. Supprimer les méta-commentaires après les Notes pédagogiques
     const metaKeywords = '(?:Notes? d\'adaptation|Remarques? contextuelles?|Notes? de rédaction|' +
       'Analyse du message|Commentaires?|Structure|Notes? de l\'IA|Chat context|PERSONALIZATION)';
 
@@ -186,11 +236,11 @@ function cleanScenarioOutput(text: string, isMistral: boolean): string {
       ''
     );
 
-    // 5. Corriger le formatage markdown (espacement avant les headers)
+    // 6. Corriger le formatage markdown (espacement avant les headers)
     cleaned = cleaned.replace(/([^\n])\n(#{2,3}\s)/g, '$1\n\n$2');
   }
 
-  // 6. Normaliser les sauts de ligne excessifs (3+ → 2)
+  // 7. Normaliser les sauts de ligne excessifs (3+ → 2)
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
   return cleaned.trim();

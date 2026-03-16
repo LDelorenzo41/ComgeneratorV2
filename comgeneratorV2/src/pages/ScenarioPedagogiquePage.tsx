@@ -282,37 +282,79 @@ export function ScenarioPedagogiquePage() {
 
   const parseMarkdownTable = (content: string): SeanceRow[] => {
     const rows: SeanceRow[] = [];
-    const lines = content.split('\n');
+
+    // Pré-traitement : fusionner les lignes de tableau cassées
+    // GPT-5 mini peut insérer des retours à la ligne dans les cellules
+    const rawLines = content.split('\n');
+    const lines: string[] = [];
+    let inTableZone = false;
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const trimmed = rawLines[i].trim();
+
+      // Détecter l'entrée dans le tableau
+      if (!inTableZone && trimmed.startsWith('|') &&
+          (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
+        inTableZone = true;
+      }
+
+      if (inTableZone && trimmed !== '') {
+        // Ligne séparateur → garder telle quelle
+        if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+          lines.push(trimmed);
+          continue;
+        }
+        // Nouvelle ligne de tableau (commence par |)
+        if (trimmed.startsWith('|')) {
+          lines.push(trimmed);
+          continue;
+        }
+        // Continuation d'une ligne de tableau (ne commence pas par |)
+        if (lines.length > 0 && lines[lines.length - 1].startsWith('|')) {
+          lines[lines.length - 1] = lines[lines.length - 1] + ' ' + trimmed;
+          continue;
+        }
+      }
+
+      lines.push(rawLines[i]);
+
+      // Sortie du tableau
+      if (inTableZone && trimmed !== '' && !trimmed.startsWith('|') && !trimmed.startsWith('#')) {
+        inTableZone = false;
+      }
+    }
+
     let inTable = false;
     let headerFound = false;
-    
+
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      
-      if (!headerFound && trimmed.startsWith('|') && 
+      const trimmed = lines[i].trim();
+
+      if (!headerFound && trimmed.startsWith('|') &&
           (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
         headerFound = true;
         inTable = true;
         continue;
       }
-      
-      if (trimmed.match(/^\|[\s\-:|\s]+\|$/)) {
+
+      if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
         continue;
       }
-      
-      if (inTable && trimmed.startsWith('|') && trimmed.endsWith('|')) {
-        const innerContent = trimmed.slice(1, -1);
+
+      if (inTable && trimmed.startsWith('|')) {
+        // S'assurer que la ligne finit par |
+        const normalizedLine = trimmed.endsWith('|') ? trimmed : trimmed + ' |';
+        const innerContent = normalizedLine.slice(1, -1);
         const cells: string[] = [];
         let currentCell = '';
         let depth = 0;
-        
+
         for (let j = 0; j < innerContent.length; j++) {
           const char = innerContent[j];
-          
+
           if (char === '(' || char === '[' || char === '{') depth++;
-          if (char === ')' || char === ']' || char === '}') depth--;
-          
+          if (char === ')' || char === ']' || char === '}') depth = Math.max(0, depth - 1);
+
           if (char === '|' && depth === 0) {
             cells.push(currentCell.trim());
             currentCell = '';
@@ -323,10 +365,10 @@ export function ScenarioPedagogiquePage() {
         if (currentCell.trim()) {
           cells.push(currentCell.trim());
         }
-        
+
         if (cells.length >= 5) {
           const firstCell = cells[0].trim();
-          
+
           if (firstCell.match(/\d+/) || firstCell.toLowerCase().includes('séance') || firstCell.toLowerCase().includes('seance')) {
             rows.push({
               numero: firstCell,
@@ -338,7 +380,7 @@ export function ScenarioPedagogiquePage() {
           }
         }
       }
-      
+
       if (inTable && rows.length > 0 && !trimmed.startsWith('|') && trimmed !== '' && !trimmed.startsWith('#')) {
         const nextLine = lines[i + 1]?.trim() || '';
         if (!nextLine.startsWith('|')) {
@@ -346,8 +388,8 @@ export function ScenarioPedagogiquePage() {
         }
       }
     }
-    
-    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content`);
+
+    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content (after line merging)`);
     return rows;
   };
 
@@ -1624,6 +1666,54 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
