@@ -181,8 +181,10 @@ async function searchRagChunks(
   topK: number
 ): Promise<RagChunk[]> {
   try {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}`);
     const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
+      p_query_embedding: embeddingStr,
       p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
@@ -190,9 +192,11 @@ async function searchRagChunks(
     });
 
     if (error) {
-      console.error('[lessons] RAG search error:', error);
+      console.log('[lessons] RAG search RPC error:', JSON.stringify(error));
       return [];
     }
+
+    console.log(`[lessons] RPC returned: ${data ? data.length : 'null'} results, type: ${typeof data}`);
 
     return (data || []).map((item: any) => ({
       id: item.id,
@@ -202,7 +206,7 @@ async function searchRagChunks(
       score: item.similarity,
     }));
   } catch (err) {
-    console.error('[lessons] RAG search exception:', err);
+    console.log('[lessons] RAG search exception:', String(err));
     return [];
   }
 }
@@ -1102,6 +1106,30 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
