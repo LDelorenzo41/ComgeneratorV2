@@ -528,15 +528,38 @@ export function ScenarioPedagogiquePage() {
 
   const cleanMarkdownForPDF = (text: string): string => {
     if (!text) return '';
-    
+
     return text
       .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
       .replace(/`([^`]+)`/g, '$1')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       .replace(/^#{1,6}\s+/gm, '')
+      // Remplacer les caractères Unicode non supportés par Helvetica (jsPDF)
+      .replace(/→/g, '->')
+      .replace(/←/g, '<-')
+      .replace(/↔/g, '<->')
+      .replace(/«\s*/g, '"')
+      .replace(/\s*»/g, '"')
+      .replace(/['']/g, "'")
+      .replace(/[""]/g, '"')
+      .replace(/…/g, '...')
+      .replace(/–/g, '-')
+      .replace(/—/g, '-')
+      .replace(/•/g, '-')
+      .replace(/≠/g, '!=')
+      .replace(/≤/g, '<=')
+      .replace(/≥/g, '>=')
+      .replace(/✓/g, 'V')
+      .replace(/✗/g, 'X')
+      .replace(/□/g, '[ ]')
+      .replace(/■/g, '[X]')
+      // Filet de sécurité : supprimer tout caractère hors jeu Latin supporté par Helvetica
+      // Garde : ASCII 32-126, retour ligne/tab, Latin-1 Supplement 160-255 (accents français)
+      // deno-lint-ignore no-control-regex
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '')
       .replace(/  +/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
@@ -732,21 +755,6 @@ export function ScenarioPedagogiquePage() {
       
       let yPos = 40;
       
-      const calculateRowHeight = (row: SeanceRow): number => {
-        pdf.setFontSize(fontSize);
-        const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
-        let maxLines = 1;
-        
-        cellData.forEach((text, i) => {
-          const maxWidth = colWidths[i] - 2 * cellPadding;
-          const cleanedText = cleanMarkdownForPDF(text || '');
-          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
-          if (lines.length > maxLines) maxLines = lines.length;
-        });
-        
-        return Math.max(minRowHeight, maxLines * lineHeightFactor + 2 * cellPadding);
-      };
-      
       const drawTableHeader = () => {
         pdf.setFillColor(99, 102, 241);
         pdf.rect(margin, yPos, contentWidth, 8, 'F');
@@ -768,50 +776,71 @@ export function ScenarioPedagogiquePage() {
       drawTableHeader();
       
       rowsData.forEach((row, index) => {
-        const rowHeight = calculateRowHeight(row);
-        
-        if (yPos + rowHeight > pageHeight - 15) {
-          pdf.addPage();
-          yPos = 15;
-          drawTableHeader();
-        }
-        
-        if (index % 2 === 0) {
-          pdf.setFillColor(248, 250, 252);
-          pdf.rect(margin, yPos, contentWidth, rowHeight, 'F');
-        }
-        
-        pdf.setDrawColor(220, 220, 220);
-        pdf.rect(margin, yPos, contentWidth, rowHeight, 'S');
-        
-        let xBorder = margin;
-        colWidths.forEach((width, i) => {
-          if (i < colWidths.length - 1) {
-            xBorder += width;
-            pdf.line(xBorder, yPos, xBorder, yPos + rowHeight);
-          }
-        });
-        
         pdf.setFontSize(fontSize);
-        let xPos = margin + cellPadding;
         const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
-        
-        cellData.forEach((text, i) => {
+
+        // Pré-calculer toutes les lignes de texte pour chaque cellule
+        const allCellLines = cellData.map((text, i) => {
           const maxWidth = colWidths[i] - 2 * cellPadding;
           const cleanedText = cleanMarkdownForPDF(text || '');
-          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
-          
-          lines.forEach((line: string, lineIndex: number) => {
-            const textY = yPos + cellPadding + 2.5 + (lineIndex * lineHeightFactor);
-            if (textY < yPos + rowHeight - cellPadding) {
-              pdf.text(line, xPos, textY);
+          return pdf.splitTextToSize(cleanedText, maxWidth) as string[];
+        });
+        const maxLines = Math.max(...allCellLines.map(l => l.length));
+
+        let lineOffset = 0;
+
+        while (lineOffset < maxLines) {
+          // Combien de lignes tiennent sur la page courante ?
+          const availableHeight = pageHeight - 15 - yPos;
+          if (availableHeight < minRowHeight) {
+            pdf.addPage();
+            yPos = 15;
+            drawTableHeader();
+            continue;
+          }
+          const maxLinesOnPage = Math.max(1, Math.floor((availableHeight - 2 * cellPadding) / lineHeightFactor));
+          const linesToDraw = Math.min(maxLinesOnPage, maxLines - lineOffset);
+          const chunkHeight = Math.max(minRowHeight, linesToDraw * lineHeightFactor + 2 * cellPadding);
+
+          // Fond alterné (uniquement sur le premier chunk de la ligne)
+          if (index % 2 === 0) {
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(margin, yPos, contentWidth, chunkHeight, 'F');
+          }
+
+          // Bordures
+          pdf.setDrawColor(220, 220, 220);
+          pdf.rect(margin, yPos, contentWidth, chunkHeight, 'S');
+          let xBorder = margin;
+          colWidths.forEach((width, ci) => {
+            if (ci < colWidths.length - 1) {
+              xBorder += width;
+              pdf.line(xBorder, yPos, xBorder, yPos + chunkHeight);
             }
           });
-          
-          xPos += colWidths[i];
-        });
-        
-        yPos += rowHeight;
+
+          // Texte de chaque cellule (portion visible)
+          pdf.setFontSize(fontSize);
+          let xPos = margin + cellPadding;
+          allCellLines.forEach((lines, ci) => {
+            const chunkLines = lines.slice(lineOffset, lineOffset + linesToDraw);
+            chunkLines.forEach((line: string, li: number) => {
+              const textY = yPos + cellPadding + 2.5 + (li * lineHeightFactor);
+              pdf.text(line, xPos, textY);
+            });
+            xPos += colWidths[ci];
+          });
+
+          yPos += chunkHeight;
+          lineOffset += linesToDraw;
+
+          // S'il reste des lignes, continuer sur la page suivante
+          if (lineOffset < maxLines) {
+            pdf.addPage();
+            yPos = 15;
+            drawTableHeader();
+          }
+        }
       });
 
       if (additionalNotes) {
@@ -1486,7 +1515,7 @@ export function ScenarioPedagogiquePage() {
                           {isEditing ? (
                             <input type="text" value={row.numero} onChange={(e) => handleCellChange(index, 'numero', e.target.value)}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
-                          ) : row.numero}
+                          ) : renderMarkdown(row.numero)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
@@ -1595,6 +1624,18 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

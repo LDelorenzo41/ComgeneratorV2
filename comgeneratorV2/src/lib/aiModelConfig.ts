@@ -35,7 +35,7 @@ export const AI_MODEL_OPTIONS: Array<{
   {
     value: "mistral-medium",
     label: "Mistral Medium",
-    description: "Mistral AI - Alternative européenne"
+    description: "Mistral AI - Alternative française"
   }
 ];
 
