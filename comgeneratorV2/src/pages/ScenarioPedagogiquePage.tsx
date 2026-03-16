@@ -282,79 +282,37 @@ export function ScenarioPedagogiquePage() {
 
   const parseMarkdownTable = (content: string): SeanceRow[] => {
     const rows: SeanceRow[] = [];
-
-    // Pré-traitement : fusionner les lignes de tableau cassées
-    // GPT-5 mini peut insérer des retours à la ligne dans les cellules
-    const rawLines = content.split('\n');
-    const lines: string[] = [];
-    let inTableZone = false;
-
-    for (let i = 0; i < rawLines.length; i++) {
-      const trimmed = rawLines[i].trim();
-
-      // Détecter l'entrée dans le tableau
-      if (!inTableZone && trimmed.startsWith('|') &&
-          (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
-        inTableZone = true;
-      }
-
-      if (inTableZone && trimmed !== '') {
-        // Ligne séparateur → garder telle quelle
-        if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
-          lines.push(trimmed);
-          continue;
-        }
-        // Nouvelle ligne de tableau (commence par |)
-        if (trimmed.startsWith('|')) {
-          lines.push(trimmed);
-          continue;
-        }
-        // Continuation d'une ligne de tableau (ne commence pas par |)
-        if (lines.length > 0 && lines[lines.length - 1].startsWith('|')) {
-          lines[lines.length - 1] = lines[lines.length - 1] + ' ' + trimmed;
-          continue;
-        }
-      }
-
-      lines.push(rawLines[i]);
-
-      // Sortie du tableau
-      if (inTableZone && trimmed !== '' && !trimmed.startsWith('|') && !trimmed.startsWith('#')) {
-        inTableZone = false;
-      }
-    }
-
+    const lines = content.split('\n');
     let inTable = false;
     let headerFound = false;
-
+    
     for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-
-      if (!headerFound && trimmed.startsWith('|') &&
+      const line = lines[i];
+      const trimmed = line.trim();
+      
+      if (!headerFound && trimmed.startsWith('|') && 
           (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
         headerFound = true;
         inTable = true;
         continue;
       }
-
-      if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+      
+      if (trimmed.match(/^\|[\s\-:|\s]+\|$/)) {
         continue;
       }
-
-      if (inTable && trimmed.startsWith('|')) {
-        // S'assurer que la ligne finit par |
-        const normalizedLine = trimmed.endsWith('|') ? trimmed : trimmed + ' |';
-        const innerContent = normalizedLine.slice(1, -1);
+      
+      if (inTable && trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        const innerContent = trimmed.slice(1, -1);
         const cells: string[] = [];
         let currentCell = '';
         let depth = 0;
-
+        
         for (let j = 0; j < innerContent.length; j++) {
           const char = innerContent[j];
-
+          
           if (char === '(' || char === '[' || char === '{') depth++;
-          if (char === ')' || char === ']' || char === '}') depth = Math.max(0, depth - 1);
-
+          if (char === ')' || char === ']' || char === '}') depth--;
+          
           if (char === '|' && depth === 0) {
             cells.push(currentCell.trim());
             currentCell = '';
@@ -365,10 +323,10 @@ export function ScenarioPedagogiquePage() {
         if (currentCell.trim()) {
           cells.push(currentCell.trim());
         }
-
+        
         if (cells.length >= 5) {
           const firstCell = cells[0].trim();
-
+          
           if (firstCell.match(/\d+/) || firstCell.toLowerCase().includes('séance') || firstCell.toLowerCase().includes('seance')) {
             rows.push({
               numero: firstCell,
@@ -380,7 +338,7 @@ export function ScenarioPedagogiquePage() {
           }
         }
       }
-
+      
       if (inTable && rows.length > 0 && !trimmed.startsWith('|') && trimmed !== '' && !trimmed.startsWith('#')) {
         const nextLine = lines[i + 1]?.trim() || '';
         if (!nextLine.startsWith('|')) {
@@ -388,8 +346,8 @@ export function ScenarioPedagogiquePage() {
         }
       }
     }
-
-    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content (after line merging)`);
+    
+    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content`);
     return rows;
   };
 
@@ -1353,46 +1311,8 @@ export function ScenarioPedagogiquePage() {
               </div>
             </div>
 
-            {/* Options avancées - Toggle RAG */}
-            <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
-              
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Utiliser mon corpus documentaire personnel (cf. mon chatbot)</p>
-                    
-                    </div>
-                  </div>
-                  
-                  <button type="button" disabled={tokenCount === 0} onClick={() => { setUseRag(!useRag); setValue('useRag', !useRag); }}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${useRag ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
-                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRag ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-                
-                {useRag && (
-                  <div className="mt-3 pl-8 space-y-3">
-                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                      ✓ La génération utilisera les documents de votre corpus personnel. Si aucun contenu pertinent n’est trouvé, l’IA générera le scénario à partir de ses propres connaissances.
-                    </p>
-                    {folders.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2">Filtrer par dossier (optionnel) :</p>
-                        <FolderSelector
-                          folders={folders}
-                          selectedFolderIds={selectedFolderIds}
-                          onChange={setSelectedFolderIds}
-                          compact
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Options avancées - Toggle RAG (masqué temporairement - bug RAG) */}
+            {/* TODO: Réactiver quand le bug de matching RAG sera résolu */}
 
             {/* ================================================================
                 AVERTISSEMENT CONSOMMATION DE TOKENS
@@ -1666,6 +1586,30 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

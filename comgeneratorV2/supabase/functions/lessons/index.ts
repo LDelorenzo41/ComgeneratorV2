@@ -181,8 +181,10 @@ async function searchRagChunks(
   topK: number
 ): Promise<RagChunk[]> {
   try {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}`);
     const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
+      p_query_embedding: embeddingStr,
       p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
@@ -190,9 +192,11 @@ async function searchRagChunks(
     });
 
     if (error) {
-      console.error('[lessons] RAG search error:', error);
+      console.log('[lessons] RAG search RPC error:', JSON.stringify(error));
       return [];
     }
+
+    console.log(`[lessons] RPC returned: ${data ? data.length : 'null'} results, type: ${typeof data}`);
 
     return (data || []).map((item: any) => ({
       id: item.id,
@@ -202,7 +206,7 @@ async function searchRagChunks(
       score: item.similarity,
     }));
   } catch (err) {
-    console.error('[lessons] RAG search exception:', err);
+    console.log('[lessons] RAG search exception:', String(err));
     return [];
   }
 }
@@ -324,12 +328,26 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           }
         }
 
+        // Déterminer le cycle à partir du niveau pour enrichir la recherche RAG
+        const levelLower = (data.level || '').toLowerCase();
+        let cycle = '';
+        let cycleNum = 0;
+        if (/cp|ce1|ce2/.test(levelLower)) { cycle = 'cycle 2'; cycleNum = 2; }
+        else if (/cm1|cm2|6[eè]me|6eme/.test(levelLower)) { cycle = 'cycle 3'; cycleNum = 3; }
+        else if (/5[eè]me|5eme|4[eè]me|4eme|3[eè]me|3eme/.test(levelLower)) { cycle = 'cycle 4'; cycleNum = 4; }
+        else if (/seconde|premi[eè]re|terminale|2nde|1[eè]re|1ere/.test(levelLower)) { cycle = 'lycée'; }
+        else if (/petite section|moyenne section|grande section|ps|ms|gs|maternelle/.test(levelLower)) { cycle = 'cycle 1'; cycleNum = 1; }
+
         const searchTerms = [
           data.subject,
           data.level,
+          cycle,
           data.topic,
+          'attendus de fin de cycle',
+          'repères de progressivité',
           'programmes officiels',
           'compétences',
+          cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
         ].filter(Boolean).join(' ');
 
         console.log(`[lessons] RAG search query: ${searchTerms}`);
@@ -347,8 +365,15 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           searchTopK
         );
 
+        console.log(`[lessons] RAG search returned ${chunks.length} chunks (before folder filter)`);
+        if (chunks.length > 0) {
+          console.log(`[lessons] Top chunk: score=${chunks[0].score.toFixed(3)}, docId=${chunks[0].documentId}, title=${chunks[0].documentTitle}`);
+        }
+
         // Filtrer par document_id si un dossier est sélectionné
         if (allowedDocIds && chunks.length > 0) {
+          console.log(`[lessons] Allowed doc IDs from folder: ${[...allowedDocIds].join(', ')}`);
+          console.log(`[lessons] Chunk doc IDs: ${[...new Set(chunks.map(c => c.documentId))].join(', ')}`);
           chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
           console.log(`[lessons] After folder filter: ${chunks.length} chunks from selected folders`);
           // Garder les meilleurs après filtrage
@@ -1003,7 +1028,8 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
       requestBody = {
         model: aiConfig.model,
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
+        temperature: 0.7,
+        max_tokens: 10000
       };
     }
 
@@ -1080,6 +1106,30 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
