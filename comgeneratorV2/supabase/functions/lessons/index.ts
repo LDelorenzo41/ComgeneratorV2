@@ -206,12 +206,6 @@ async function searchRagChunks(
 
     const embeddingStr = `[${embedding.join(',')}]`;
 
-    // Debug: analyser l'embedding de requête
-    const magnitude = Math.sqrt(embedding.reduce((sum: number, v: number) => sum + v * v, 0));
-    const hasNaN = embedding.some((v: number) => isNaN(v));
-    const hasZero = embedding.every((v: number) => v === 0);
-    console.log(`[lessons] DEBUG query embedding: first5=[${embedding.slice(0, 5).join(',')}], magnitude=${magnitude.toFixed(4)}, hasNaN=${hasNaN}, allZero=${hasZero}, length=${embedding.length}, strLength=${embeddingStr.length}`);
-
     // Debug: comparer avec un embedding de la base
     const { data: testChunk } = await supabase
       .from('rag_chunks')
@@ -221,10 +215,23 @@ async function searchRagChunks(
       .single();
     if (testChunk?.embedding) {
       const testEmbStr = typeof testChunk.embedding === 'string' ? testChunk.embedding : `[${testChunk.embedding}]`;
-      console.log(`[lessons] DEBUG DB embedding: first50chars="${testEmbStr.substring(0, 50)}", length=${testEmbStr.length}`);
-      console.log(`[lessons] DEBUG query embedding: first50chars="${embeddingStr.substring(0, 50)}"`);
 
-      // Test RPC avec embedding de la base (fonctionne)
+      // Calculer la similarité côté JS pour comparer
+      const dbValues = testEmbStr.replace(/[\[\]]/g, '').split(',').map(Number);
+      let dotProduct = 0;
+      for (let i = 0; i < Math.min(embedding.length, dbValues.length); i++) {
+        dotProduct += embedding[i] * dbValues[i];
+      }
+      const magA = Math.sqrt(embedding.reduce((s: number, v: number) => s + v * v, 0));
+      const magB = Math.sqrt(dbValues.reduce((s: number, v: number) => s + v * v, 0));
+      const jsSimilarity = dotProduct / (magA * magB);
+      console.log(`[lessons] DEBUG JS cosine similarity: ${jsSimilarity.toFixed(4)}, dbEmbLength=${dbValues.length}, queryEmbLength=${embedding.length}`);
+
+      // Vérifier si des valeurs en notation scientifique dans le string
+      const sciNotation = embeddingStr.match(/[eE][+-]?\d+/g);
+      console.log(`[lessons] DEBUG scientific notation in query embedding: ${sciNotation ? sciNotation.length + ' occurrences' : 'none'}`);
+
+      // Test 1: RPC avec embedding DB (devrait marcher)
       const { data: testData, error: testError } = await supabase.rpc('match_rag_chunks', {
         p_query_embedding: testEmbStr,
         p_similarity_threshold: 0.3,
@@ -232,17 +239,29 @@ async function searchRagChunks(
         p_user_id: userId,
         p_document_id: null,
       });
-      console.log(`[lessons] DEBUG RPC with DB embedding: ${testData?.length ?? 'null'} results, error: ${testError ? JSON.stringify(testError) : 'none'}`);
+      console.log(`[lessons] DEBUG RPC with DB embedding: ${testData?.length ?? 'null'} results`);
 
-      // Test RPC avec seuil TRÈS bas pour la requête
-      const { data: lowThreshData, error: lowThreshError } = await supabase.rpc('match_rag_chunks', {
+      // Test 2: RPC avec query embedding REFORMATÉ comme le DB (toFixed)
+      const reformatted = `[${embedding.map((v: number) => v.toFixed(9)).join(',')}]`;
+      console.log(`[lessons] DEBUG reformatted first50: "${reformatted.substring(0, 50)}", length=${reformatted.length}`);
+      const { data: refData, error: refError } = await supabase.rpc('match_rag_chunks', {
+        p_query_embedding: reformatted,
+        p_similarity_threshold: 0.0,
+        p_match_count: 3,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+      console.log(`[lessons] DEBUG RPC with REFORMATTED embedding: ${refData?.length ?? 'null'} results${refData?.[0] ? ', topSim=' + refData[0].similarity : ''}, error: ${refError ? JSON.stringify(refError) : 'none'}`);
+
+      // Test 3: RPC avec query embedding brut threshold=0
+      const { data: lowData, error: lowErr } = await supabase.rpc('match_rag_chunks', {
         p_query_embedding: embeddingStr,
         p_similarity_threshold: 0.0,
         p_match_count: 3,
         p_user_id: userId,
         p_document_id: null,
       });
-      console.log(`[lessons] DEBUG RPC with query embedding threshold=0: ${lowThreshData?.length ?? 'null'} results${lowThreshData?.[0] ? ', topSimilarity=' + lowThreshData[0].similarity : ''}, error: ${lowThreshError ? JSON.stringify(lowThreshError) : 'none'}`);
+      console.log(`[lessons] DEBUG RPC raw query threshold=0: ${lowData?.length ?? 'null'} results${lowData?.[0] ? ', topSim=' + lowData[0].similarity : ''}, error: ${lowErr ? JSON.stringify(lowErr) : 'none'}`);
     }
 
     console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}`);
