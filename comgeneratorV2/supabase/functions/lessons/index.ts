@@ -181,6 +181,31 @@ async function searchRagChunks(
   topK: number
 ): Promise<RagChunk[]> {
   try {
+    // Diagnostic: vérifier que des chunks existent pour cet utilisateur
+    const { count: chunkCount, error: countError } = await supabase
+      .from('rag_chunks')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    console.log(`[lessons] Diagnostic: ${chunkCount ?? 'null'} total chunks in DB for user ${userId}${countError ? `, error: ${JSON.stringify(countError)}` : ''}`);
+
+    // Vérifier si les chunks ont des embeddings non-null
+    const { data: sampleChunks, error: sampleError } = await supabase
+      .from('rag_chunks')
+      .select('id, document_id, embedding')
+      .eq('user_id', userId)
+      .limit(3);
+    if (sampleChunks && sampleChunks.length > 0) {
+      const hasEmbedding = sampleChunks.map((c: any) => ({
+        id: c.id,
+        doc: c.document_id,
+        hasEmb: c.embedding !== null,
+        embLength: c.embedding ? (typeof c.embedding === 'string' ? 'string' : Array.isArray(c.embedding) ? c.embedding.length : typeof c.embedding) : 'null',
+      }));
+      console.log(`[lessons] Diagnostic chunks sample: ${JSON.stringify(hasEmbedding)}`);
+    }
+
+    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}, embeddingLength=${embedding.length}`);
+
     const { data, error } = await supabase.rpc('match_rag_chunks', {
       p_query_embedding: `[${embedding.join(',')}]`,
       p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
@@ -190,9 +215,11 @@ async function searchRagChunks(
     });
 
     if (error) {
-      console.error('[lessons] RAG search error:', error);
+      console.log('[lessons] RAG search RPC error:', JSON.stringify(error));
       return [];
     }
+
+    console.log(`[lessons] RPC returned: ${data ? data.length : 'null'} results, type: ${typeof data}`);
 
     return (data || []).map((item: any) => ({
       id: item.id,
@@ -202,7 +229,7 @@ async function searchRagChunks(
       score: item.similarity,
     }));
   } catch (err) {
-    console.error('[lessons] RAG search exception:', err);
+    console.log('[lessons] RAG search exception:', String(err));
     return [];
   }
 }
