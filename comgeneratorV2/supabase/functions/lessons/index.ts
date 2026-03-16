@@ -361,8 +361,15 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           searchTopK
         );
 
+        console.log(`[lessons] RAG search returned ${chunks.length} chunks (before folder filter)`);
+        if (chunks.length > 0) {
+          console.log(`[lessons] Top chunk: score=${chunks[0].score.toFixed(3)}, docId=${chunks[0].documentId}, title=${chunks[0].documentTitle}`);
+        }
+
         // Filtrer par document_id si un dossier est sélectionné
         if (allowedDocIds && chunks.length > 0) {
+          console.log(`[lessons] Allowed doc IDs from folder: ${[...allowedDocIds].join(', ')}`);
+          console.log(`[lessons] Chunk doc IDs: ${[...new Set(chunks.map(c => c.documentId))].join(', ')}`);
           chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
           console.log(`[lessons] After folder filter: ${chunks.length} chunks from selected folders`);
           // Garder les meilleurs après filtrage
