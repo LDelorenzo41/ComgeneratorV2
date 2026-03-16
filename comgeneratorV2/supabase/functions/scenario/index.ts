@@ -26,6 +26,7 @@ interface ScenarioRequest {
   documentsContent?: string;
   documentNames?: string[];
   folderIds?: string[];
+  aiModel?: string;
 }
 
 interface RagChunk {
@@ -53,6 +54,197 @@ const CONFIG = {
   ragTopK: 15,
   ragSimilarityThreshold: 0.40,
 };
+
+// =====================================================
+// CONFIGURATION DES MODÈLES IA
+// =====================================================
+
+function resolveAIConfig(aiModel: string | undefined, openaiKey: string, mistralKey: string | undefined) {
+  // Modèle par défaut : gpt-4.1-mini (comportement actuel inchangé)
+  if (!aiModel || aiModel === 'default') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-4.1-mini',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // GPT-5 mini (OpenAI) - utilise l'API Responses, pas Chat Completions
+  if (aiModel === 'gpt-5-mini') {
+    return {
+      endpoint: 'https://api.openai.com/v1/responses',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-5-mini',
+      tokenParamName: 'max_output_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: true
+    };
+  }
+
+  // Mistral Medium
+  if (aiModel === 'mistral-medium') {
+    if (!mistralKey) {
+      throw new Error('MISTRAL_API_KEY non configurée');
+    }
+    return {
+      endpoint: 'https://api.mistral.ai/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'mistral-medium-latest',
+      tokenParamName: 'max_tokens',
+      supportsTemperature: true,
+      isResponsesAPI: false
+    };
+  }
+
+  // Fallback : modèle par défaut si choix non reconnu
+  console.warn(`[scenario] Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  return {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json'
+    },
+    model: 'gpt-4.1-mini',
+    tokenParamName: 'max_tokens',
+    supportsTemperature: true,
+    isResponsesAPI: false
+  };
+}
+
+// =====================================================
+// NETTOYAGE DE LA SORTIE (notamment pour Mistral)
+// =====================================================
+
+function cleanScenarioOutput(text: string, isMistral: boolean): string {
+  let cleaned = text;
+
+  // 1. Supprimer les blocs code fence markdown (```markdown ... ``` ou ``` ... ```)
+  cleaned = cleaned.replace(/^```(?:markdown)?\s*\n?/i, '');
+  cleaned = cleaned.replace(/\n?```\s*$/i, '');
+  // Fences internes résiduelles
+  cleaned = cleaned.replace(/^```(?:markdown)?\s*\n?/gim, '');
+  cleaned = cleaned.replace(/\n?```\s*$/gim, '');
+
+  // 2. Supprimer tout texte d'introduction AVANT le tableau
+  //    Le tableau commence par une ligne qui débute par | et contient "séance"
+  const lines = cleaned.split('\n');
+  let tableStartIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith('|') && /s[ée]ance/i.test(trimmed)) {
+      tableStartIdx = i;
+      break;
+    }
+  }
+  if (tableStartIdx > 0) {
+    // Supprimer les lignes avant le tableau (intro, commentaires, etc.)
+    cleaned = lines.slice(tableStartIdx).join('\n');
+  }
+
+  // 3. Fusionner les lignes de tableau cassées (GPT-5 mini peut insérer des \n dans les cellules)
+  //    Une ligne qui ne commence pas par | mais qu'on est dans le tableau → continuation de la ligne précédente
+  {
+    const tableLines = cleaned.split('\n');
+    const merged: string[] = [];
+    let inTableZone = false;
+
+    for (let i = 0; i < tableLines.length; i++) {
+      const trimmed = tableLines[i].trim();
+
+      // Détection de la zone tableau (commence par | et contient "séance")
+      if (!inTableZone && trimmed.startsWith('|') && /s[ée]ance/i.test(trimmed)) {
+        inTableZone = true;
+      }
+
+      if (inTableZone && trimmed !== '') {
+        // Ligne séparateur (|---|---|...) → garder telle quelle
+        if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+          merged.push(trimmed);
+          continue;
+        }
+
+        // Ligne qui commence par | → nouvelle ligne de tableau
+        if (trimmed.startsWith('|')) {
+          merged.push(trimmed);
+          continue;
+        }
+
+        // Ligne qui NE commence PAS par | mais on est dans le tableau
+        // → c'est une continuation de la ligne précédente, on fusionne
+        if (merged.length > 0 && merged[merged.length - 1].startsWith('|')) {
+          // Ajouter un espace avant le texte de continuation
+          merged[merged.length - 1] = merged[merged.length - 1] + ' ' + trimmed;
+          continue;
+        }
+      }
+
+      // Hors du tableau ou ligne vide → garder normalement
+      merged.push(tableLines[i]);
+
+      // Détecter la fin du tableau (ligne non-vide, hors tableau, après des lignes |)
+      if (inTableZone && trimmed !== '' && !trimmed.startsWith('|') && !trimmed.startsWith('#')) {
+        // On est sorti du tableau
+        inTableZone = false;
+      }
+    }
+
+    cleaned = merged.join('\n');
+  }
+
+  // 4. Normaliser les lignes du tableau
+  cleaned = cleaned.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) return line;
+
+    // S'assurer que la ligne finit par |
+    let normalized = trimmed.endsWith('|') ? trimmed : trimmed + ' |';
+
+    // Nettoyer le bold/italic markdown dans la première cellule (ex: **Séance 1** → Séance 1)
+    normalized = normalized.replace(
+      /^\|\s*\*{1,3}([^|*]+)\*{1,3}\s*/,
+      '| $1 '
+    );
+
+    return normalized;
+  }).join('\n');
+
+  if (isMistral) {
+    // 5. Supprimer les méta-commentaires après les Notes pédagogiques
+    const metaKeywords = '(?:Notes? d\'adaptation|Remarques? contextuelles?|Notes? de rédaction|' +
+      'Analyse du message|Commentaires?|Structure|Notes? de l\'IA|Chat context|PERSONALIZATION)';
+
+    // Après un séparateur ---
+    cleaned = cleaned.replace(
+      new RegExp(`\\n---\\s*\\n\\s*${metaKeywords}[\\s\\S]*$`, 'i'),
+      ''
+    );
+    // Sans séparateur
+    cleaned = cleaned.replace(
+      new RegExp(`\\n\\n\\s*${metaKeywords}[\\s\\S]*$`, 'i'),
+      ''
+    );
+
+    // 6. Corriger le formatage markdown (espacement avant les headers)
+    cleaned = cleaned.replace(/([^\n])\n(#{2,3}\s)/g, '$1\n\n$2');
+  }
+
+  // 7. Normaliser les sauts de ligne excessifs (3+ → 2)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -368,6 +560,7 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     if (!OPENAI_API_KEY) {
       return new Response('Missing OPENAI_API_KEY', { status: 500, headers: corsHeaders });
     }
+    const MISTRAL_API_KEY = Deno.env.get('MISTRAL_API_KEY');
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -389,9 +582,21 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     }
 
     const data: ScenarioRequest = await req.json();
-    const { documentsContent, documentNames } = data;
+    const { documentsContent, documentNames, aiModel } = data;
     const { cycle, cycleNum } = getCycleFromNiveau(data.niveau);
 
+    // Résoudre la configuration du modèle IA
+    let aiConfig;
+    try {
+      aiConfig = resolveAIConfig(aiModel, OPENAI_API_KEY, MISTRAL_API_KEY);
+    } catch (configError: any) {
+      return new Response(JSON.stringify({ error: configError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`[scenario] Modèle IA utilisé: ${aiConfig.model}`);
     console.log(`[scenario] Generating for: ${data.matiere} - ${data.niveau} (${cycle})`);
     console.log(`[scenario] useRag: ${data.useRag}`);
     console.log(`[scenario] Documents fournis: ${documentNames?.length || 0}`);
@@ -591,49 +796,138 @@ ${documentsContext}
 Génère maintenant le scénario pédagogique complet :`;
 
     // ========================================================================
-    // APPEL OPENAI
+    // APPEL API IA (GPT-4.1-mini / GPT-5 mini / Mistral Medium)
     // ========================================================================
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: CONFIG.chatModel,
+    // Instructions strictes sur le format de sortie (pour modèles non-default)
+    let formatInstruction = '';
+
+    if (aiConfig.model === 'mistral-medium-latest') {
+      formatInstruction = `\n\n⚠️ INSTRUCTIONS STRICTES POUR LA SORTIE :
+1. N'enveloppe JAMAIS ta réponse dans des blocs de code (\`\`\`markdown ou \`\`\`). Écris directement le contenu markdown SANS balises de code.
+2. Commence DIRECTEMENT par le tableau markdown des séances (première ligne = | Séance | Phase...).
+3. Chaque ligne du tableau DOIT commencer ET finir par le caractère |
+4. Chaque ligne du tableau DOIT contenir exactement 5 colonnes séparées par |
+5. Chaque séance = UNE SEULE ligne du tableau (pas de retour à la ligne dans les cellules).
+6. Après le tableau, ajoute UNIQUEMENT la section "**Notes pédagogiques**" avec les éléments demandés.
+7. N'ajoute AUCUNE note, remarque, ou commentaire sur ta propre rédaction après les "Notes pédagogiques".
+8. Ne génère AUCUNE section technique comme "# Chat context", "# PERSONALIZATION INSTRUCTIONS", ou similaire.
+9. La section "Notes pédagogiques" NE doit PAS répéter le contenu du tableau. Elle doit contenir UNIQUEMENT :
+   - Les attendus de fin de cycle visés
+   - Les compétences du socle commun travaillées
+   - Les points de vigilance pour l'enseignant
+   - Les liens interdisciplinaires possibles
+   - Ce qui doit rester chez les élèves après la séquence
+   - Les rituels de réactivation recommandés`;
+    } else if (aiConfig.isResponsesAPI) {
+      formatInstruction = `\n\n⚠️ INSTRUCTIONS STRICTES POUR LE FORMAT DE SORTIE :
+1. N'enveloppe JAMAIS ta réponse dans des blocs de code (\`\`\`markdown ou \`\`\`). Écris directement le contenu.
+2. Commence DIRECTEMENT par le tableau markdown (première ligne = | Séance | Phase et objectif opérationnel | Obstacles, erreurs et différenciation | Activités et dispositifs | Évaluation et critères de réussite |).
+3. La deuxième ligne DOIT être le séparateur : |--------|------|------|------|------|
+4. Chaque ligne de données du tableau DOIT commencer ET finir par le caractère |
+5. Chaque ligne DOIT contenir exactement 5 colonnes séparées par |
+6. Chaque séance = UNE SEULE ligne du tableau (pas de retour à la ligne dans les cellules).
+7. N'ajoute AUCUN texte d'introduction avant le tableau.
+8. Après le tableau, ajoute la section "**Notes pédagogiques**".`;
+    }
+
+    let requestBody: any;
+
+    if (aiConfig.isResponsesAPI) {
+      // GPT-5 mini : API Responses (format différent)
+      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      requestBody = {
+        model: aiConfig.model,
+        input: fullPrompt,
+        max_output_tokens: 8000,
+        text: { format: { type: "text" } },
+        reasoning: { effort: "medium" }
+      };
+    } else if (aiConfig.model === 'mistral-medium-latest') {
+      // Mistral : pas de rôle system, tout dans un message user
+      const combinedPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      requestBody = {
+        model: aiConfig.model,
+        messages: [{ role: 'user', content: combinedPrompt }],
+        temperature: 0.7,
+        max_tokens: 5500,
+      };
+    } else {
+      // Default (gpt-4.1-mini) : comportement actuel inchangé
+      requestBody = {
+        model: aiConfig.model,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.6,
         max_tokens: 5500,
-      }),
+      };
+    }
+
+    const response = await fetch(aiConfig.endpoint, {
+      method: 'POST',
+      headers: aiConfig.headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      console.error('[scenario] OpenAI API error:', await response.text());
-      return new Response('OpenAI API Error', { status: response.status, headers: corsHeaders });
+      console.error(`[scenario] ${aiConfig.model} API error:`, await response.text());
+      return new Response(JSON.stringify({ error: `Erreur API ${aiConfig.model}` }), {
+        status: response.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const openAIData = await response.json();
-    const content = openAIData.choices?.[0]?.message?.content;
+    // ========================================================================
+    // PARSING DE LA RÉPONSE (format différent selon l'API)
+    // ========================================================================
+
+    const aiData = await response.json();
+    let content: string | null = null;
+
+    if (aiConfig.isResponsesAPI) {
+      // GPT-5 mini : format Responses API
+      if (aiData?.output && Array.isArray(aiData.output)) {
+        const messageItem = aiData.output.find((item: any) => item.type === 'message');
+        if (messageItem?.content && Array.isArray(messageItem.content)) {
+          const outputText = messageItem.content.find((c: any) => c.type === 'output_text');
+          if (outputText?.text) {
+            content = outputText.text;
+          }
+        }
+      }
+      // Fallback pour format simplifié
+      if (!content && aiData?.output_text) {
+        content = aiData.output_text;
+      }
+    } else {
+      // Chat Completions (OpenAI + Mistral)
+      content = aiData.choices?.[0]?.message?.content;
+      if (!content) {
+        content = aiData.choices?.[0]?.text;
+      }
+    }
 
     if (!content) {
       return new Response(JSON.stringify({
-        error: 'Réponse invalide de l\'API OpenAI'
+        error: 'Réponse invalide de l\'API'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`[scenario] Generated ${content.length} chars`);
+    // Nettoyage de la sortie (suppression code fences, méta-commentaires Mistral)
+    const isMistral = aiConfig.model === 'mistral-medium-latest';
+    content = cleanScenarioOutput(content, isMistral);
+
+    console.log(`[scenario] Generated ${content.length} chars with ${aiConfig.model}`);
     console.log(`[scenario] RAG sources returned: ${ragSources.length}`);
 
     return new Response(JSON.stringify({
       content,
-      usage: openAIData.usage,
+      usage: aiData.usage,
       sources: ragSources.length > 0 ? ragSources : undefined,
     }), {
       status: 200,
@@ -647,6 +941,10 @@ Génère maintenant le scénario pédagogique complet :`;
 };
 
 Deno.serve(scenarioHandler);
+
+
+
+
 
 
 

@@ -282,37 +282,79 @@ export function ScenarioPedagogiquePage() {
 
   const parseMarkdownTable = (content: string): SeanceRow[] => {
     const rows: SeanceRow[] = [];
-    const lines = content.split('\n');
+
+    // Pré-traitement : fusionner les lignes de tableau cassées
+    // GPT-5 mini peut insérer des retours à la ligne dans les cellules
+    const rawLines = content.split('\n');
+    const lines: string[] = [];
+    let inTableZone = false;
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const trimmed = rawLines[i].trim();
+
+      // Détecter l'entrée dans le tableau
+      if (!inTableZone && trimmed.startsWith('|') &&
+          (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
+        inTableZone = true;
+      }
+
+      if (inTableZone && trimmed !== '') {
+        // Ligne séparateur → garder telle quelle
+        if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+          lines.push(trimmed);
+          continue;
+        }
+        // Nouvelle ligne de tableau (commence par |)
+        if (trimmed.startsWith('|')) {
+          lines.push(trimmed);
+          continue;
+        }
+        // Continuation d'une ligne de tableau (ne commence pas par |)
+        if (lines.length > 0 && lines[lines.length - 1].startsWith('|')) {
+          lines[lines.length - 1] = lines[lines.length - 1] + ' ' + trimmed;
+          continue;
+        }
+      }
+
+      lines.push(rawLines[i]);
+
+      // Sortie du tableau
+      if (inTableZone && trimmed !== '' && !trimmed.startsWith('|') && !trimmed.startsWith('#')) {
+        inTableZone = false;
+      }
+    }
+
     let inTable = false;
     let headerFound = false;
-    
+
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      
-      if (!headerFound && trimmed.startsWith('|') && 
+      const trimmed = lines[i].trim();
+
+      if (!headerFound && trimmed.startsWith('|') &&
           (trimmed.toLowerCase().includes('séance') || trimmed.toLowerCase().includes('seance'))) {
         headerFound = true;
         inTable = true;
         continue;
       }
-      
-      if (trimmed.match(/^\|[\s\-:|\s]+\|$/)) {
+
+      if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
         continue;
       }
-      
-      if (inTable && trimmed.startsWith('|') && trimmed.endsWith('|')) {
-        const innerContent = trimmed.slice(1, -1);
+
+      if (inTable && trimmed.startsWith('|')) {
+        // S'assurer que la ligne finit par |
+        const normalizedLine = trimmed.endsWith('|') ? trimmed : trimmed + ' |';
+        const innerContent = normalizedLine.slice(1, -1);
         const cells: string[] = [];
         let currentCell = '';
         let depth = 0;
-        
+
         for (let j = 0; j < innerContent.length; j++) {
           const char = innerContent[j];
-          
+
           if (char === '(' || char === '[' || char === '{') depth++;
-          if (char === ')' || char === ']' || char === '}') depth--;
-          
+          if (char === ')' || char === ']' || char === '}') depth = Math.max(0, depth - 1);
+
           if (char === '|' && depth === 0) {
             cells.push(currentCell.trim());
             currentCell = '';
@@ -323,10 +365,10 @@ export function ScenarioPedagogiquePage() {
         if (currentCell.trim()) {
           cells.push(currentCell.trim());
         }
-        
+
         if (cells.length >= 5) {
           const firstCell = cells[0].trim();
-          
+
           if (firstCell.match(/\d+/) || firstCell.toLowerCase().includes('séance') || firstCell.toLowerCase().includes('seance')) {
             rows.push({
               numero: firstCell,
@@ -338,7 +380,7 @@ export function ScenarioPedagogiquePage() {
           }
         }
       }
-      
+
       if (inTable && rows.length > 0 && !trimmed.startsWith('|') && trimmed !== '' && !trimmed.startsWith('#')) {
         const nextLine = lines[i + 1]?.trim() || '';
         if (!nextLine.startsWith('|')) {
@@ -346,8 +388,8 @@ export function ScenarioPedagogiquePage() {
         }
       }
     }
-    
-    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content`);
+
+    console.log(`[parseMarkdownTable] Parsed ${rows.length} rows from content (after line merging)`);
     return rows;
   };
 
@@ -528,15 +570,38 @@ export function ScenarioPedagogiquePage() {
 
   const cleanMarkdownForPDF = (text: string): string => {
     if (!text) return '';
-    
+
     return text
       .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/\*([^*]+)\*/g, '$1')
-      .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
       .replace(/`([^`]+)`/g, '$1')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
       .replace(/^#{1,6}\s+/gm, '')
+      // Remplacer les caractères Unicode non supportés par Helvetica (jsPDF)
+      .replace(/→/g, '->')
+      .replace(/←/g, '<-')
+      .replace(/↔/g, '<->')
+      .replace(/«\s*/g, '"')
+      .replace(/\s*»/g, '"')
+      .replace(/['']/g, "'")
+      .replace(/[""]/g, '"')
+      .replace(/…/g, '...')
+      .replace(/–/g, '-')
+      .replace(/—/g, '-')
+      .replace(/•/g, '-')
+      .replace(/≠/g, '!=')
+      .replace(/≤/g, '<=')
+      .replace(/≥/g, '>=')
+      .replace(/✓/g, 'V')
+      .replace(/✗/g, 'X')
+      .replace(/□/g, '[ ]')
+      .replace(/■/g, '[X]')
+      // Filet de sécurité : supprimer tout caractère hors jeu Latin supporté par Helvetica
+      // Garde : ASCII 32-126, retour ligne/tab, Latin-1 Supplement 160-255 (accents français)
+      // deno-lint-ignore no-control-regex
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '')
       .replace(/  +/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
@@ -732,21 +797,6 @@ export function ScenarioPedagogiquePage() {
       
       let yPos = 40;
       
-      const calculateRowHeight = (row: SeanceRow): number => {
-        pdf.setFontSize(fontSize);
-        const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
-        let maxLines = 1;
-        
-        cellData.forEach((text, i) => {
-          const maxWidth = colWidths[i] - 2 * cellPadding;
-          const cleanedText = cleanMarkdownForPDF(text || '');
-          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
-          if (lines.length > maxLines) maxLines = lines.length;
-        });
-        
-        return Math.max(minRowHeight, maxLines * lineHeightFactor + 2 * cellPadding);
-      };
-      
       const drawTableHeader = () => {
         pdf.setFillColor(99, 102, 241);
         pdf.rect(margin, yPos, contentWidth, 8, 'F');
@@ -768,50 +818,71 @@ export function ScenarioPedagogiquePage() {
       drawTableHeader();
       
       rowsData.forEach((row, index) => {
-        const rowHeight = calculateRowHeight(row);
-        
-        if (yPos + rowHeight > pageHeight - 15) {
-          pdf.addPage();
-          yPos = 15;
-          drawTableHeader();
-        }
-        
-        if (index % 2 === 0) {
-          pdf.setFillColor(248, 250, 252);
-          pdf.rect(margin, yPos, contentWidth, rowHeight, 'F');
-        }
-        
-        pdf.setDrawColor(220, 220, 220);
-        pdf.rect(margin, yPos, contentWidth, rowHeight, 'S');
-        
-        let xBorder = margin;
-        colWidths.forEach((width, i) => {
-          if (i < colWidths.length - 1) {
-            xBorder += width;
-            pdf.line(xBorder, yPos, xBorder, yPos + rowHeight);
-          }
-        });
-        
         pdf.setFontSize(fontSize);
-        let xPos = margin + cellPadding;
         const cellData = [row.numero, row.phaseObjectif, row.obstaclesDiff, row.activitesDispositifs, row.evaluationCriteres];
-        
-        cellData.forEach((text, i) => {
+
+        // Pré-calculer toutes les lignes de texte pour chaque cellule
+        const allCellLines = cellData.map((text, i) => {
           const maxWidth = colWidths[i] - 2 * cellPadding;
           const cleanedText = cleanMarkdownForPDF(text || '');
-          const lines = pdf.splitTextToSize(cleanedText, maxWidth);
-          
-          lines.forEach((line: string, lineIndex: number) => {
-            const textY = yPos + cellPadding + 2.5 + (lineIndex * lineHeightFactor);
-            if (textY < yPos + rowHeight - cellPadding) {
-              pdf.text(line, xPos, textY);
+          return pdf.splitTextToSize(cleanedText, maxWidth) as string[];
+        });
+        const maxLines = Math.max(...allCellLines.map(l => l.length));
+
+        let lineOffset = 0;
+
+        while (lineOffset < maxLines) {
+          // Combien de lignes tiennent sur la page courante ?
+          const availableHeight = pageHeight - 15 - yPos;
+          if (availableHeight < minRowHeight) {
+            pdf.addPage();
+            yPos = 15;
+            drawTableHeader();
+            continue;
+          }
+          const maxLinesOnPage = Math.max(1, Math.floor((availableHeight - 2 * cellPadding) / lineHeightFactor));
+          const linesToDraw = Math.min(maxLinesOnPage, maxLines - lineOffset);
+          const chunkHeight = Math.max(minRowHeight, linesToDraw * lineHeightFactor + 2 * cellPadding);
+
+          // Fond alterné (uniquement sur le premier chunk de la ligne)
+          if (index % 2 === 0) {
+            pdf.setFillColor(248, 250, 252);
+            pdf.rect(margin, yPos, contentWidth, chunkHeight, 'F');
+          }
+
+          // Bordures
+          pdf.setDrawColor(220, 220, 220);
+          pdf.rect(margin, yPos, contentWidth, chunkHeight, 'S');
+          let xBorder = margin;
+          colWidths.forEach((width, ci) => {
+            if (ci < colWidths.length - 1) {
+              xBorder += width;
+              pdf.line(xBorder, yPos, xBorder, yPos + chunkHeight);
             }
           });
-          
-          xPos += colWidths[i];
-        });
-        
-        yPos += rowHeight;
+
+          // Texte de chaque cellule (portion visible)
+          pdf.setFontSize(fontSize);
+          let xPos = margin + cellPadding;
+          allCellLines.forEach((lines, ci) => {
+            const chunkLines = lines.slice(lineOffset, lineOffset + linesToDraw);
+            chunkLines.forEach((line: string, li: number) => {
+              const textY = yPos + cellPadding + 2.5 + (li * lineHeightFactor);
+              pdf.text(line, xPos, textY);
+            });
+            xPos += colWidths[ci];
+          });
+
+          yPos += chunkHeight;
+          lineOffset += linesToDraw;
+
+          // S'il reste des lignes, continuer sur la page suivante
+          if (lineOffset < maxLines) {
+            pdf.addPage();
+            yPos = 15;
+            drawTableHeader();
+          }
+        }
       });
 
       if (additionalNotes) {
@@ -1486,7 +1557,7 @@ export function ScenarioPedagogiquePage() {
                           {isEditing ? (
                             <input type="text" value={row.numero} onChange={(e) => handleCellChange(index, 'numero', e.target.value)}
                               className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
-                          ) : row.numero}
+                          ) : renderMarkdown(row.numero)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
@@ -1595,6 +1666,66 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
