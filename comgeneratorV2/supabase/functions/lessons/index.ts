@@ -204,10 +204,32 @@ async function searchRagChunks(
       console.log(`[lessons] Diagnostic chunks sample: ${JSON.stringify(hasEmbedding)}`);
     }
 
-    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}, embeddingLength=${embedding.length}`);
+    const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}, embeddingLength=${embedding.length}, strLength=${embeddingStr.length}`);
+
+    // Debug: tester le RPC avec un embedding CONNU de la base
+    const { data: testChunk } = await supabase
+      .from('rag_chunks')
+      .select('embedding')
+      .eq('user_id', userId)
+      .limit(1)
+      .single();
+    if (testChunk?.embedding) {
+      const testEmbStr = typeof testChunk.embedding === 'string' ? testChunk.embedding : `[${testChunk.embedding}]`;
+      const { data: testData, error: testError } = await supabase.rpc('match_rag_chunks', {
+        p_query_embedding: testEmbStr,
+        p_similarity_threshold: 0.3,
+        p_match_count: 3,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+      console.log(`[lessons] DEBUG RPC with DB embedding: ${testData?.length ?? 'null'} results, error: ${testError ? JSON.stringify(testError) : 'none'}`);
+    } else {
+      console.log(`[lessons] DEBUG: could not fetch test embedding from DB`);
+    }
 
     const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
+      p_query_embedding: embeddingStr,
       p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
