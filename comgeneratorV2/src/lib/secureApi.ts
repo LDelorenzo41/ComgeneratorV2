@@ -162,6 +162,11 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      sources?: Array<{
+        document_name: string;
+        chunk_content: string;
+        similarity: number;
+      }>;
     }>('lessons', params);
   }
 
@@ -189,4 +194,5 @@ class SecureApiService {
 
 // Instance singleton
 export const secureApi = new SecureApiService();
+
 
