@@ -186,7 +186,15 @@ async function searchRagChunks(
 ): Promise<RagChunk[]> {
   try {
     const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[lessons] Embedding length: ${embedding.length}, first 3 values: [${embedding.slice(0, 3).join(', ')}]`);
     console.log(`[lessons] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
+
+    // Augmenter ef_search pour améliorer la précision de l'index HNSW
+    await supabase.rpc('set_config_param', { param_name: 'hnsw.ef_search', param_value: '400' }).catch(() => {
+      // Si la fonction set_config_param n'existe pas, on continue sans
+      console.log('[lessons] set_config_param not available, trying direct SQL');
+    });
+
     const { data, error } = await supabase.rpc('match_rag_chunks', {
       p_query_embedding: embeddingStr,
       p_similarity_threshold: similarityThreshold,
@@ -201,6 +209,51 @@ async function searchRagChunks(
     }
 
     console.log(`[lessons] RPC returned: ${data ? data.length : 'null'} results, type: ${typeof data}`);
+
+    // Si le RPC retourne 0 résultats, faire une recherche exacte (sans index HNSW)
+    if (!data || data.length === 0) {
+      console.log('[lessons] RPC returned 0 results, trying exact search fallback...');
+      const { data: exactData, error: exactError } = await supabase.rpc('match_rag_chunks_exact', {
+        p_query_embedding: embeddingStr,
+        p_similarity_threshold: similarityThreshold,
+        p_match_count: topK,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+
+      if (exactError) {
+        console.log('[lessons] Exact search fallback error:', JSON.stringify(exactError));
+        // Dernier recours : requête SQL brute
+        console.log('[lessons] Trying raw SQL fallback...');
+        const { data: rawData, error: rawError } = await supabase.rpc('match_rag_chunks_raw', {
+          p_query_embedding: embeddingStr,
+          p_threshold: similarityThreshold,
+          p_limit: topK,
+          p_user_id: userId,
+        });
+        if (rawError) {
+          console.log('[lessons] Raw SQL fallback also failed:', JSON.stringify(rawError));
+          return [];
+        }
+        console.log(`[lessons] Raw SQL fallback returned: ${rawData ? rawData.length : 'null'} results`);
+        return (rawData || []).map((item: any) => ({
+          id: item.id,
+          content: item.content,
+          documentId: item.document_id || '',
+          documentTitle: item.document_title,
+          score: item.similarity,
+        }));
+      }
+
+      console.log(`[lessons] Exact search fallback returned: ${exactData ? exactData.length : 'null'} results`);
+      return (exactData || []).map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        documentId: item.document_id || '',
+        documentTitle: item.document_title,
+        score: item.similarity,
+      }));
+    }
 
     return (data || []).map((item: any) => ({
       id: item.id,

@@ -520,9 +520,11 @@ async function searchRagChunks(
   similarityThreshold: number
 ): Promise<RagChunk[]> {
   try {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[scenario] Embedding length: ${embedding.length}, first 3 values: [${embedding.slice(0, 3).join(', ')}]`);
     console.log(`[scenario] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
     const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
+      p_query_embedding: embeddingStr,
       p_similarity_threshold: similarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
@@ -532,6 +534,32 @@ async function searchRagChunks(
     if (error) {
       console.error('[scenario] RAG search error:', error);
       return [];
+    }
+
+    console.log(`[scenario] RPC returned: ${data ? data.length : 'null'} results`);
+
+    // Fallback : si 0 résultats, utiliser la recherche exacte (sans index HNSW)
+    if (!data || data.length === 0) {
+      console.log('[scenario] RPC returned 0 results, trying exact search fallback...');
+      const { data: exactData, error: exactError } = await supabase.rpc('match_rag_chunks_exact', {
+        p_query_embedding: embeddingStr,
+        p_similarity_threshold: similarityThreshold,
+        p_match_count: topK,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+      if (exactError) {
+        console.error('[scenario] Exact search fallback error:', exactError);
+        return [];
+      }
+      console.log(`[scenario] Exact search returned: ${exactData ? exactData.length : 'null'} results`);
+      return (exactData || []).map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        documentId: item.document_id || '',
+        documentTitle: item.document_title,
+        score: item.similarity,
+      }));
     }
 
     return (data || []).map((item: any) => ({
