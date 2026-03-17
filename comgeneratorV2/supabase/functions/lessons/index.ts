@@ -507,6 +507,7 @@ CONTENU DU DOCUMENT :
 ${data.documentContext}
 ---
 ` : ''}
+${ragContext}
 ═══════════════════════════════════════════════════════════════
         EXIGENCES PÉDAGOGIQUES NON NÉGOCIABLES
 ═══════════════════════════════════════════════════════════════
@@ -1010,12 +1011,14 @@ ${ragContext ? '✅ Les sources documentaires sont CITÉES explicitement avec [S
 ${noMetaInstruction}
 ${ragContext ? `
 ═══════════════════════════════════════════════════════════════
-  ⚠️ RAPPEL FINAL — SOURCES DOCUMENTAIRES À UTILISER ⚠️
+  ⚠️ RAPPEL FINAL — UTILISE LES SOURCES DOCUMENTAIRES ⚠️
 ═══════════════════════════════════════════════════════════════
 
-${ragContext}
+Les sources documentaires ont été fournies plus haut dans ce message.
+Tu DOIS les citer explicitement avec [Source : nom_du_document].
+La section "📖 Sources documentaires utilisées" est OBLIGATOIRE.
 
-Génère maintenant cette séance en t'appuyant OBLIGATOIREMENT sur les sources ci-dessus.` : `
+Génère maintenant cette séance en t'appuyant OBLIGATOIREMENT sur ces sources.` : `
 Génère maintenant cette séance avec le niveau d'expertise attendu.`}`;
 
     // Construction du body — séparation system/user pour meilleur suivi des instructions

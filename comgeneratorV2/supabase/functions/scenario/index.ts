@@ -747,6 +747,7 @@ ${data.pointDepart || 'Non précisé - considérer un niveau hétérogène avec 
 
 **ATTENDUS DE FIN DE SÉQUENCE (objectifs terminaux)**
 ${data.attendus}
+${ragContext}
 ${documentsContext}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -788,11 +789,14 @@ ${ragContext ? `9. **Citation des sources documentaires OBLIGATOIRE** :
    - Dans les "Notes pédagogiques", ajouter une sous-section "Sources documentaires utilisées" listant chaque document et les éléments repris` : ''}
 ${ragContext ? `
 ═══════════════════════════════════════════════════════════════════════════════
-  ⚠️ RAPPEL FINAL — SOURCES DOCUMENTAIRES À UTILISER OBLIGATOIREMENT ⚠️
+  ⚠️ RAPPEL FINAL — UTILISE LES SOURCES DOCUMENTAIRES ⚠️
 ═══════════════════════════════════════════════════════════════════════════════
-${ragContext}
 
-Génère maintenant le scénario pédagogique en t'appuyant OBLIGATOIREMENT sur les sources ci-dessus :` : `
+Les sources documentaires ont été fournies plus haut dans ce message.
+Tu DOIS les citer explicitement avec [Source : nom_du_document].
+La sous-section "Sources documentaires utilisées" dans les Notes pédagogiques est OBLIGATOIRE.
+
+Génère maintenant le scénario pédagogique en t'appuyant OBLIGATOIREMENT sur ces sources :` : `
 Génère maintenant le scénario pédagogique complet :`}`;
 
     // ========================================================================
