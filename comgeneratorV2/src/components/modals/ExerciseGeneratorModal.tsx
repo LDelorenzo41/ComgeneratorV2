@@ -466,8 +466,9 @@ export function ExerciseGeneratorModal({
           </div>
         </div>
 
-        {/* Body — masqué si minimisé */}
+        {/* Body + Footer — masqués si minimisé */}
         {!isMinimized && (
+        <>
         <div className="overflow-y-auto flex-1 p-6">
 
           {/* Error state */}
@@ -643,7 +644,7 @@ export function ExerciseGeneratorModal({
             </button>
           </div>
         )}
-        </div>
+        </>
         )}
       </div>
     </>
