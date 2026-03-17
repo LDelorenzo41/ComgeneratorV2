@@ -398,7 +398,9 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           chunks = chunks.slice(0, RAG_CONFIG.ragTopK);
         }
 
-        // Détecter les documents du dossier non représentés dans les résultats
+        // Recherche de rattrapage : pour chaque document du dossier absent des résultats,
+        // faire une recherche ciblée par document_id avec un seuil très bas
+        // L'utilisateur a sélectionné ce dossier, il veut ces documents utilisés.
         if (allowedDocIds && data.folderIds?.length) {
           const representedDocIds = new Set(chunks.map(c => c.documentId));
           const { data: allFolderDocs } = await serviceClient
@@ -411,11 +413,50 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           if (allFolderDocs) {
             for (const doc of allFolderDocs) {
               if (!representedDocIds.has(doc.id)) {
-                ragWarnings.push(`ℹ️ Le document "${doc.title}" n'a pas été utilisé car son contenu n'est pas suffisamment similaire au thème de la séance. Essayez d'ajouter des mots-clés du document dans le thème.`);
-                console.log(`[lessons] INFO: Document "${doc.title}" (${doc.id}) in folder but no chunks matched the query`);
+                console.log(`[lessons] Document "${doc.title}" missing from results, running targeted search...`);
+                // Recherche ciblée avec seuil minimal et limité aux 3 meilleurs chunks
+                const fallbackChunks = await searchRagChunks(
+                  serviceClient,
+                  authUser.id,
+                  embedding,
+                  3,
+                  0.15,  // Seuil très bas car on veut absolument des résultats
+                );
+                // Filtrer pour ne garder que ce document spécifique
+                const docChunks = fallbackChunks.filter(c => c.documentId === doc.id);
+                if (docChunks.length > 0) {
+                  chunks.push(...docChunks);
+                  console.log(`[lessons] Recovered ${docChunks.length} chunks from "${doc.title}" (best score: ${docChunks[0].score.toFixed(3)})`);
+                } else {
+                  // Dernier recours : recherche directe par document_id via la RPC
+                  const { data: directChunks, error: directError } = await serviceClient.rpc('match_rag_chunks', {
+                    p_query_embedding: `[${embedding.join(',')}]`,
+                    p_similarity_threshold: 0.05,
+                    p_match_count: 3,
+                    p_user_id: authUser.id,
+                    p_document_id: doc.id,
+                  });
+                  if (!directError && directChunks && directChunks.length > 0) {
+                    const recovered = directChunks.map((item: any) => ({
+                      id: item.chunk_id || item.id,
+                      content: item.content,
+                      documentId: item.document_id || '',
+                      documentTitle: item.document_title || doc.title,
+                      score: item.similarity,
+                    }));
+                    chunks.push(...recovered);
+                    console.log(`[lessons] Recovered ${recovered.length} chunks from "${doc.title}" via direct search (best score: ${recovered[0].score.toFixed(3)})`);
+                  } else {
+                    ragWarnings.push(`ℹ️ Le document "${doc.title}" n'a retourné aucun résultat même avec une recherche ciblée. Le document a peut-être besoin d'être ré-ingéré.`);
+                    console.log(`[lessons] WARNING: No chunks recoverable for "${doc.title}" even with direct search`);
+                  }
+                }
               }
             }
           }
+          // Re-trier par score et limiter
+          chunks.sort((a, b) => b.score - a.score);
+          chunks = chunks.slice(0, RAG_CONFIG.ragTopK);
         }
 
         if (chunks.length > 0) {
