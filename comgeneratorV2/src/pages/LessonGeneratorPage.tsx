@@ -867,6 +867,7 @@ export function LessonGeneratorPage() {
   const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
   const [extractedText, setExtractedText] = React.useState<string>('');
   const [isExtracting, setIsExtracting] = React.useState(false);
+  const [isDragging, setIsDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // États pour les sources RAG
@@ -921,14 +922,18 @@ export function LessonGeneratorPage() {
     }
   });
 
-  // Gestion de l'upload de document (PDF, DOCX, TXT)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Vérifier la taille (10 MB max)
+  // Traitement d'un fichier (partagé entre input et drag & drop)
+  const processFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
       alert('Le fichier est trop volumineux (max 10 MB).');
+      return;
+    }
+
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const allowedExtensions = ['.pdf', '.docx', '.txt'];
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+      alert('Format non supporté. Formats acceptés : PDF, DOCX, TXT.');
       return;
     }
 
@@ -936,7 +941,6 @@ export function LessonGeneratorPage() {
       setIsExtracting(true);
       setUploadedFile(file);
       const text = await extractTextFromFile(file);
-      // Nettoyer et limiter le texte à 4000 caractères
       const cleanedText = text
         .replace(/\s+/g, ' ')
         .trim()
@@ -952,6 +956,35 @@ export function LessonGeneratorPage() {
     } finally {
       setIsExtracting(false);
     }
+  };
+
+  // Gestion de l'upload de document (PDF, DOCX, TXT)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  };
+
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (tokenCount && tokenCount > 0) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (tokenCount === 0) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) await processFile(file);
   };
 
   // Réinitialiser le document
@@ -1378,12 +1411,22 @@ export function LessonGeneratorPage() {
               </div>
 
               {!uploadedFile ? (
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-xl p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`rounded-xl p-6 border-2 border-dashed transition-colors duration-200 ${
+                    isDragging
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      : 'border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20'
+                  }`}
+                >
                   <div className="text-center">
-                    <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      Uploadez un document de référence (bulletin officiel, programme, manuel, exemples d'exercices...)
-                      pour optimiser la génération de séance
+                      {isDragging
+                        ? 'Déposez votre fichier ici...'
+                        : 'Glissez-déposez un document ou cliquez pour sélectionner (bulletin officiel, programme, manuel, exemples d\'exercices...)'}
                     </p>
                     <input
                       ref={fileInputRef}
@@ -1577,64 +1620,4 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

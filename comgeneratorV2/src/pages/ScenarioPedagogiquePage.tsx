@@ -128,6 +128,7 @@ export function ScenarioPedagogiquePage() {
   const [extractedTexts, setExtractedTexts] = React.useState<string[]>([]);
   const [isExtracting, setIsExtracting] = React.useState(false);
   const [extractionError, setExtractionError] = React.useState<string | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
   
   const [hasBankAccess, setHasBankAccess] = React.useState<boolean | null>(null);
   const [bankAccessLoading, setBankAccessLoading] = React.useState(true);
@@ -240,19 +241,29 @@ export function ScenarioPedagogiquePage() {
   // GESTION DE L'UPLOAD DE FICHIERS
   // ============================================================================
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Traitement d'une liste de fichiers (partagé entre input et drag & drop)
+  const processFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
 
     setIsExtracting(true);
     setExtractionError(null);
 
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const allowedExtensions = ['.pdf', '.docx', '.txt'];
+
     const newFiles: File[] = [];
     const newTexts: string[] = [];
 
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       if (file.size > 10 * 1024 * 1024) {
         setExtractionError(`Le fichier ${file.name} dépasse 10MB`);
+        continue;
+      }
+
+      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+        setExtractionError(`Format non supporté pour ${file.name}. Formats acceptés : PDF, DOCX, TXT.`);
         continue;
       }
 
@@ -268,7 +279,35 @@ export function ScenarioPedagogiquePage() {
     setUploadedFiles(prev => [...prev, ...newFiles]);
     setExtractedTexts(prev => [...prev, ...newTexts]);
     setIsExtracting(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await processFiles(files);
     e.target.value = '';
+  };
+
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isExtracting && tokenCount && tokenCount > 0) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (isExtracting || !tokenCount) return;
+    const files = e.dataTransfer.files;
+    if (files.length > 0) await processFiles(files);
   };
 
   const removeFile = (index: number) => {
@@ -1259,10 +1298,15 @@ export function ScenarioPedagogiquePage() {
                 />
                 <label
                   htmlFor="file-upload"
-                  className={`flex items-center justify-center px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed rounded-xl transition-colors duration-200 ${
                     isExtracting || tokenCount === 0
                       ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-50'
-                      : 'border-blue-300 hover:border-blue-500 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20'
+                      : isDragging
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-copy'
+                        : 'border-blue-300 hover:border-blue-500 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20 cursor-pointer'
                   }`}
                 >
                   {isExtracting ? (
@@ -1270,10 +1314,16 @@ export function ScenarioPedagogiquePage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent mr-2"></div>
                       <span className="text-sm text-gray-500">Extraction en cours...</span>
                     </div>
+                  ) : isDragging ? (
+                    <>
+                      <Upload className="w-8 h-8 text-blue-500 mb-2" />
+                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Déposez vos fichiers ici...</span>
+                    </>
                   ) : (
                     <>
-                      <Upload className="w-5 h-5 text-blue-500 mr-2" />
-                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Cliquez pour ajouter des fichiers</span>
+                      <Upload className="w-8 h-8 text-blue-400 mb-2" />
+                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Glissez-déposez ou cliquez pour ajouter des fichiers</span>
+                      <span className="text-xs text-gray-500 mt-1">PDF, DOCX, TXT — max 10 MB par fichier</span>
                     </>
                   )}
                 </label>
@@ -1624,123 +1674,4 @@ export function ScenarioPedagogiquePage() {
 }
 
 export default ScenarioPedagogiquePage;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
