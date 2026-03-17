@@ -1028,7 +1028,7 @@ export function ScenarioPedagogiquePage() {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               Votre scénario pédagogique est en cours de création.
               <br />
-              Cette opération peut prendre jusqu'à 30 secondes.
+              Cette opération peut prendre jusqu'à 1 minute.
             </p>
             <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl p-3">
               <p className="text-amber-700 dark:text-amber-300 text-sm font-medium">

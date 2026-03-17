@@ -24,7 +24,6 @@ import {
   UserCheck,
   Sparkles,
   ShoppingCart,
-  AlertCircle,
   Zap,
   Bot,
   FileSearch
@@ -99,11 +98,13 @@ interface DashboardData {
     total_sent: number;
   };
   storage: {
-    used_bytes: number;
-    limit_bytes: number;
-    used_mb: number;
-    limit_mb: number;
-    percent_used: number;
+    db_size_bytes: number;
+    db_size_mb: number;
+    wal_size_bytes: number;
+    wal_size_mb: number;
+    wal_available: boolean;
+    storage_bytes: number;
+    storage_mb: number;
   };
   edge_functions: {
     rag_chat: {
@@ -252,92 +253,94 @@ function Section({ title, icon, children, color }: SectionProps) {
   );
 }
 
-// Composant barre de progression pour le stockage
-interface StorageBarProps {
+// Composant vignette de stockage avec comparaison Free / Pro
+interface StorageCardProps {
+  title: string;
+  icon: React.ReactNode;
+  iconBg: string;
   usedMB: number;
-  limitMB: number;
-  percentUsed: number;
+  freeLimitMB: number;
+  proLimitMB: number;
+  subtitle?: string;
 }
 
-function StorageBar({ usedMB, limitMB, percentUsed }: StorageBarProps) {
-  const getBarColor = () => {
-    if (percentUsed >= 90) return 'bg-red-500';
-    if (percentUsed >= 70) return 'bg-yellow-500';
+function StorageCard({ title, icon, iconBg, usedMB, freeLimitMB, proLimitMB, subtitle }: StorageCardProps) {
+  const freePercent = (usedMB / freeLimitMB) * 100;
+  const proPercent = (usedMB / proLimitMB) * 100;
+
+  const getBarColor = (percent: number) => {
+    if (percent >= 90) return 'bg-red-500';
+    if (percent >= 70) return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
-  const getStatusColor = () => {
-    if (percentUsed >= 90) return 'text-red-600 dark:text-red-400';
-    if (percentUsed >= 70) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-green-600 dark:text-green-400';
+  const getStatusBadge = (percent: number) => {
+    if (percent >= 90) return { text: 'Critique', cls: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' };
+    if (percent >= 70) return { text: 'Attention', cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300' };
+    return { text: 'OK', cls: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' };
   };
 
-  const getStatusText = () => {
-    if (percentUsed >= 90) return 'Critique';
-    if (percentUsed >= 70) return 'Attention';
-    return 'OK';
+  const formatSize = (mb: number) => {
+    if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+    return `${mb.toFixed(2)} MB`;
   };
+
+  const freeBadge = getStatusBadge(freePercent);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-            <HardDrive className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+          <div className={`p-2.5 rounded-xl ${iconBg}`}>
+            {icon}
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stockage Supabase</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Plan gratuit : 500 MB (DB + Storage)</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+            {subtitle && <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>}
           </div>
         </div>
-        <div className={`flex items-center gap-2 ${getStatusColor()}`}>
-          {percentUsed >= 70 && <AlertCircle className="w-4 h-4" />}
-          <span className="font-semibold">{getStatusText()}</span>
-        </div>
+        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${freeBadge.cls}`}>
+          {freeBadge.text}
+        </span>
       </div>
-      
-      {/* Barre de progression */}
-      <div className="relative h-6 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-3">
-        <div 
-          className={`absolute left-0 top-0 h-full transition-all duration-500 ${getBarColor()}`}
-          style={{ width: `${Math.min(percentUsed, 100)}%` }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-bold text-white drop-shadow-md">
-            {percentUsed.toFixed(1)}%
+
+      {/* Valeur principale */}
+      <div className="mb-5">
+        <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatSize(usedMB)}</p>
+      </div>
+
+      {/* Barre Free */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Plan Gratuit</span>
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            {formatSize(usedMB)} / {formatSize(freeLimitMB)} ({freePercent.toFixed(1)}%)
           </span>
         </div>
-      </div>
-      
-      {/* Détails */}
-      <div className="flex justify-between text-sm">
-        <span className="text-gray-600 dark:text-gray-400">
-          Utilisé: <span className="font-semibold text-gray-900 dark:text-white">{usedMB.toFixed(2)} MB</span>
-        </span>
-        <span className="text-gray-600 dark:text-gray-400">
-          Limite: <span className="font-semibold text-gray-900 dark:text-white">{limitMB} MB</span>
-        </span>
-      </div>
-      
-      {/* Recommandation si proche de la limite */}
-      {percentUsed >= 70 && (
-        <div className={`mt-4 p-3 rounded-lg ${
-          percentUsed >= 90 
-            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' 
-            : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-        }`}>
-          <p className={`text-sm ${
-            percentUsed >= 90 
-              ? 'text-red-700 dark:text-red-300' 
-              : 'text-yellow-700 dark:text-yellow-300'
-          }`}>
-            {percentUsed >= 90 
-              ? 'Stockage critique ! Pensez a upgrader vers le plan Pro de Supabase.'
-              : 'Stockage utilise a plus de 70%. Surveillez evolution.'
-            }
-          </p>
+        <div className="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className={`absolute left-0 top-0 h-full transition-all duration-500 rounded-full ${getBarColor(freePercent)}`}
+            style={{ width: `${Math.min(freePercent, 100)}%` }}
+          />
         </div>
-      )}
+      </div>
+
+      {/* Barre Pro */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Plan Pro</span>
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            {formatSize(usedMB)} / {formatSize(proLimitMB)} ({proPercent.toFixed(1)}%)
+          </span>
+        </div>
+        <div className="relative h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className={`absolute left-0 top-0 h-full transition-all duration-500 rounded-full ${getBarColor(proPercent)}`}
+            style={{ width: `${Math.min(proPercent, 100)}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -471,11 +474,25 @@ export function AdminDashboardPage() {
             
             {/* ========== STOCKAGE SUPABASE ========== */}
             {data.storage && (
-              <StorageBar 
-                usedMB={data.storage.used_mb}
-                limitMB={data.storage.limit_mb}
-                percentUsed={data.storage.percent_used}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <StorageCard
+                  title="Base de donnees"
+                  icon={<Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                  iconBg="bg-blue-100 dark:bg-blue-900/30"
+                  usedMB={data.storage.db_size_mb}
+                  freeLimitMB={500}
+                  proLimitMB={8192}
+                  subtitle={data.storage.wal_available ? `dont WAL : ${data.storage.wal_size_mb.toFixed(2)} MB` : 'WAL non disponible'}
+                />
+                <StorageCard
+                  title="Stockage fichiers"
+                  icon={<HardDrive className="w-5 h-5 text-orange-600 dark:text-orange-400" />}
+                  iconBg="bg-orange-100 dark:bg-orange-900/30"
+                  usedMB={data.storage.storage_mb}
+                  freeLimitMB={1024}
+                  proLimitMB={102400}
+                />
+              </div>
             )}
 
             {/* ========== MONETISATION ========== */}
@@ -744,5 +761,6 @@ export function AdminDashboardPage() {
     </div>
   );
 }
+
 
 
