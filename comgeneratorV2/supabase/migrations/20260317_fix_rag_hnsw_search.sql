@@ -1,15 +1,12 @@
--- Migration: Fix RAG HNSW search returning 0 results
--- Problem: HNSW index with low ef_search misses results, especially after adding new chunks
+-- Migration: Fix RAG search functions for Supabase compatibility
+-- Problem: hnsw.ef_search cannot be tuned on Supabase (permission denied)
 -- Solution:
---   1. Recreate match_rag_chunks with hnsw.ef_search = 400 (tuning recall)
---   2. Create match_rag_chunks_exact as emergency fallback (service_role only)
---
--- Tuning note: ef_search=400 trades ~2-3x latency for significantly better recall.
--- Default pgvector ef_search is 40, which causes missed results on small-to-medium
--- datasets after index updates. 400 is a safe production value for <100k vectors.
+--   1. match_rag_chunks uses default pgvector ef_search (no tuning)
+--   2. match_rag_chunks_exact bypasses HNSW entirely (sequential scan)
+--   3. Fallback logic (HNSW → exact) is handled in Edge Functions
 
 -- =====================================================
--- 1. Recreate match_rag_chunks with higher ef_search
+-- 1. match_rag_chunks — standard HNSW search
 -- =====================================================
 CREATE OR REPLACE FUNCTION match_rag_chunks(
   p_query_embedding text,
@@ -35,10 +32,6 @@ DECLARE
 BEGIN
   query_vec := p_query_embedding::vector(1536);
 
-  -- Augmenter ef_search pour améliorer la précision HNSW (défaut pgvector = 40)
-  -- set_config avec local_only=true limite l'effet à la transaction courante
-  PERFORM set_config('hnsw.ef_search', '400', true);
-
   RETURN QUERY
   SELECT
     c.id,
@@ -62,9 +55,8 @@ $$;
 
 -- =====================================================
 -- 2. Exact search fallback (bypasses HNSW index)
---    RESTRICTED to service_role only — this is an emergency
---    fallback called from Edge Functions (which use service_role).
---    Potentially expensive on large tables, must stay exceptional.
+--    RESTRICTED to service_role only — emergency fallback
+--    called from Edge Functions when HNSW returns 0 results.
 -- =====================================================
 CREATE OR REPLACE FUNCTION match_rag_chunks_exact(
   p_query_embedding text,
@@ -91,7 +83,7 @@ BEGIN
   query_vec := p_query_embedding::vector(1536);
 
   -- Forcer la recherche séquentielle (exacte) en désactivant les index
-  -- set_config avec local_only=true limite l'effet à la transaction courante
+  -- enable_indexscan / enable_bitmapscan sont des paramètres core PG, pas d'extension
   PERFORM set_config('enable_indexscan', 'off', true);
   PERFORM set_config('enable_bitmapscan', 'off', true);
 
@@ -121,13 +113,9 @@ $$;
 -- =====================================================
 
 -- match_rag_chunks : accessible depuis l'app (authenticated) et le backend (service_role)
--- SECURITY DEFINER est nécessaire car les Edge Functions appellent via le client
--- Supabase avec le token utilisateur, mais la requête doit bypasser les RLS
--- sur rag_chunks/rag_documents pour joindre et filtrer correctement.
 GRANT EXECUTE ON FUNCTION public.match_rag_chunks(text, float, int, uuid, uuid) TO authenticated, service_role;
 
 -- match_rag_chunks_exact : service_role uniquement (fallback coûteux, appelé depuis Edge Functions)
--- Note: SECURITY DEFINER requis pour les mêmes raisons que match_rag_chunks.
 REVOKE ALL ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) TO service_role;
