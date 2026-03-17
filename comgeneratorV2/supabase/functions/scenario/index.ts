@@ -51,8 +51,8 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 15,
-  ragSimilarityThreshold: 0.40,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.55,
 };
 
 // =====================================================
@@ -630,15 +630,10 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       }
 
       const searchTerms = [
+        data.theme,
         data.matiere,
         data.niveau,
         cycle,
-        data.theme,
-        'attendus de fin de cycle',
-        'repères de progressivité',
-        'programmes officiels',
-        'compétences',
-        cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
       ].filter(Boolean).join(' ');
 
       console.log(`[scenario] RAG search query: ${searchTerms}`);
@@ -674,27 +669,23 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         ragContext = `
 
 ═══════════════════════════════════════════════════════════════════════════════
-              RESSOURCES OFFICIELLES (PROGRAMMES ET ACCOMPAGNEMENTS)
+   ⚠️ CORPUS DOCUMENTAIRE — UTILISATION OBLIGATOIRE ⚠️
 ═══════════════════════════════════════════════════════════════════════════════
 
-Les extraits suivants proviennent des textes officiels de l'Éducation nationale.
-Tu DOIS t'appuyer sur ces ressources pour :
-- Formuler des objectifs alignés sur les attendus de fin de cycle
-- Utiliser le vocabulaire institutionnel exact
-- Respecter les repères de progressivité mentionnés
-- Référencer les compétences du socle commun (cycles 2-4)
+Les extraits ci-dessous proviennent du corpus documentaire de l'enseignant.
+Tu DOIS OBLIGATOIREMENT :
+1. CITER explicitement au moins 3 éléments tirés de ces sources dans le scénario
+2. REPRENDRE le vocabulaire exact et les formulations des documents
+3. ALIGNER les objectifs de la séquence sur les attendus mentionnés dans ces sources
+4. RÉFÉRENCER les sources par leur nom (ex: "[Source : nom_du_document]") dans les colonnes pertinentes du tableau
+5. Dans la section "Notes pédagogiques", LISTER les sources utilisées avec les éléments repris
 
 ${chunks.map((chunk, i) => `
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ SOURCE ${i + 1} : ${chunk.documentTitle}
-│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
-└─────────────────────────────────────────────────────────────────────────────┘
+[SOURCE ${i + 1} — ${chunk.documentTitle} — Pertinence : ${(chunk.score * 100).toFixed(0)}%]
 ${chunk.content}
 `).join('\n')}
 
-⚠️ CONSIGNE IMPÉRATIVE : Les objectifs et attendus de ta séquence doivent être 
-DIRECTEMENT ISSUS ou ALIGNÉS sur ces textes officiels. Cite explicitement les 
-attendus de fin de cycle dans la section "Notes pédagogiques".
+⚠️ RAPPEL : Si tu ne cites pas explicitement ces sources dans ta réponse, le scénario sera considéré comme NON CONFORME.
 `;
       } else {
         console.log('[scenario] No relevant RAG chunks found');
@@ -756,7 +747,6 @@ ${data.pointDepart || 'Non précisé - considérer un niveau hétérogène avec 
 
 **ATTENDUS DE FIN DE SÉQUENCE (objectifs terminaux)**
 ${data.attendus}
-${ragContext}
 ${documentsContext}
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -775,7 +765,7 @@ ${documentsContext}
 
 3. **Différenciation systématique** : Pour chaque séance, préciser les adaptations
 
-4. **Cohérence avec les programmes** : ${data.useRag ? 'Utilise les ressources officielles fournies ci-dessus pour aligner les objectifs' : 'Veille à la cohérence avec les programmes du ' + cycle}
+4. **Cohérence avec les programmes** : ${ragContext ? 'Utilise OBLIGATOIREMENT les sources documentaires fournies ci-dessous. Cite-les explicitement par leur nom [Source : nom_du_document] dans les colonnes du tableau.' : 'Veille à la cohérence avec les programmes du ' + cycle}
 
 5. **Format de sortie** : Tableau markdown avec les 5 colonnes définies, suivi des notes pédagogiques
 
@@ -793,7 +783,17 @@ ${documentsContext}
 8. **Postures enseignantes explicites** :
    - Pour chaque activité, indiquer quand l'enseignant observe, étaye, régule ou institutionnalise
 
-Génère maintenant le scénario pédagogique complet :`;
+${ragContext ? `9. **Citation des sources documentaires OBLIGATOIRE** :
+   - Référencer chaque source utilisée par son nom entre crochets [Source : nom_du_document]
+   - Dans les "Notes pédagogiques", ajouter une sous-section "Sources documentaires utilisées" listant chaque document et les éléments repris` : ''}
+${ragContext ? `
+═══════════════════════════════════════════════════════════════════════════════
+  ⚠️ RAPPEL FINAL — SOURCES DOCUMENTAIRES À UTILISER OBLIGATOIREMENT ⚠️
+═══════════════════════════════════════════════════════════════════════════════
+${ragContext}
+
+Génère maintenant le scénario pédagogique en t'appuyant OBLIGATOIREMENT sur les sources ci-dessus :` : `
+Génère maintenant le scénario pédagogique complet :`}`;
 
     // ========================================================================
     // APPEL API IA (GPT-4.1-mini / GPT-5 mini / Mistral Medium)
@@ -831,11 +831,16 @@ Génère maintenant le scénario pédagogique complet :`;
 8. Après le tableau, ajoute la section "**Notes pédagogiques**".`;
     }
 
+    // Enrichir le system prompt avec une instruction RAG si des sources sont disponibles
+    const effectiveSystemPrompt = ragContext
+      ? `${SYSTEM_PROMPT}\n\nRÈGLE FONDAMENTALE : Des sources documentaires sont fournies par l'enseignant. Tu DOIS les citer explicitement dans ta réponse. Chaque source pertinente doit être référencée par son nom entre crochets [Source : nom_du_document] dans les colonnes du tableau. La sous-section "Sources documentaires utilisées" dans les Notes pédagogiques est OBLIGATOIRE.`
+      : SYSTEM_PROMPT;
+
     let requestBody: any;
 
     if (aiConfig.isResponsesAPI) {
       // GPT-5 mini : API Responses (format différent)
-      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      const fullPrompt = `${effectiveSystemPrompt}\n\n---\n\n${userPrompt}${formatInstruction}`;
       requestBody = {
         model: aiConfig.model,
         input: fullPrompt,
@@ -845,7 +850,7 @@ Génère maintenant le scénario pédagogique complet :`;
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
       // Mistral : pas de rôle system, tout dans un message user
-      const combinedPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      const combinedPrompt = `${effectiveSystemPrompt}\n\n---\n\n${userPrompt}${formatInstruction}`;
       requestBody = {
         model: aiConfig.model,
         messages: [{ role: 'user', content: combinedPrompt }],
@@ -853,11 +858,11 @@ Génère maintenant le scénario pédagogique complet :`;
         max_tokens: 5500,
       };
     } else {
-      // Default (gpt-4.1-mini) : comportement actuel inchangé
+      // Default (gpt-4.1-mini) : séparation system/user pour meilleur suivi du contexte RAG
       requestBody = {
         model: aiConfig.model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: effectiveSystemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.6,

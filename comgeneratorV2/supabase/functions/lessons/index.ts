@@ -148,8 +148,8 @@ interface RagSource {
 const RAG_CONFIG = {
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 15,
-  ragSimilarityThreshold: 0.40,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.55,
 };
 
 async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
@@ -339,15 +339,10 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
         else if (/petite section|moyenne section|grande section|ps|ms|gs|maternelle/.test(levelLower)) { cycle = 'cycle 1'; cycleNum = 1; }
 
         const searchTerms = [
+          data.topic,
           data.subject,
           data.level,
           cycle,
-          data.topic,
-          'attendus de fin de cycle',
-          'repères de progressivité',
-          'programmes officiels',
-          'compétences',
-          cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
         ].filter(Boolean).join(' ');
 
         console.log(`[lessons] RAG search query: ${searchTerms}`);
@@ -391,24 +386,23 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
           ragContext = `
 ═══════════════════════════════════════════════════════════════
-            RESSOURCES DE VOTRE CORPUS DOCUMENTAIRE
+    ⚠️ CORPUS DOCUMENTAIRE — UTILISATION OBLIGATOIRE ⚠️
 ═══════════════════════════════════════════════════════════════
 
-Les extraits suivants proviennent du corpus documentaire personnel de l'enseignant.
-Appuie-toi sur ces ressources pour enrichir et contextualiser la séance :
-- Formuler des objectifs alignés sur les contenus fournis
-- Utiliser le vocabulaire et les références des documents
-- Intégrer les éléments pertinents dans les activités
+Les extraits ci-dessous proviennent du corpus documentaire de l'enseignant.
+Tu DOIS OBLIGATOIREMENT :
+1. CITER explicitement au moins 3 éléments tirés de ces sources dans la séance
+2. REPRENDRE le vocabulaire exact et les formulations des documents
+3. ALIGNER les objectifs de la séance sur les attendus mentionnés dans ces sources
+4. RÉFÉRENCER les sources par leur nom (ex: "[Source : nom_du_document]") dans les sections pertinentes
+5. REMPLIR la section "📖 Sources documentaires utilisées" en fin de séance
 
 ${chunks.map((chunk, i) => `
-┌─────────────────────────────────────────────────────────────┐
-│ SOURCE ${i + 1} : ${chunk.documentTitle}
-│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
-└─────────────────────────────────────────────────────────────┘
+[SOURCE ${i + 1} — ${chunk.documentTitle} — Pertinence : ${(chunk.score * 100).toFixed(0)}%]
 ${chunk.content}
 `).join('\n')}
 
-⚠️ CONSIGNE : Intègre ces ressources dans la conception de la séance lorsqu'elles sont pertinentes.
+⚠️ RAPPEL : Si tu ne cites pas explicitement ces sources dans ta réponse, la séance sera considérée comme NON CONFORME.
 `;
         } else {
           console.log('[lessons] No relevant RAG chunks found');
@@ -481,8 +475,12 @@ ${chunk.content}
     6. **Ne génère AUCUN contenu en dehors de la structure Markdown fournie**.`
       : '';
 
-    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
+    // Séparer le prompt en système (template/instructions) et utilisateur (contexte/RAG)
+    const systemPrompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.${ragContext ? `
 
+RÈGLE FONDAMENTALE : Lorsque des sources documentaires te sont fournies, tu DOIS les citer explicitement dans ta réponse. Chaque source pertinente doit être référencée par son nom entre crochets [Source : nom_du_document] dans les sections de la séance où elle est utilisée. La section "📖 Sources documentaires utilisées" est OBLIGATOIRE.` : ''}`;
+
+    const userPromptContent = `
 ═══════════════════════════════════════════════════════════════
                     CONTEXTE DE LA SÉANCE
 ═══════════════════════════════════════════════════════════════
@@ -509,7 +507,6 @@ CONTENU DU DOCUMENT :
 ${data.documentContext}
 ---
 ` : ''}
-${ragContext}
 ═══════════════════════════════════════════════════════════════
         EXIGENCES PÉDAGOGIQUES NON NÉGOCIABLES
 ═══════════════════════════════════════════════════════════════
@@ -984,6 +981,18 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 
 > **📚 Ressources complémentaires :** [Sites institutionnels, manuels, outils TICE]
 
+${ragContext ? `---
+
+## 📖 Sources documentaires utilisées
+
+> **SECTION OBLIGATOIRE** — Liste ici chaque document du corpus qui a été utilisé pour construire cette séance.
+
+| Source | Élément repris | Intégration dans la séance |
+|--------|---------------|---------------------------|
+| [Nom du document 1] | [Extrait, attendu ou compétence cité] | [Où et comment il est utilisé dans la séance] |
+| [Nom du document 2] | [Extrait, attendu ou compétence cité] | [Où et comment il est utilisé dans la séance] |
+
+` : ''}
 ═══════════════════════════════════════════════════════════════
               EXIGENCES QUALITÉ FINALES
 ═══════════════════════════════════════════════════════════════
@@ -997,17 +1006,26 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 ✅ La différenciation est CONCRÈTE (pas de formules vagues)
 ${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alternance judicieuse des modalités de travail'}
 ✅ Document exploitable IMMÉDIATEMENT sans interprétation
+${ragContext ? '✅ Les sources documentaires sont CITÉES explicitement avec [Source : nom_du_document]' : ''}
 ${noMetaInstruction}
+${ragContext ? `
+═══════════════════════════════════════════════════════════════
+  ⚠️ RAPPEL FINAL — SOURCES DOCUMENTAIRES À UTILISER ⚠️
+═══════════════════════════════════════════════════════════════
 
-Génère maintenant cette séance avec le niveau d'expertise attendu.`;
+${ragContext}
 
-    // Construction du body
+Génère maintenant cette séance en t'appuyant OBLIGATOIREMENT sur les sources ci-dessus.` : `
+Génère maintenant cette séance avec le niveau d'expertise attendu.`}`;
+
+    // Construction du body — séparation system/user pour meilleur suivi des instructions
     let requestBody;
 
     if (aiConfig.isResponsesAPI) {
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${userPromptContent}`;
       requestBody = {
         model: aiConfig.model,
-        input: prompt,
+        input: fullPrompt,
         max_output_tokens: 8000,
         text: {
           format: { type: "text" }
@@ -1017,17 +1035,22 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
         }
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
+      // Mistral : pas de rôle system fiable, tout dans un message user
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${userPromptContent}`;
       requestBody = {
         model: aiConfig.model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: fullPrompt }],
         temperature: 0.7,
         max_tokens: 10000
       };
     } else {
-      // Modèle par défaut
+      // gpt-4.1-mini : séparation system/user pour meilleur suivi du contexte RAG
       requestBody = {
         model: aiConfig.model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPromptContent }
+        ],
         temperature: 0.7,
         max_tokens: 10000
       };
