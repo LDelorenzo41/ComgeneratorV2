@@ -1311,8 +1311,46 @@ export function ScenarioPedagogiquePage() {
               </div>
             </div>
 
-            {/* Options avancées - Toggle RAG (masqué temporairement - bug RAG) */}
-            {/* TODO: Réactiver quand le bug de matching RAG sera résolu */}
+            {/* Options avancées - Toggle RAG */}
+            <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
+
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">Utiliser mon corpus documentaire personnel (cf. mon chatbot)</p>
+
+                    </div>
+                  </div>
+
+                  <button type="button" disabled={tokenCount === 0} onClick={() => { setUseRag(!useRag); setValue('useRag', !useRag); }}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${useRag ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRag ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {useRag && (
+                  <div className="mt-3 pl-8 space-y-3">
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      ✓ La génération utilisera les documents de votre corpus personnel. Si aucun contenu pertinent n'est trouvé, l'IA générera le scénario à partir de ses propres connaissances.
+                    </p>
+                    {folders.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2">Filtrer par dossier (optionnel) :</p>
+                        <FolderSelector
+                          folders={folders}
+                          selectedFolderIds={selectedFolderIds}
+                          onChange={setSelectedFolderIds}
+                          compact
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* ================================================================
                 AVERTISSEMENT CONSOMMATION DE TOKENS
