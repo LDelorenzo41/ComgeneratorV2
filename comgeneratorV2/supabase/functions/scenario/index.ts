@@ -612,7 +612,8 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     
     let ragContext = '';
     let ragSources: RagSource[] = [];
-    
+    let ragWarnings: string[] = [];
+
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
 
@@ -622,13 +623,27 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       if (data.folderIds?.length) {
         const { data: folderDocs } = await serviceClient
           .from('rag_documents')
-          .select('id')
+          .select('id, title, status, chunk_count')
           .eq('user_id', user.id)
           .in('folder_id', data.folderIds);
 
         if (folderDocs && folderDocs.length > 0) {
           allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
           console.log(`[scenario] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+
+          // Diagnostiquer les documents sans chunks ou en erreur
+          for (const doc of folderDocs) {
+            if (doc.status === 'error') {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" est en erreur d'ingestion. Essayez de le ré-ingérer depuis votre espace documents.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has status=error`);
+            } else if (doc.status !== 'ready') {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" n'est pas encore prêt (status: ${doc.status}). Veuillez patienter ou le ré-ingérer.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has status=${doc.status}`);
+            } else if (!doc.chunk_count || doc.chunk_count === 0) {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" est marqué comme prêt mais ne contient aucun chunk indexé. Essayez de le ré-ingérer.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has chunk_count=0 despite status=ready`);
+            }
+          }
         } else {
           console.log('[scenario] No documents found in selected folders');
         }
@@ -665,6 +680,26 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
         console.log(`[scenario] After folder filter: ${chunks.length} chunks from selected folders`);
         chunks = chunks.slice(0, CONFIG.ragTopK);
+      }
+
+      // Détecter les documents du dossier non représentés dans les résultats
+      if (allowedDocIds && data.folderIds?.length) {
+        const representedDocIds = new Set(chunks.map(c => c.documentId));
+        const { data: allFolderDocs } = await serviceClient
+          .from('rag_documents')
+          .select('id, title')
+          .eq('user_id', user.id)
+          .eq('status', 'ready')
+          .in('folder_id', data.folderIds);
+
+        if (allFolderDocs) {
+          for (const doc of allFolderDocs) {
+            if (!representedDocIds.has(doc.id)) {
+              ragWarnings.push(`ℹ️ Le document "${doc.title}" n'a pas été utilisé car son contenu n'est pas suffisamment similaire au thème. Essayez d'ajouter des mots-clés du document dans le thème.`);
+              console.log(`[scenario] INFO: Document "${doc.title}" (${doc.id}) in folder but no chunks matched the query`);
+            }
+          }
+        }
       }
 
       if (chunks.length > 0) {
@@ -948,6 +983,7 @@ Génère maintenant le scénario pédagogique complet :`}`;
       content,
       usage: aiData.usage,
       sources: ragSources.length > 0 ? ragSources : undefined,
+      warnings: ragWarnings.length > 0 ? ragWarnings : undefined,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
