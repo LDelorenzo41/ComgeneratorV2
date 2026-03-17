@@ -6,8 +6,7 @@
 -- Date: 2026-03-18
 -- ============================================================================
 
--- 1) Supprimer la table/vue v_wal_size_bytes si elle existe (ne devrait pas exister)
-DROP VIEW IF EXISTS public.v_wal_size_bytes;
+-- 1) Supprimer la table v_wal_size_bytes (créée par erreur, alerte RLS)
 DROP TABLE IF EXISTS public.v_wal_size_bytes;
 
 -- 2) Recréer la fonction get_admin_dashboard avec les correctifs WAL
