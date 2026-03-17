@@ -27,48 +27,61 @@ export function extractTextFromChildren(children: React.ReactNode): string {
 }
 
 /**
- * Extrait le contenu markdown d'une phase spécifique à partir du markdown complet
+ * Normalise un texte pour la comparaison : supprime emojis, markdown bold, espaces multiples
+ */
+function normalizeText(text: string): string {
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\*\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Extrait un identifiant unique de phase (ex: "phase 1", "échauffement")
+ */
+function extractPhaseId(text: string): string | null {
+  const normalized = normalizeText(text);
+  // Match "phase X" where X is a digit
+  const phaseMatch = normalized.match(/phase\s+(\d+)/);
+  if (phaseMatch) return `phase ${phaseMatch[1]}`;
+  // Match EPS-specific keywords
+  if (normalized.includes('échauffement')) return 'échauffement';
+  if (normalized.includes('apprentissage moteur')) return 'apprentissage moteur';
+  if (normalized.includes('situation complexe')) return 'situation complexe';
+  if (normalized.includes('retour au calme')) return 'retour au calme';
+  return null;
+}
+
+/**
+ * Extrait le contenu markdown d'une phase spécifique à partir du markdown complet.
+ * Utilise le numéro de phase (ou mot-clé EPS) comme identifiant unique.
  */
 export function extractPhaseContent(fullMarkdown: string, phaseHeading: string): string {
   if (!fullMarkdown || !phaseHeading) return '';
+
+  const targetPhaseId = extractPhaseId(phaseHeading);
+  if (!targetPhaseId) return '';
 
   const lines = fullMarkdown.split('\n');
   let startIndex = -1;
   let endIndex = lines.length;
 
-  // Normaliser le heading pour la comparaison
-  const normalizedHeading = phaseHeading
-    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-    .replace(/[\u{2600}-\u{26FF}]/gu, '')
-    .replace(/[\u{2700}-\u{27BF}]/gu, '')
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
-    .replace(/\*\*/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line.startsWith('### ')) continue;
 
-    const lineText = line
-      .replace(/^###\s*/, '')
-      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-      .replace(/[\u{2600}-\u{26FF}]/gu, '')
-      .replace(/[\u{2700}-\u{27BF}]/gu, '')
-      .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-      .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
-      .replace(/\*\*/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const linePhaseId = extractPhaseId(line);
+    if (!linePhaseId) continue;
 
     if (startIndex === -1) {
-      // Chercher la correspondance (contient le heading recherché)
-      if (lineText.includes(normalizedHeading) || normalizedHeading.includes(lineText)) {
+      if (linePhaseId === targetPhaseId) {
         startIndex = i;
       }
     } else {
-      // On a trouvé le début, chercher la fin (prochain h3)
+      // On a trouvé le début, le prochain h3 de phase marque la fin
       endIndex = i;
       break;
     }
@@ -77,4 +90,67 @@ export function extractPhaseContent(fullMarkdown: string, phaseHeading: string):
   if (startIndex === -1) return '';
 
   return lines.slice(startIndex, endIndex).join('\n').trim();
+}
+
+/**
+ * Convertit les tableaux markdown en HTML pour un meilleur rendu avec ReactMarkdown + rehypeRaw
+ */
+export function convertMarkdownTablesToHtml(markdown: string): string {
+  const lines = markdown.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableLines: string[] = [];
+
+  const processTable = (tLines: string[]): string => {
+    if (tLines.length < 2) return tLines.join('\n');
+
+    const headerLine = tLines[0];
+    const dataLines = tLines.slice(2); // Skip separator line
+
+    const parseRow = (line: string): string[] => {
+      return line.slice(1, -1).split('|').map(cell => cell.trim());
+    };
+
+    const headers = parseRow(headerLine);
+
+    let html = '<table class="markdown-table"><thead><tr>';
+    headers.forEach(h => { html += `<th>${h}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    dataLines.forEach(line => {
+      if (line.trim()) {
+        const cells = parseRow(line);
+        html += '<tr>';
+        cells.forEach(c => { html += `<td>${c}</td>`; });
+        html += '</tr>';
+      }
+    });
+
+    html += '</tbody></table>';
+    return html;
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableLines = [];
+      }
+      tableLines.push(trimmed);
+    } else {
+      if (inTable) {
+        result.push(processTable(tableLines));
+        inTable = false;
+        tableLines = [];
+      }
+      result.push(line);
+    }
+  });
+
+  if (inTable && tableLines.length > 0) {
+    result.push(processTable(tableLines));
+  }
+
+  return result.join('\n');
 }
