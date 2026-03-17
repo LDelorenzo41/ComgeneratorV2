@@ -189,12 +189,7 @@ async function searchRagChunks(
     console.log(`[lessons] Embedding length: ${embedding.length}, first 3 values: [${embedding.slice(0, 3).join(', ')}]`);
     console.log(`[lessons] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
 
-    // Augmenter ef_search pour améliorer la précision de l'index HNSW
-    await supabase.rpc('set_config_param', { param_name: 'hnsw.ef_search', param_value: '400' }).catch(() => {
-      // Si la fonction set_config_param n'existe pas, on continue sans
-      console.log('[lessons] set_config_param not available, trying direct SQL');
-    });
-
+    // ef_search=400 est maintenant configuré directement dans la fonction SQL (SET clause)
     const { data, error } = await supabase.rpc('match_rag_chunks', {
       p_query_embedding: embeddingStr,
       p_similarity_threshold: similarityThreshold,
@@ -223,26 +218,7 @@ async function searchRagChunks(
 
       if (exactError) {
         console.log('[lessons] Exact search fallback error:', JSON.stringify(exactError));
-        // Dernier recours : requête SQL brute
-        console.log('[lessons] Trying raw SQL fallback...');
-        const { data: rawData, error: rawError } = await supabase.rpc('match_rag_chunks_raw', {
-          p_query_embedding: embeddingStr,
-          p_threshold: similarityThreshold,
-          p_limit: topK,
-          p_user_id: userId,
-        });
-        if (rawError) {
-          console.log('[lessons] Raw SQL fallback also failed:', JSON.stringify(rawError));
-          return [];
-        }
-        console.log(`[lessons] Raw SQL fallback returned: ${rawData ? rawData.length : 'null'} results`);
-        return (rawData || []).map((item: any) => ({
-          id: item.id,
-          content: item.content,
-          documentId: item.document_id || '',
-          documentTitle: item.document_title,
-          score: item.similarity,
-        }));
+        return [];
       }
 
       console.log(`[lessons] Exact search fallback returned: ${exactData ? exactData.length : 'null'} results`);

@@ -1,8 +1,12 @@
 -- Migration: Fix RAG HNSW search returning 0 results
 -- Problem: HNSW index with low ef_search misses results, especially after adding new chunks
 -- Solution:
---   1. Recreate match_rag_chunks with SET LOCAL hnsw.ef_search = 400
---   2. Create match_rag_chunks_exact as fallback (forces sequential scan)
+--   1. Recreate match_rag_chunks with hnsw.ef_search = 400 (tuning recall)
+--   2. Create match_rag_chunks_exact as emergency fallback (service_role only)
+--
+-- Tuning note: ef_search=400 trades ~2-3x latency for significantly better recall.
+-- Default pgvector ef_search is 40, which causes missed results on small-to-medium
+-- datasets after index updates. 400 is a safe production value for <100k vectors.
 
 -- =====================================================
 -- 1. Recreate match_rag_chunks with higher ef_search
@@ -25,16 +29,12 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
+SET hnsw.ef_search = 400
 AS $$
 DECLARE
   query_vec vector(1536);
 BEGIN
-  -- Convertir le texte en vecteur
   query_vec := p_query_embedding::vector(1536);
-
-  -- Augmenter ef_search pour améliorer la précision HNSW
-  -- SET LOCAL ne persiste que pour la transaction courante
-  PERFORM set_config('hnsw.ef_search', '400', true);
 
   RETURN QUERY
   SELECT
@@ -58,7 +58,10 @@ END;
 $$;
 
 -- =====================================================
--- 2. Create exact search fallback (bypasses HNSW index)
+-- 2. Exact search fallback (bypasses HNSW index)
+--    RESTRICTED to service_role only — this is an emergency
+--    fallback called from Edge Functions (which use service_role).
+--    Potentially expensive on large tables, must stay exceptional.
 -- =====================================================
 CREATE OR REPLACE FUNCTION match_rag_chunks_exact(
   p_query_embedding text,
@@ -78,16 +81,13 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
+SET enable_indexscan = off
+SET enable_bitmapscan = off
 AS $$
 DECLARE
   query_vec vector(1536);
 BEGIN
-  -- Convertir le texte en vecteur
   query_vec := p_query_embedding::vector(1536);
-
-  -- Forcer la recherche séquentielle (exacte) au lieu de l'index HNSW
-  PERFORM set_config('enable_indexscan', 'off', true);
-  PERFORM set_config('enable_bitmapscan', 'off', true);
 
   RETURN QUERY
   SELECT
@@ -107,30 +107,16 @@ BEGIN
     AND (p_document_id IS NULL OR c.document_id = p_document_id)
   ORDER BY c.embedding <=> query_vec
   LIMIT p_match_count;
-
-  -- Réactiver les index pour les autres requêtes
-  PERFORM set_config('enable_indexscan', 'on', true);
-  PERFORM set_config('enable_bitmapscan', 'on', true);
 END;
 $$;
 
 -- =====================================================
--- 3. Helper function for setting config from Edge Functions
+-- 3. Permissions
 -- =====================================================
-CREATE OR REPLACE FUNCTION set_config_param(
-  param_name text,
-  param_value text
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  PERFORM set_config(param_name, param_value, true);
-END;
-$$;
-
--- Grant execute permissions
+-- match_rag_chunks : accessible depuis l'app (authenticated) et le backend (service_role)
 GRANT EXECUTE ON FUNCTION match_rag_chunks TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION match_rag_chunks_exact TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION set_config_param TO authenticated, service_role;
+
+-- match_rag_chunks_exact : service_role uniquement (fallback coûteux, appelé depuis Edge Functions)
+REVOKE ALL ON FUNCTION match_rag_chunks_exact FROM PUBLIC;
+REVOKE ALL ON FUNCTION match_rag_chunks_exact FROM authenticated;
+GRANT EXECUTE ON FUNCTION match_rag_chunks_exact TO service_role;
