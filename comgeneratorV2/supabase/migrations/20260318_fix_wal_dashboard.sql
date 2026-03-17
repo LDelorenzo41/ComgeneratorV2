@@ -89,6 +89,7 @@ DECLARE
     v_db_size_bytes bigint := 0;
     v_wal_size_bytes bigint := 0;
     v_wal_available boolean := false;
+    v_total_with_wal_bytes bigint := 0;
     v_storage_bytes bigint := 0;
 
     -- Edge function usage
@@ -139,18 +140,31 @@ BEGIN
     -- UTILISATEURS ACTIFS (toutes activités confondues)
     -- ==========================================
 
-    SELECT
-        COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_today_start), 0),
-        COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_week_start), 0),
-        COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_month_start), 0)
-    INTO v_active_today, v_active_week, v_active_month
-    FROM (
-        SELECT user_id, created_at FROM appreciations
-        UNION ALL
-        SELECT user_id, created_at FROM lessons
-        UNION ALL
-        SELECT user_id, created_at FROM edge_function_logs WHERE user_id IS NOT NULL
-    ) all_activity;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'edge_function_logs') THEN
+        SELECT
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_today_start), 0),
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_week_start), 0),
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_month_start), 0)
+        INTO v_active_today, v_active_week, v_active_month
+        FROM (
+            SELECT user_id, created_at FROM appreciations
+            UNION ALL
+            SELECT user_id, created_at FROM lessons
+            UNION ALL
+            SELECT user_id, created_at FROM edge_function_logs WHERE user_id IS NOT NULL
+        ) all_activity;
+    ELSE
+        SELECT
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_today_start), 0),
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_week_start), 0),
+            COALESCE(COUNT(DISTINCT user_id) FILTER (WHERE created_at >= v_month_start), 0)
+        INTO v_active_today, v_active_week, v_active_month
+        FROM (
+            SELECT user_id, created_at FROM appreciations
+            UNION ALL
+            SELECT user_id, created_at FROM lessons
+        ) all_activity;
+    END IF;
 
     -- ==========================================
     -- APPRÉCIATIONS
@@ -283,8 +297,8 @@ BEGIN
         v_wal_available := false;
     END;
 
-    -- Inclure le WAL dans le total DB (Supabase compte DB+WAL ensemble)
-    v_db_size_bytes := v_db_size_bytes + v_wal_size_bytes;
+    -- Total DB + WAL (Supabase compte les deux ensemble pour le quota)
+    v_total_with_wal_bytes := v_db_size_bytes + v_wal_size_bytes;
 
     -- Taille du bucket storage (fichiers uploadés)
     BEGIN
@@ -391,6 +405,8 @@ BEGIN
             'wal_size_bytes', v_wal_size_bytes,
             'wal_size_mb', ROUND(v_wal_size_bytes::numeric / 1024 / 1024, 2),
             'wal_available', v_wal_available,
+            'total_with_wal_bytes', v_total_with_wal_bytes,
+            'total_with_wal_mb', ROUND(v_total_with_wal_bytes::numeric / 1024 / 1024, 2),
             'storage_bytes', v_storage_bytes,
             'storage_mb', ROUND(v_storage_bytes::numeric / 1024 / 1024, 2)
         ),
@@ -415,4 +431,4 @@ END;
 $$;
 
 -- Permissions
-GRANT EXECUTE ON FUNCTION get_admin_dashboard() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_admin_dashboard() TO authenticated;

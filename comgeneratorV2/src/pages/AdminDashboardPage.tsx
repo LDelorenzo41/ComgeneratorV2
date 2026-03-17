@@ -103,6 +103,8 @@ interface DashboardData {
     wal_size_bytes: number;
     wal_size_mb: number;
     wal_available: boolean;
+    total_with_wal_bytes: number;
+    total_with_wal_mb: number;
     storage_bytes: number;
     storage_mb: number;
   };
@@ -476,13 +478,13 @@ export function AdminDashboardPage() {
             {data.storage && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <StorageCard
-                  title="Base de donnees"
+                  title="Base de donnees (DB + WAL)"
                   icon={<Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
                   iconBg="bg-blue-100 dark:bg-blue-900/30"
-                  usedMB={data.storage.db_size_mb}
+                  usedMB={data.storage.total_with_wal_mb}
                   freeLimitMB={500}
                   proLimitMB={8192}
-                  subtitle={data.storage.wal_available ? `dont WAL : ${data.storage.wal_size_mb.toFixed(2)} MB` : 'WAL non disponible'}
+                  subtitle={data.storage.wal_available ? `DB : ${data.storage.db_size_mb.toFixed(2)} MB | WAL : ${data.storage.wal_size_mb.toFixed(2)} MB` : `DB : ${data.storage.db_size_mb.toFixed(2)} MB | WAL non disponible`}
                 />
                 <StorageCard
                   title="Stockage fichiers"
