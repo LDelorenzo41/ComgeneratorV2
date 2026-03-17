@@ -29,12 +29,15 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-SET hnsw.ef_search = 400
 AS $$
 DECLARE
   query_vec vector(1536);
 BEGIN
   query_vec := p_query_embedding::vector(1536);
+
+  -- Augmenter ef_search pour améliorer la précision HNSW (défaut pgvector = 40)
+  -- set_config avec local_only=true limite l'effet à la transaction courante
+  PERFORM set_config('hnsw.ef_search', '400', true);
 
   RETURN QUERY
   SELECT
@@ -81,13 +84,16 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-SET enable_indexscan = off
-SET enable_bitmapscan = off
 AS $$
 DECLARE
   query_vec vector(1536);
 BEGIN
   query_vec := p_query_embedding::vector(1536);
+
+  -- Forcer la recherche séquentielle (exacte) en désactivant les index
+  -- set_config avec local_only=true limite l'effet à la transaction courante
+  PERFORM set_config('enable_indexscan', 'off', true);
+  PERFORM set_config('enable_bitmapscan', 'off', true);
 
   RETURN QUERY
   SELECT
