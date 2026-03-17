@@ -1051,8 +1051,11 @@ async function searchByVector(
 ): Promise<{ chunks: RetrievedChunk[]; rawCount: number }> {
   if (allowedDocIds.length === 0) return { chunks: [], rawCount: 0 };
 
+  const embeddingStr = `[${embedding.join(',')}]`;
+  console.log(`[Vector Search] Embedding length: ${embedding.length}, threshold=${threshold}, topK=${topK}`);
+
   const { data, error } = await supabase.rpc('match_rag_chunks', {
-    p_query_embedding: `[${embedding.join(',')}]`,
+    p_query_embedding: embeddingStr,
     p_similarity_threshold: threshold,
     p_match_count: topK,
     p_user_id: userId,
@@ -1064,10 +1067,31 @@ async function searchByVector(
     return { chunks: [], rawCount: 0 };
   }
 
-  const rawCount = data?.length || 0;
+  let results = data || [];
+  console.log(`[Vector Search] RPC returned: ${results.length} results`);
+
+  // Fallback : si 0 résultats, utiliser la recherche exacte (sans index HNSW)
+  if (results.length === 0) {
+    console.log('[Vector Search] 0 results from HNSW, trying exact search fallback...');
+    const { data: exactData, error: exactError } = await supabase.rpc('match_rag_chunks_exact', {
+      p_query_embedding: embeddingStr,
+      p_similarity_threshold: threshold,
+      p_match_count: topK,
+      p_user_id: userId,
+      p_document_id: null,
+    });
+    if (!exactError && exactData) {
+      console.log(`[Vector Search] Exact search returned: ${exactData.length} results`);
+      results = exactData;
+    } else {
+      console.error('[Vector Search] Exact search fallback error:', exactError);
+    }
+  }
+
+  const rawCount = results.length;
   const allowedSet = new Set(allowedDocIds);
-  
-  const chunks = (data || [])
+
+  const chunks = results
     .filter((item: any) => allowedSet.has(item.document_id))
     .map((item: any, index: number) => ({
       id: generateChunkId(item, index),
@@ -2241,5 +2265,7 @@ async function chatHandler(req: Request): Promise<Response> {
 }
 
 Deno.serve(chatHandler);
+
+
 
 

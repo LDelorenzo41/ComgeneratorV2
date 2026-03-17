@@ -1123,6 +1123,33 @@ export function LessonGeneratorPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      {/* Overlay de chargement */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mx-4 max-w-md text-center border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-indigo-200 dark:border-indigo-900 rounded-full"></div>
+                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Génération en cours...
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Votre séance pédagogique est en cours de création.
+              <br />
+              Cette opération peut prendre jusqu'à une minute.
+            </p>
+            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-xl p-3">
+              <p className="text-amber-700 dark:text-amber-300 text-sm font-medium">
+                ⚠️ Veuillez rester sur cette page pour ne pas perdre la génération.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
@@ -1223,7 +1250,10 @@ export function LessonGeneratorPage() {
                   <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité de la génération. Le contenu est limité à ~4000 tokens.
+                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité mais son contenu est limité à ~4000 tokens. Pour exploiter un document complet, <strong>ingérez-le dans votre corpus RAG</strong> (Mon chatbot → Documents → Créer un dossier) puis activez "Utiliser mon corpus documentaire personnel" ci-dessous.
+              </li>
+              <li>
+                  <strong>Corpus personnel :</strong> Activez l'option en bas de page pour que la génération s'appuie sur vos documents ingérés. Sélectionnez un dossier spécifique pour cibler les sources pertinentes.
               </li>
           </ul>
       </div>
@@ -1402,8 +1432,43 @@ export function LessonGeneratorPage() {
             </div>
             {/* FIN NOUVELLE SECTION */}
 
-            {/* Options avancées - Corpus personnel (masqué temporairement - bug RAG) */}
-            {/* TODO: Réactiver quand le bug de matching RAG sera résolu */}
+            {/* Options avancées - Corpus personnel */}
+            <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
+
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <p className="font-medium text-gray-900 dark:text-white">Utiliser mon corpus documentaire personnel (cf. mon chatbot)</p>
+                  </div>
+
+                  <button type="button" disabled={tokenCount === 0} onClick={() => setUseRag(!useRag)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${useRag ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRag ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {useRag && (
+                  <div className="mt-3 pl-8 space-y-3">
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      ✓ La génération utilisera les documents de votre corpus personnel. Si aucun contenu pertinent n'est trouvé, l'IA générera la séance à partir de ses propres connaissances.
+                    </p>
+                    {folders.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2">Filtrer par dossier (optionnel) :</p>
+                        <FolderSelector
+                          folders={folders}
+                          selectedFolderIds={selectedFolderIds}
+                          onChange={setSelectedFolderIds}
+                          compact
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {error && (
               <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
@@ -1512,6 +1577,43 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -434,7 +434,9 @@ export async function getRagStats(): Promise<RagStats> {
   const queries = [
     (supabase as any).from('rag_documents').select('*', { count: 'exact', head: true }),
     (supabase as any).from('rag_documents').select('*', { count: 'exact', head: true }).eq('status', 'ready'),
-    (supabase as any).from('rag_chunks').select('*', { count: 'exact', head: true }),
+    user
+      ? (supabase as any).from('rag_chunks').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+      : (supabase as any).from('rag_chunks').select('*', { count: 'exact', head: true }),
     (supabase as any).from('rag_documents').select('*', { count: 'exact', head: true }).eq('scope', 'global').eq('status', 'ready'),
   ];
 
@@ -634,6 +636,17 @@ export async function moveDocumentToFolder(documentId: string, folderId: string 
 
   if (error) throw new Error('Erreur lors du déplacement du document');
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

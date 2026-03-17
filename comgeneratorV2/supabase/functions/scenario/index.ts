@@ -51,8 +51,11 @@ const CONFIG = {
   chatModel: 'gpt-4.1-mini',
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 15,
-  ragSimilarityThreshold: 0.40,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.55,
+  // Seuil plus bas quand l'utilisateur a sélectionné un dossier :
+  // il a explicitement choisi ces documents, on doit être plus inclusif
+  ragFolderThreshold: 0.35,
 };
 
 // =====================================================
@@ -513,12 +516,16 @@ async function searchRagChunks(
   supabase: any,
   userId: string,
   embedding: number[],
-  topK: number
+  topK: number,
+  similarityThreshold: number
 ): Promise<RagChunk[]> {
   try {
+    const embeddingStr = `[${embedding.join(',')}]`;
+    console.log(`[scenario] Embedding length: ${embedding.length}, first 3 values: [${embedding.slice(0, 3).join(', ')}]`);
+    console.log(`[scenario] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
     const { data, error } = await supabase.rpc('match_rag_chunks', {
-      p_query_embedding: `[${embedding.join(',')}]`,
-      p_similarity_threshold: CONFIG.ragSimilarityThreshold,
+      p_query_embedding: embeddingStr,
+      p_similarity_threshold: similarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
       p_document_id: null,
@@ -527,6 +534,32 @@ async function searchRagChunks(
     if (error) {
       console.error('[scenario] RAG search error:', error);
       return [];
+    }
+
+    console.log(`[scenario] RPC returned: ${data ? data.length : 'null'} results`);
+
+    // Fallback : si 0 résultats, utiliser la recherche exacte (sans index HNSW)
+    if (!data || data.length === 0) {
+      console.log('[scenario] RPC returned 0 results, trying exact search fallback...');
+      const { data: exactData, error: exactError } = await supabase.rpc('match_rag_chunks_exact', {
+        p_query_embedding: embeddingStr,
+        p_similarity_threshold: similarityThreshold,
+        p_match_count: topK,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+      if (exactError) {
+        console.error('[scenario] Exact search fallback error:', exactError);
+        return [];
+      }
+      console.log(`[scenario] Exact search returned: ${exactData ? exactData.length : 'null'} results`);
+      return (exactData || []).map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        documentId: item.document_id || '',
+        documentTitle: item.document_title,
+        score: item.similarity,
+      }));
     }
 
     return (data || []).map((item: any) => ({
@@ -607,7 +640,8 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     
     let ragContext = '';
     let ragSources: RagSource[] = [];
-    
+    let ragWarnings: string[] = [];
+
     if (data.useRag) {
       console.log('[scenario] RAG mode enabled, searching documents...');
 
@@ -617,48 +651,118 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
       if (data.folderIds?.length) {
         const { data: folderDocs } = await serviceClient
           .from('rag_documents')
-          .select('id')
+          .select('id, title, status, chunk_count')
           .eq('user_id', user.id)
           .in('folder_id', data.folderIds);
 
         if (folderDocs && folderDocs.length > 0) {
           allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
           console.log(`[scenario] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+
+          // Diagnostiquer les documents sans chunks ou en erreur
+          for (const doc of folderDocs) {
+            if (doc.status === 'error') {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" est en erreur d'ingestion. Essayez de le ré-ingérer depuis votre espace documents.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has status=error`);
+            } else if (doc.status !== 'ready') {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" n'est pas encore prêt (status: ${doc.status}). Veuillez patienter ou le ré-ingérer.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has status=${doc.status}`);
+            } else if (!doc.chunk_count || doc.chunk_count === 0) {
+              ragWarnings.push(`⚠️ Le document "${doc.title}" est marqué comme prêt mais ne contient aucun chunk indexé. Essayez de le ré-ingérer.`);
+              console.log(`[scenario] WARNING: Document "${doc.title}" (${doc.id}) has chunk_count=0 despite status=ready`);
+            }
+          }
         } else {
           console.log('[scenario] No documents found in selected folders');
         }
       }
 
       const searchTerms = [
+        data.theme,
         data.matiere,
         data.niveau,
         cycle,
-        data.theme,
-        'attendus de fin de cycle',
-        'repères de progressivité',
-        'programmes officiels',
-        'compétences',
-        cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
       ].filter(Boolean).join(' ');
 
       console.log(`[scenario] RAG search query: ${searchTerms}`);
 
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
 
-      // Chercher plus de chunks quand un filtre dossier est actif
+      // Quand un dossier est sélectionné : seuil plus bas (l'utilisateur a choisi ces docs)
+      // + topK plus large (le filtrage post-recherche en éliminera)
+      const effectiveThreshold = allowedDocIds
+        ? CONFIG.ragFolderThreshold
+        : CONFIG.ragSimilarityThreshold;
       const searchTopK = allowedDocIds ? CONFIG.ragTopK * 5 : CONFIG.ragTopK;
 
       let chunks = await searchRagChunks(
         serviceClient,
         user.id,
         embedding,
-        searchTopK
+        searchTopK,
+        effectiveThreshold
       );
 
       // Filtrer par document_id si un dossier est sélectionné
       if (allowedDocIds && chunks.length > 0) {
         chunks = chunks.filter(c => allowedDocIds!.has(c.documentId));
         console.log(`[scenario] After folder filter: ${chunks.length} chunks from selected folders`);
+        chunks = chunks.slice(0, CONFIG.ragTopK);
+      }
+
+      // Recherche de rattrapage : pour chaque document du dossier absent des résultats,
+      // faire une recherche ciblée par document_id avec un seuil très bas
+      if (allowedDocIds && data.folderIds?.length) {
+        const representedDocIds = new Set(chunks.map(c => c.documentId));
+        const { data: allFolderDocs } = await serviceClient
+          .from('rag_documents')
+          .select('id, title')
+          .eq('user_id', user.id)
+          .eq('status', 'ready')
+          .in('folder_id', data.folderIds);
+
+        if (allFolderDocs) {
+          for (const doc of allFolderDocs) {
+            if (!representedDocIds.has(doc.id)) {
+              console.log(`[scenario] Document "${doc.title}" missing from results, running targeted search...`);
+              const fallbackChunks = await searchRagChunks(
+                serviceClient,
+                user.id,
+                embedding,
+                3,
+                0.15,
+              );
+              const docChunks = fallbackChunks.filter(c => c.documentId === doc.id);
+              if (docChunks.length > 0) {
+                chunks.push(...docChunks);
+                console.log(`[scenario] Recovered ${docChunks.length} chunks from "${doc.title}" (best score: ${docChunks[0].score.toFixed(3)})`);
+              } else {
+                const { data: directChunks, error: directError } = await serviceClient.rpc('match_rag_chunks', {
+                  p_query_embedding: `[${embedding.join(',')}]`,
+                  p_similarity_threshold: 0.05,
+                  p_match_count: 3,
+                  p_user_id: user.id,
+                  p_document_id: doc.id,
+                });
+                if (!directError && directChunks && directChunks.length > 0) {
+                  const recovered = directChunks.map((item: any) => ({
+                    id: item.chunk_id || item.id,
+                    content: item.content,
+                    documentId: item.document_id || '',
+                    documentTitle: item.document_title || doc.title,
+                    score: item.similarity,
+                  }));
+                  chunks.push(...recovered);
+                  console.log(`[scenario] Recovered ${recovered.length} chunks from "${doc.title}" via direct search (best score: ${recovered[0].score.toFixed(3)})`);
+                } else {
+                  ragWarnings.push(`ℹ️ Le document "${doc.title}" n'a retourné aucun résultat même avec une recherche ciblée.`);
+                  console.log(`[scenario] WARNING: No chunks recoverable for "${doc.title}" even with direct search`);
+                }
+              }
+            }
+          }
+        }
+        chunks.sort((a, b) => b.score - a.score);
         chunks = chunks.slice(0, CONFIG.ragTopK);
       }
 
@@ -674,27 +778,23 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
         ragContext = `
 
 ═══════════════════════════════════════════════════════════════════════════════
-              RESSOURCES OFFICIELLES (PROGRAMMES ET ACCOMPAGNEMENTS)
+   ⚠️ CORPUS DOCUMENTAIRE — UTILISATION OBLIGATOIRE ⚠️
 ═══════════════════════════════════════════════════════════════════════════════
 
-Les extraits suivants proviennent des textes officiels de l'Éducation nationale.
-Tu DOIS t'appuyer sur ces ressources pour :
-- Formuler des objectifs alignés sur les attendus de fin de cycle
-- Utiliser le vocabulaire institutionnel exact
-- Respecter les repères de progressivité mentionnés
-- Référencer les compétences du socle commun (cycles 2-4)
+Les extraits ci-dessous proviennent du corpus documentaire de l'enseignant.
+Tu DOIS OBLIGATOIREMENT :
+1. CITER explicitement des éléments tirés de CHAQUE source dans le scénario
+2. REPRENDRE le vocabulaire exact et les formulations des documents
+3. ALIGNER les objectifs de la séquence sur les attendus mentionnés dans ces sources
+4. RÉFÉRENCER les sources par leur nom (ex: "[Source : nom_du_document]") dans les colonnes pertinentes du tableau
+5. Dans la section "Notes pédagogiques", LISTER les sources utilisées avec les éléments repris
 
 ${chunks.map((chunk, i) => `
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ SOURCE ${i + 1} : ${chunk.documentTitle}
-│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
-└─────────────────────────────────────────────────────────────────────────────┘
+[SOURCE ${i + 1} — ${chunk.documentTitle} — Pertinence : ${(chunk.score * 100).toFixed(0)}%]
 ${chunk.content}
 `).join('\n')}
 
-⚠️ CONSIGNE IMPÉRATIVE : Les objectifs et attendus de ta séquence doivent être 
-DIRECTEMENT ISSUS ou ALIGNÉS sur ces textes officiels. Cite explicitement les 
-attendus de fin de cycle dans la section "Notes pédagogiques".
+⚠️ RAPPEL : Si tu ne cites pas explicitement ces sources dans ta réponse, le scénario sera considéré comme NON CONFORME.
 `;
       } else {
         console.log('[scenario] No relevant RAG chunks found');
@@ -775,7 +875,7 @@ ${documentsContext}
 
 3. **Différenciation systématique** : Pour chaque séance, préciser les adaptations
 
-4. **Cohérence avec les programmes** : ${data.useRag ? 'Utilise les ressources officielles fournies ci-dessus pour aligner les objectifs' : 'Veille à la cohérence avec les programmes du ' + cycle}
+4. **Cohérence avec les programmes** : ${ragContext ? 'Utilise OBLIGATOIREMENT les sources documentaires fournies ci-dessous. Cite-les explicitement par leur nom [Source : nom_du_document] dans les colonnes du tableau.' : 'Veille à la cohérence avec les programmes du ' + cycle}
 
 5. **Format de sortie** : Tableau markdown avec les 5 colonnes définies, suivi des notes pédagogiques
 
@@ -793,7 +893,20 @@ ${documentsContext}
 8. **Postures enseignantes explicites** :
    - Pour chaque activité, indiquer quand l'enseignant observe, étaye, régule ou institutionnalise
 
-Génère maintenant le scénario pédagogique complet :`;
+${ragContext ? `9. **Citation des sources documentaires OBLIGATOIRE** :
+   - Référencer chaque source utilisée par son nom entre crochets [Source : nom_du_document]
+   - Dans les "Notes pédagogiques", ajouter une sous-section "Sources documentaires utilisées" listant chaque document et les éléments repris` : ''}
+${ragContext ? `
+═══════════════════════════════════════════════════════════════════════════════
+  ⚠️ RAPPEL FINAL — UTILISE LES SOURCES DOCUMENTAIRES ⚠️
+═══════════════════════════════════════════════════════════════════════════════
+
+Les sources documentaires ont été fournies plus haut dans ce message.
+Tu DOIS les citer explicitement avec [Source : nom_du_document].
+La sous-section "Sources documentaires utilisées" dans les Notes pédagogiques est OBLIGATOIRE.
+
+Génère maintenant le scénario pédagogique en t'appuyant OBLIGATOIREMENT sur ces sources :` : `
+Génère maintenant le scénario pédagogique complet :`}`;
 
     // ========================================================================
     // APPEL API IA (GPT-4.1-mini / GPT-5 mini / Mistral Medium)
@@ -831,11 +944,16 @@ Génère maintenant le scénario pédagogique complet :`;
 8. Après le tableau, ajoute la section "**Notes pédagogiques**".`;
     }
 
+    // Enrichir le system prompt avec une instruction RAG si des sources sont disponibles
+    const effectiveSystemPrompt = ragContext
+      ? `${SYSTEM_PROMPT}\n\nRÈGLE FONDAMENTALE : Des sources documentaires sont fournies par l'enseignant. Tu DOIS les citer explicitement dans ta réponse. Chaque source pertinente doit être référencée par son nom entre crochets [Source : nom_du_document] dans les colonnes du tableau. La sous-section "Sources documentaires utilisées" dans les Notes pédagogiques est OBLIGATOIRE.`
+      : SYSTEM_PROMPT;
+
     let requestBody: any;
 
     if (aiConfig.isResponsesAPI) {
       // GPT-5 mini : API Responses (format différent)
-      const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      const fullPrompt = `${effectiveSystemPrompt}\n\n---\n\n${userPrompt}${formatInstruction}`;
       requestBody = {
         model: aiConfig.model,
         input: fullPrompt,
@@ -845,7 +963,7 @@ Génère maintenant le scénario pédagogique complet :`;
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
       // Mistral : pas de rôle system, tout dans un message user
-      const combinedPrompt = `${SYSTEM_PROMPT}\n\n---\n\n${userPrompt}${formatInstruction}`;
+      const combinedPrompt = `${effectiveSystemPrompt}\n\n---\n\n${userPrompt}${formatInstruction}`;
       requestBody = {
         model: aiConfig.model,
         messages: [{ role: 'user', content: combinedPrompt }],
@@ -853,11 +971,11 @@ Génère maintenant le scénario pédagogique complet :`;
         max_tokens: 5500,
       };
     } else {
-      // Default (gpt-4.1-mini) : comportement actuel inchangé
+      // Default (gpt-4.1-mini) : séparation system/user pour meilleur suivi du contexte RAG
       requestBody = {
         model: aiConfig.model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: effectiveSystemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.6,
@@ -929,6 +1047,7 @@ Génère maintenant le scénario pédagogique complet :`;
       content,
       usage: aiData.usage,
       sources: ragSources.length > 0 ? ragSources : undefined,
+      warnings: ragWarnings.length > 0 ? ragWarnings : undefined,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -941,6 +1060,14 @@ Génère maintenant le scénario pédagogique complet :`;
 };
 
 Deno.serve(scenarioHandler);
+
+
+
+
+
+
+
+
 
 
 
