@@ -148,8 +148,11 @@ interface RagSource {
 const RAG_CONFIG = {
   embeddingModel: 'text-embedding-3-large',
   embeddingDimensions: 1536,
-  ragTopK: 15,
-  ragSimilarityThreshold: 0.40,
+  ragTopK: 8,
+  ragSimilarityThreshold: 0.55,
+  // Seuil plus bas quand l'utilisateur a sélectionné un dossier :
+  // il a explicitement choisi ces documents, on doit être plus inclusif
+  ragFolderThreshold: 0.35,
 };
 
 async function createEmbedding(text: string, apiKey: string): Promise<number[]> {
@@ -178,14 +181,23 @@ async function searchRagChunks(
   supabase: any,
   userId: string,
   embedding: number[],
-  topK: number
+  topK: number,
+  similarityThreshold: number
 ): Promise<RagChunk[]> {
   try {
     const embeddingStr = `[${embedding.join(',')}]`;
-    console.log(`[lessons] Calling match_rag_chunks with threshold=${RAG_CONFIG.ragSimilarityThreshold}, topK=${topK}`);
+    console.log(`[lessons] Embedding length: ${embedding.length}, first 3 values: [${embedding.slice(0, 3).join(', ')}]`);
+    console.log(`[lessons] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
+
+    // Augmenter ef_search pour améliorer la précision de l'index HNSW
+    await supabase.rpc('set_config_param', { param_name: 'hnsw.ef_search', param_value: '400' }).catch(() => {
+      // Si la fonction set_config_param n'existe pas, on continue sans
+      console.log('[lessons] set_config_param not available, trying direct SQL');
+    });
+
     const { data, error } = await supabase.rpc('match_rag_chunks', {
       p_query_embedding: embeddingStr,
-      p_similarity_threshold: RAG_CONFIG.ragSimilarityThreshold,
+      p_similarity_threshold: similarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
       p_document_id: null,
@@ -197,6 +209,51 @@ async function searchRagChunks(
     }
 
     console.log(`[lessons] RPC returned: ${data ? data.length : 'null'} results, type: ${typeof data}`);
+
+    // Si le RPC retourne 0 résultats, faire une recherche exacte (sans index HNSW)
+    if (!data || data.length === 0) {
+      console.log('[lessons] RPC returned 0 results, trying exact search fallback...');
+      const { data: exactData, error: exactError } = await supabase.rpc('match_rag_chunks_exact', {
+        p_query_embedding: embeddingStr,
+        p_similarity_threshold: similarityThreshold,
+        p_match_count: topK,
+        p_user_id: userId,
+        p_document_id: null,
+      });
+
+      if (exactError) {
+        console.log('[lessons] Exact search fallback error:', JSON.stringify(exactError));
+        // Dernier recours : requête SQL brute
+        console.log('[lessons] Trying raw SQL fallback...');
+        const { data: rawData, error: rawError } = await supabase.rpc('match_rag_chunks_raw', {
+          p_query_embedding: embeddingStr,
+          p_threshold: similarityThreshold,
+          p_limit: topK,
+          p_user_id: userId,
+        });
+        if (rawError) {
+          console.log('[lessons] Raw SQL fallback also failed:', JSON.stringify(rawError));
+          return [];
+        }
+        console.log(`[lessons] Raw SQL fallback returned: ${rawData ? rawData.length : 'null'} results`);
+        return (rawData || []).map((item: any) => ({
+          id: item.id,
+          content: item.content,
+          documentId: item.document_id || '',
+          documentTitle: item.document_title,
+          score: item.similarity,
+        }));
+      }
+
+      console.log(`[lessons] Exact search fallback returned: ${exactData ? exactData.length : 'null'} results`);
+      return (exactData || []).map((item: any) => ({
+        id: item.id,
+        content: item.content,
+        documentId: item.document_id || '',
+        documentTitle: item.document_title,
+        score: item.similarity,
+      }));
+    }
 
     return (data || []).map((item: any) => ({
       id: item.id,
@@ -303,6 +360,7 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
     let ragContext = '';
     let ragSources: RagSource[] = [];
+    let ragWarnings: string[] = [];
 
     if (data.useRag) {
       console.log(`[lessons] RAG mode enabled, searching documents...`);
@@ -316,13 +374,27 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
         if (data.folderIds?.length) {
           const { data: folderDocs } = await serviceClient
             .from('rag_documents')
-            .select('id')
+            .select('id, title, status, chunk_count')
             .eq('user_id', authUser.id)
             .in('folder_id', data.folderIds);
 
           if (folderDocs && folderDocs.length > 0) {
             allowedDocIds = new Set(folderDocs.map((d: any) => d.id));
             console.log(`[lessons] Folder filter: ${allowedDocIds.size} documents in selected folders`);
+
+            // Diagnostiquer les documents sans chunks ou en erreur
+            for (const doc of folderDocs) {
+              if (doc.status === 'error') {
+                ragWarnings.push(`⚠️ Le document "${doc.title}" est en erreur d'ingestion. Essayez de le ré-ingérer depuis votre espace documents.`);
+                console.log(`[lessons] WARNING: Document "${doc.title}" (${doc.id}) has status=error`);
+              } else if (doc.status !== 'ready') {
+                ragWarnings.push(`⚠️ Le document "${doc.title}" n'est pas encore prêt (status: ${doc.status}). Veuillez patienter ou le ré-ingérer.`);
+                console.log(`[lessons] WARNING: Document "${doc.title}" (${doc.id}) has status=${doc.status}`);
+              } else if (!doc.chunk_count || doc.chunk_count === 0) {
+                ragWarnings.push(`⚠️ Le document "${doc.title}" est marqué comme prêt mais ne contient aucun chunk indexé. Essayez de le ré-ingérer.`);
+                console.log(`[lessons] WARNING: Document "${doc.title}" (${doc.id}) has chunk_count=0 despite status=ready`);
+              }
+            }
           } else {
             console.log('[lessons] No documents found in selected folders');
           }
@@ -339,30 +411,29 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
         else if (/petite section|moyenne section|grande section|ps|ms|gs|maternelle/.test(levelLower)) { cycle = 'cycle 1'; cycleNum = 1; }
 
         const searchTerms = [
+          data.topic,
           data.subject,
           data.level,
           cycle,
-          data.topic,
-          'attendus de fin de cycle',
-          'repères de progressivité',
-          'programmes officiels',
-          'compétences',
-          cycleNum >= 2 && cycleNum <= 4 ? 'socle commun' : '',
         ].filter(Boolean).join(' ');
 
         console.log(`[lessons] RAG search query: ${searchTerms}`);
 
         const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
 
-        // Chercher plus de chunks quand un filtre dossier est actif,
-        // car le filtrage post-recherche peut en éliminer beaucoup
+        // Quand un dossier est sélectionné : seuil plus bas (l'utilisateur a choisi ces docs)
+        // + topK plus large (le filtrage post-recherche en éliminera)
+        const effectiveThreshold = allowedDocIds
+          ? RAG_CONFIG.ragFolderThreshold
+          : RAG_CONFIG.ragSimilarityThreshold;
         const searchTopK = allowedDocIds ? RAG_CONFIG.ragTopK * 5 : RAG_CONFIG.ragTopK;
 
         let chunks = await searchRagChunks(
           serviceClient,
           authUser.id,
           embedding,
-          searchTopK
+          searchTopK,
+          effectiveThreshold
         );
 
         console.log(`[lessons] RAG search returned ${chunks.length} chunks (before folder filter)`);
@@ -380,6 +451,67 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
           chunks = chunks.slice(0, RAG_CONFIG.ragTopK);
         }
 
+        // Recherche de rattrapage : pour chaque document du dossier absent des résultats,
+        // faire une recherche ciblée par document_id avec un seuil très bas
+        // L'utilisateur a sélectionné ce dossier, il veut ces documents utilisés.
+        if (allowedDocIds && data.folderIds?.length) {
+          const representedDocIds = new Set(chunks.map(c => c.documentId));
+          const { data: allFolderDocs } = await serviceClient
+            .from('rag_documents')
+            .select('id, title')
+            .eq('user_id', authUser.id)
+            .eq('status', 'ready')
+            .in('folder_id', data.folderIds);
+
+          if (allFolderDocs) {
+            for (const doc of allFolderDocs) {
+              if (!representedDocIds.has(doc.id)) {
+                console.log(`[lessons] Document "${doc.title}" missing from results, running targeted search...`);
+                // Recherche ciblée avec seuil minimal et limité aux 3 meilleurs chunks
+                const fallbackChunks = await searchRagChunks(
+                  serviceClient,
+                  authUser.id,
+                  embedding,
+                  3,
+                  0.15,  // Seuil très bas car on veut absolument des résultats
+                );
+                // Filtrer pour ne garder que ce document spécifique
+                const docChunks = fallbackChunks.filter(c => c.documentId === doc.id);
+                if (docChunks.length > 0) {
+                  chunks.push(...docChunks);
+                  console.log(`[lessons] Recovered ${docChunks.length} chunks from "${doc.title}" (best score: ${docChunks[0].score.toFixed(3)})`);
+                } else {
+                  // Dernier recours : recherche directe par document_id via la RPC
+                  const { data: directChunks, error: directError } = await serviceClient.rpc('match_rag_chunks', {
+                    p_query_embedding: `[${embedding.join(',')}]`,
+                    p_similarity_threshold: 0.05,
+                    p_match_count: 3,
+                    p_user_id: authUser.id,
+                    p_document_id: doc.id,
+                  });
+                  if (!directError && directChunks && directChunks.length > 0) {
+                    const recovered = directChunks.map((item: any) => ({
+                      id: item.chunk_id || item.id,
+                      content: item.content,
+                      documentId: item.document_id || '',
+                      documentTitle: item.document_title || doc.title,
+                      score: item.similarity,
+                    }));
+                    chunks.push(...recovered);
+                    console.log(`[lessons] Recovered ${recovered.length} chunks from "${doc.title}" via direct search (best score: ${recovered[0].score.toFixed(3)})`);
+                  } else {
+                    ragWarnings.push(`ℹ️ Le document "${doc.title}" n'a retourné aucun résultat même avec une recherche ciblée. Le document a peut-être besoin d'être ré-ingéré.`);
+                    console.log(`[lessons] WARNING: No chunks recoverable for "${doc.title}" even with direct search`);
+                  }
+                }
+              }
+            }
+          }
+          // Re-trier par score et limiter
+          chunks.sort((a, b) => b.score - a.score);
+          chunks = chunks.slice(0, RAG_CONFIG.ragTopK);
+        }
+
         if (chunks.length > 0) {
           console.log(`[lessons] Found ${chunks.length} relevant chunks`);
 
@@ -391,24 +523,23 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
 
           ragContext = `
 ═══════════════════════════════════════════════════════════════
-            RESSOURCES DE VOTRE CORPUS DOCUMENTAIRE
+    ⚠️ CORPUS DOCUMENTAIRE — UTILISATION OBLIGATOIRE ⚠️
 ═══════════════════════════════════════════════════════════════
 
-Les extraits suivants proviennent du corpus documentaire personnel de l'enseignant.
-Appuie-toi sur ces ressources pour enrichir et contextualiser la séance :
-- Formuler des objectifs alignés sur les contenus fournis
-- Utiliser le vocabulaire et les références des documents
-- Intégrer les éléments pertinents dans les activités
+Les extraits ci-dessous proviennent du corpus documentaire de l'enseignant.
+Tu DOIS OBLIGATOIREMENT :
+1. CITER explicitement des éléments tirés de CHAQUE source dans la séance
+2. REPRENDRE le vocabulaire exact et les formulations des documents
+3. ALIGNER les objectifs de la séance sur les attendus mentionnés dans ces sources
+4. RÉFÉRENCER les sources par leur nom (ex: "[Source : nom_du_document]") dans les sections pertinentes
+5. REMPLIR la section "📖 Sources documentaires utilisées" en fin de séance
 
 ${chunks.map((chunk, i) => `
-┌─────────────────────────────────────────────────────────────┐
-│ SOURCE ${i + 1} : ${chunk.documentTitle}
-│ Pertinence : ${(chunk.score * 100).toFixed(0)}%
-└─────────────────────────────────────────────────────────────┘
+[SOURCE ${i + 1} — ${chunk.documentTitle} — Pertinence : ${(chunk.score * 100).toFixed(0)}%]
 ${chunk.content}
 `).join('\n')}
 
-⚠️ CONSIGNE : Intègre ces ressources dans la conception de la séance lorsqu'elles sont pertinentes.
+⚠️ RAPPEL : Si tu ne cites pas explicitement ces sources dans ta réponse, la séance sera considérée comme NON CONFORME.
 `;
         } else {
           console.log('[lessons] No relevant RAG chunks found');
@@ -481,8 +612,12 @@ ${chunk.content}
     6. **Ne génère AUCUN contenu en dehors de la structure Markdown fournie**.`
       : '';
 
-    const prompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.
+    // Séparer le prompt en système (template/instructions) et utilisateur (contexte/RAG)
+    const systemPrompt = `Tu es un expert en ingénierie pédagogique et en didactique de haut niveau. Tu conçois des séances d'enseignement conformes aux attendus institutionnels français, directement exploitables par un enseignant sans interprétation supplémentaire.${ragContext ? `
 
+RÈGLE FONDAMENTALE : Lorsque des sources documentaires te sont fournies, tu DOIS les citer explicitement dans ta réponse. Chaque source pertinente doit être référencée par son nom entre crochets [Source : nom_du_document] dans les sections de la séance où elle est utilisée. La section "📖 Sources documentaires utilisées" est OBLIGATOIRE.` : ''}`;
+
+    const userPromptContent = `
 ═══════════════════════════════════════════════════════════════
                     CONTEXTE DE LA SÉANCE
 ═══════════════════════════════════════════════════════════════
@@ -984,6 +1119,18 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 
 > **📚 Ressources complémentaires :** [Sites institutionnels, manuels, outils TICE]
 
+${ragContext ? `---
+
+## 📖 Sources documentaires utilisées
+
+> **SECTION OBLIGATOIRE** — Liste ici chaque document du corpus qui a été utilisé pour construire cette séance.
+
+| Source | Élément repris | Intégration dans la séance |
+|--------|---------------|---------------------------|
+| [Nom du document 1] | [Extrait, attendu ou compétence cité] | [Où et comment il est utilisé dans la séance] |
+| [Nom du document 2] | [Extrait, attendu ou compétence cité] | [Où et comment il est utilisé dans la séance] |
+
+` : ''}
 ═══════════════════════════════════════════════════════════════
               EXIGENCES QUALITÉ FINALES
 ═══════════════════════════════════════════════════════════════
@@ -997,17 +1144,28 @@ ${isEPS ? '- **Observation motrice :** [Critères techniques à observer]' : '- 
 ✅ La différenciation est CONCRÈTE (pas de formules vagues)
 ${isEPS ? '✅ 75% minimum de temps en activité motrice effective' : '✅ Alternance judicieuse des modalités de travail'}
 ✅ Document exploitable IMMÉDIATEMENT sans interprétation
+${ragContext ? '✅ Les sources documentaires sont CITÉES explicitement avec [Source : nom_du_document]' : ''}
 ${noMetaInstruction}
+${ragContext ? `
+═══════════════════════════════════════════════════════════════
+  ⚠️ RAPPEL FINAL — UTILISE LES SOURCES DOCUMENTAIRES ⚠️
+═══════════════════════════════════════════════════════════════
 
-Génère maintenant cette séance avec le niveau d'expertise attendu.`;
+Les sources documentaires ont été fournies plus haut dans ce message.
+Tu DOIS les citer explicitement avec [Source : nom_du_document].
+La section "📖 Sources documentaires utilisées" est OBLIGATOIRE.
 
-    // Construction du body
+Génère maintenant cette séance en t'appuyant OBLIGATOIREMENT sur ces sources.` : `
+Génère maintenant cette séance avec le niveau d'expertise attendu.`}`;
+
+    // Construction du body — séparation system/user pour meilleur suivi des instructions
     let requestBody;
 
     if (aiConfig.isResponsesAPI) {
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${userPromptContent}`;
       requestBody = {
         model: aiConfig.model,
-        input: prompt,
+        input: fullPrompt,
         max_output_tokens: 8000,
         text: {
           format: { type: "text" }
@@ -1017,17 +1175,22 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
         }
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
+      // Mistral : pas de rôle system fiable, tout dans un message user
+      const fullPrompt = `${systemPrompt}\n\n---\n\n${userPromptContent}`;
       requestBody = {
         model: aiConfig.model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: fullPrompt }],
         temperature: 0.7,
         max_tokens: 10000
       };
     } else {
-      // Modèle par défaut
+      // gpt-4.1-mini : séparation system/user pour meilleur suivi du contexte RAG
       requestBody = {
         model: aiConfig.model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPromptContent }
+        ],
         temperature: 0.7,
         max_tokens: 10000
       };
@@ -1088,6 +1251,7 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
       content: cleanedContent,
       usage: aiData.usage,
       ...(ragSources.length > 0 && { sources: ragSources }),
+      ...(ragWarnings.length > 0 && { warnings: ragWarnings }),
     }), {
       status: 200,
       headers: {
@@ -1106,6 +1270,114 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`;
 };
 
 Deno.serve(lessonsHandler);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
