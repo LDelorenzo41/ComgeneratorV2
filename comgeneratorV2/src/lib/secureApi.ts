@@ -51,6 +51,15 @@ export interface SynthesisParams {
   outputType?: 'complet' | 'essentiel';
 }
 
+// Interface - Génération de supports pédagogiques (exercices)
+export interface ExerciseParams {
+  phaseContent: string;
+  supportType: string;
+  subject: string;
+  level: string;
+  fullLessonContext: string;
+}
+
 // ✅ NOUVELLE INTERFACE - Scénario pédagogique
 export interface ScenarioParams {
   matiere: string;
@@ -176,6 +185,14 @@ class SecureApiService {
       content: string;
       usage: any;
     }>('synthesis', params);
+  }
+
+  // Génération de supports pédagogiques (exercices)
+  async generateExercise(params: ExerciseParams) {
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+    }>('exercises', params);
   }
 
   // ✅ NOUVELLE MÉTHODE - Génération de scénarios pédagogiques

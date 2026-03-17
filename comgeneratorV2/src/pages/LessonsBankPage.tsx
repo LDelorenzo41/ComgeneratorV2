@@ -6,6 +6,8 @@ import { Button } from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import jsPDF from 'jspdf';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
+import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import { 
   BookOpen, 
   Search, 
@@ -125,6 +127,12 @@ export function LessonsBankPage() {
 
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [exportingId, setExportingId] = React.useState<string | null>(null);
+
+  // États pour le modal de génération de supports
+  const [exerciseModalOpen, setExerciseModalOpen] = React.useState(false);
+  const [selectedPhaseHeading, setSelectedPhaseHeading] = React.useState('');
+  const [selectedPhaseContent, setSelectedPhaseContent] = React.useState('');
+  const [selectedLessonForExercise, setSelectedLessonForExercise] = React.useState<LessonBank | null>(null);
 
   React.useEffect(() => {
     const fetchLessons = async () => {
@@ -731,6 +739,14 @@ export function LessonsBankPage() {
     }, 2000);
   };
 
+  const handleOpenExerciseModal = (phaseHeadingText: string, lesson: LessonBank) => {
+    const phaseContent = extractPhaseContent(lesson.content, phaseHeadingText);
+    setSelectedPhaseHeading(phaseHeadingText);
+    setSelectedPhaseContent(phaseContent);
+    setSelectedLessonForExercise(lesson);
+    setExerciseModalOpen(true);
+  };
+
   const toggleExpanded = (id: string) => {
     const newExpanded = new Set(expandedItems);
     if (newExpanded.has(id)) {
@@ -1034,11 +1050,25 @@ export function LessonsBankPage() {
                             {children}
                           </h2>
                         ),
-                        h3: ({ children }) => (
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
-                            {children}
-                          </h3>
-                        ),
+                        h3: ({ children }) => {
+                          const text = extractTextFromChildren(children);
+                          const isPhase = PHASE_HEADING_PATTERN.test(text);
+                          return (
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4 flex items-center gap-2 flex-wrap">
+                              <span>{children}</span>
+                              {isPhase && (
+                                <button
+                                  onClick={() => handleOpenExerciseModal(text, lesson)}
+                                  className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                                  title="Générer un support pédagogique pour cette phase"
+                                >
+                                  <Sparkles className="w-3 h-3 mr-1" />
+                                  Générer un support
+                                </button>
+                              )}
+                            </h3>
+                          );
+                        },
                         p: ({ children }) => (
                           <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">
                             {children}
@@ -1171,6 +1201,16 @@ export function LessonsBankPage() {
           </div>
         )}
       </div>
+
+      <ExerciseGeneratorModal
+        isOpen={exerciseModalOpen}
+        onClose={() => setExerciseModalOpen(false)}
+        phaseHeading={selectedPhaseHeading}
+        phaseContent={selectedPhaseContent}
+        fullLessonContent={selectedLessonForExercise?.content ?? ''}
+        subject={selectedLessonForExercise?.subject ?? ''}
+        level={selectedLessonForExercise?.level ?? ''}
+      />
     </div>
   );
 }

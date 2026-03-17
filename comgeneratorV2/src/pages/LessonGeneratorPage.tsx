@@ -20,6 +20,8 @@ import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
+import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
@@ -195,7 +197,8 @@ const MarkdownEditor: React.FC<{
   onSaveToBank: (content: string) => void;
   isSaving?: boolean;
   tokensAvailable?: number;
-}> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0 }) => {
+  onOpenExerciseModal?: (phaseHeading: string) => void;
+}> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0, onOpenExerciseModal }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(content);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -801,7 +804,25 @@ const MarkdownEditor: React.FC<{
             components={{
               h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">{children}</h1>,
               h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
+              h3: ({ children }) => {
+                const text = extractTextFromChildren(children);
+                const isPhase = PHASE_HEADING_PATTERN.test(text);
+                return (
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4 flex items-center gap-2 flex-wrap">
+                    <span>{children}</span>
+                    {isPhase && onOpenExerciseModal && (
+                      <button
+                        onClick={() => onOpenExerciseModal(text)}
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                        title="Générer un support pédagogique pour cette phase"
+                      >
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Générer un support
+                      </button>
+                    )}
+                  </h3>
+                );
+              },
               p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
               ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
               ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
@@ -872,6 +893,11 @@ export function LessonGeneratorPage() {
 
   // États pour les sources RAG
   const [ragSources, setRagSources] = React.useState<RagSource[]>([]);
+
+  // États pour le modal de génération de supports
+  const [exerciseModalOpen, setExerciseModalOpen] = React.useState(false);
+  const [selectedPhaseHeading, setSelectedPhaseHeading] = React.useState('');
+  const [selectedPhaseContent, setSelectedPhaseContent] = React.useState('');
 
   // Charger les dossiers
   React.useEffect(() => {
@@ -1091,6 +1117,13 @@ export function LessonGeneratorPage() {
 
   const handleContentChange = (newContent: string) => {
     setGeneratedContent(newContent);
+  };
+
+  const handleOpenExerciseModal = (phaseHeadingText: string) => {
+    const phaseContent = extractPhaseContent(generatedContent, phaseHeadingText);
+    setSelectedPhaseHeading(phaseHeadingText);
+    setSelectedPhaseContent(phaseContent);
+    setExerciseModalOpen(true);
   };
 
   // ✅ FONCTION handleSaveToBank avec vérification d'accès
@@ -1573,6 +1606,7 @@ export function LessonGeneratorPage() {
               onSaveToBank={handleSaveToBank}
               isSaving={savingToBank}
               tokensAvailable={tokenCount ?? 0}
+              onOpenExerciseModal={handleOpenExerciseModal}
             />
 
             {/* Sources RAG */}
@@ -1615,6 +1649,16 @@ export function LessonGeneratorPage() {
           </div>
         )}
       </div>
+
+      <ExerciseGeneratorModal
+        isOpen={exerciseModalOpen}
+        onClose={() => setExerciseModalOpen(false)}
+        phaseHeading={selectedPhaseHeading}
+        phaseContent={selectedPhaseContent}
+        fullLessonContent={generatedContent}
+        subject={lastFormData?.subject ?? ''}
+        level={lastFormData?.level ?? ''}
+      />
     </div>
   );
 }
