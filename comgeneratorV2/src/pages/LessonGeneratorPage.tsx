@@ -1223,7 +1223,10 @@ export function LessonGeneratorPage() {
                   <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité de la génération. Le contenu est limité à ~4000 tokens.
+                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité mais son contenu est limité à ~4000 tokens. Pour exploiter un document complet, <strong>ingérez-le dans votre corpus RAG</strong> (Mon chatbot → Documents → Créer un dossier) puis activez "Utiliser mon corpus documentaire personnel" ci-dessous.
+              </li>
+              <li>
+                  <strong>Corpus personnel :</strong> Activez l'option en bas de page pour que la génération s'appuie sur vos documents ingérés. Sélectionnez un dossier spécifique pour cibler les sources pertinentes.
               </li>
           </ul>
       </div>
@@ -1402,8 +1405,43 @@ export function LessonGeneratorPage() {
             </div>
             {/* FIN NOUVELLE SECTION */}
 
-            {/* Options avancées - Corpus personnel (masqué temporairement - bug RAG) */}
-            {/* TODO: Réactiver quand le bug de matching RAG sera résolu */}
+            {/* Options avancées - Corpus personnel */}
+            <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
+
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Database className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <p className="font-medium text-gray-900 dark:text-white">Utiliser mon corpus documentaire personnel (cf. mon chatbot)</p>
+                  </div>
+
+                  <button type="button" disabled={tokenCount === 0} onClick={() => setUseRag(!useRag)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${useRag ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${useRag ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {useRag && (
+                  <div className="mt-3 pl-8 space-y-3">
+                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                      ✓ La génération utilisera les documents de votre corpus personnel. Si aucun contenu pertinent n'est trouvé, l'IA générera la séance à partir de ses propres connaissances.
+                    </p>
+                    {folders.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2">Filtrer par dossier (optionnel) :</p>
+                        <FolderSelector
+                          folders={folders}
+                          selectedFolderIds={selectedFolderIds}
+                          onChange={setSelectedFolderIds}
+                          compact
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {error && (
               <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
@@ -1512,6 +1550,13 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
+
+
+
+
+
+
+
 
 
 
