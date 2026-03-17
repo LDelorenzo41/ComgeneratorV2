@@ -111,12 +111,20 @@ END;
 $$;
 
 -- =====================================================
--- 3. Permissions
+-- 3. Permissions (signatures qualifiées pour éviter toute ambiguïté)
 -- =====================================================
+
 -- match_rag_chunks : accessible depuis l'app (authenticated) et le backend (service_role)
-GRANT EXECUTE ON FUNCTION match_rag_chunks TO authenticated, service_role;
+-- SECURITY DEFINER est nécessaire car les Edge Functions appellent via le client
+-- Supabase avec le token utilisateur, mais la requête doit bypasser les RLS
+-- sur rag_chunks/rag_documents pour joindre et filtrer correctement.
+GRANT EXECUTE ON FUNCTION public.match_rag_chunks(text, float, int, uuid, uuid) TO authenticated, service_role;
 
 -- match_rag_chunks_exact : service_role uniquement (fallback coûteux, appelé depuis Edge Functions)
-REVOKE ALL ON FUNCTION match_rag_chunks_exact FROM PUBLIC;
-REVOKE ALL ON FUNCTION match_rag_chunks_exact FROM authenticated;
-GRANT EXECUTE ON FUNCTION match_rag_chunks_exact TO service_role;
+-- Note: SECURITY DEFINER requis pour les mêmes raisons que match_rag_chunks.
+REVOKE ALL ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.match_rag_chunks_exact(text, float, int, uuid, uuid) TO service_role;
+
+-- Note: p_user_id = NULL retourne volontairement 0 résultats (pas de user = pas de données).
+-- Ce comportement est voulu : toute recherche RAG doit être scopée à un utilisateur.
