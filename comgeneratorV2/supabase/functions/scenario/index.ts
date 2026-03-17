@@ -53,6 +53,9 @@ const CONFIG = {
   embeddingDimensions: 1536,
   ragTopK: 8,
   ragSimilarityThreshold: 0.55,
+  // Seuil plus bas quand l'utilisateur a sélectionné un dossier :
+  // il a explicitement choisi ces documents, on doit être plus inclusif
+  ragFolderThreshold: 0.35,
 };
 
 // =====================================================
@@ -513,12 +516,14 @@ async function searchRagChunks(
   supabase: any,
   userId: string,
   embedding: number[],
-  topK: number
+  topK: number,
+  similarityThreshold: number
 ): Promise<RagChunk[]> {
   try {
+    console.log(`[scenario] Calling match_rag_chunks with threshold=${similarityThreshold}, topK=${topK}`);
     const { data, error } = await supabase.rpc('match_rag_chunks', {
       p_query_embedding: `[${embedding.join(',')}]`,
-      p_similarity_threshold: CONFIG.ragSimilarityThreshold,
+      p_similarity_threshold: similarityThreshold,
       p_match_count: topK,
       p_user_id: userId,
       p_document_id: null,
@@ -640,14 +645,19 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
 
       const embedding = await createEmbedding(searchTerms, OPENAI_API_KEY);
 
-      // Chercher plus de chunks quand un filtre dossier est actif
+      // Quand un dossier est sélectionné : seuil plus bas (l'utilisateur a choisi ces docs)
+      // + topK plus large (le filtrage post-recherche en éliminera)
+      const effectiveThreshold = allowedDocIds
+        ? CONFIG.ragFolderThreshold
+        : CONFIG.ragSimilarityThreshold;
       const searchTopK = allowedDocIds ? CONFIG.ragTopK * 5 : CONFIG.ragTopK;
 
       let chunks = await searchRagChunks(
         serviceClient,
         user.id,
         embedding,
-        searchTopK
+        searchTopK,
+        effectiveThreshold
       );
 
       // Filtrer par document_id si un dossier est sélectionné
@@ -674,7 +684,7 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
 
 Les extraits ci-dessous proviennent du corpus documentaire de l'enseignant.
 Tu DOIS OBLIGATOIREMENT :
-1. CITER explicitement au moins 3 éléments tirés de ces sources dans le scénario
+1. CITER explicitement des éléments tirés de CHAQUE source dans le scénario
 2. REPRENDRE le vocabulaire exact et les formulations des documents
 3. ALIGNER les objectifs de la séquence sur les attendus mentionnés dans ces sources
 4. RÉFÉRENCER les sources par leur nom (ex: "[Source : nom_du_document]") dans les colonnes pertinentes du tableau
