@@ -1,7 +1,7 @@
 // src/components/modals/ExerciseGeneratorModal.tsx
 // Modal pour générer des supports pédagogiques (exercices, fiches, QCM...) à partir d'une phase
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import jsPDF from 'jspdf';
@@ -14,6 +14,8 @@ import {
   FileText,
   RotateCcw,
   CheckCircle,
+  GripHorizontal,
+  Minimize2,
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
@@ -55,6 +57,54 @@ export function ExerciseGeneratorModal({
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // Drag state
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const isDragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only drag from header area, ignore buttons
+    if ((e.target as HTMLElement).closest('button')) return;
+    isDragging.current = true;
+    const rect = modalRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragOffset.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    }
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      setPosition({
+        x: e.clientX - dragOffset.current.x,
+        y: e.clientY - dragOffset.current.y,
+      });
+    };
+    const handleMouseUp = () => {
+      isDragging.current = false;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Reset position when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setPosition(null);
+      setIsMinimized(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -97,9 +147,7 @@ export function ExerciseGeneratorModal({
   };
 
   const handleClose = () => {
-    setGeneratedContent(null);
-    setError(null);
-    setSupportType('auto');
+    // Persistant : on ne reset PAS le contenu généré à la fermeture
     setCopied(false);
     onClose();
   };
@@ -353,15 +401,39 @@ export function ExerciseGeneratorModal({
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
-    >
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+  const modalStyle: React.CSSProperties = position
+    ? {
+        position: 'fixed',
+        left: position.x,
+        top: position.y,
+        transform: 'none',
+      }
+    : {
+        position: 'fixed',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+      };
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-6 text-white shrink-0">
+  return (
+    <>
+      {/* Overlay transparent - ne bloque pas l'interaction avec la page */}
+      <div className="fixed inset-0 bg-black/30 z-40 pointer-events-none" />
+
+      {/* Modal déplaçable */}
+      <div
+        ref={modalRef}
+        style={modalStyle}
+        className={`z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl ${
+          isMinimized ? '' : 'max-h-[90vh]'
+        } overflow-hidden flex flex-col`}
+      >
+
+        {/* Header — zone de drag */}
+        <div
+          className="bg-gradient-to-r from-purple-500 to-indigo-600 p-6 text-white shrink-0 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleMouseDown}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
@@ -374,16 +446,28 @@ export function ExerciseGeneratorModal({
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleClose}
-              className="text-white/80 hover:text-white transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              <GripHorizontal className="w-5 h-5 text-white/40" />
+              <button
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="text-white/80 hover:text-white transition-colors"
+                title={isMinimized ? 'Agrandir' : 'Réduire'}
+              >
+                <Minimize2 className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleClose}
+                className="text-white/80 hover:text-white transition-colors"
+                title="Fermer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
+        {/* Body — masqué si minimisé */}
+        {!isMinimized && (
         <div className="overflow-y-auto flex-1 p-6">
 
           {/* Error state */}
@@ -559,8 +643,10 @@ export function ExerciseGeneratorModal({
             </button>
           </div>
         )}
+        </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
