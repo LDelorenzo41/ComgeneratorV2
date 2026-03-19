@@ -9,10 +9,12 @@ import {
   Bot,
   Map,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  BookOpen,
+  Copy
 } from 'lucide-react';
 
-const MODAL_STORAGE_KEY = 'profassist_nav_update_v1_seen';
+const MODAL_STORAGE_KEY = 'profassist_nav_update_v2_seen';
 
 export function NavigationUpdateModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -194,10 +196,42 @@ export function NavigationUpdateModal() {
                 <div className="flex-1">
                   <h4 className="font-semibold text-gray-900 dark:text-white text-sm flex items-center gap-2">
                     Création de scénarios pédagogiques
-                    <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 rounded-full">à venir</span>
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 rounded-full">Nouveau</span>
                   </h4>
                   <p className="text-xs text-gray-600 dark:text-gray-400">
                     Concevez vos séquences de manière structurée
+                  </p>
+                </div>
+              </div>
+
+              {/* Génération de supports et exercices */}
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 rounded-xl border border-purple-200 dark:border-purple-700">
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                  <BookOpen className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                    Génération de supports et exercices
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 rounded-full">Nouveau</span>
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Créez QCM, textes à trous, fiches élèves et plus pour chaque phase de vos séances
+                  </p>
+                </div>
+              </div>
+
+              {/* Copie du thème vers séance */}
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/20 dark:to-emerald-500/20 rounded-xl border border-green-200 dark:border-green-700">
+                <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                  <Copy className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                    Copie du thème vers une séance
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300 rounded-full">Nouveau</span>
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Copiez le thème d'une séance depuis votre banque de scénarios pour lancer la génération en un clic
                   </p>
                 </div>
               </div>
