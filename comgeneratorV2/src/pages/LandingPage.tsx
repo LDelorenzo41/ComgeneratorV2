@@ -22,7 +22,9 @@ import {
   Play,
   Gift,
   Bot,
-  Map  // ✅ AJOUT pour les scénarios pédagogiques
+  Map,
+  Settings,
+  Cpu
 } from 'lucide-react';
 
 export function LandingPage() {
@@ -86,7 +88,7 @@ export function LandingPage() {
       description: "Vision macro de vos séquences d'apprentissage",
       icon: Map,
       color: "bg-amber-500",
-      comingSoon: true
+      comingSoon: false
     }
   ];
 
@@ -100,7 +102,7 @@ export function LandingPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveFeature((prev) => (prev + 1) % features.length);
-    }, 3000);
+    }, 7000);
     return () => clearInterval(interval);
   }, []);
 
@@ -362,9 +364,17 @@ export function LandingPage() {
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                           <span className="text-sm">Rendu Markdown</span>
                         </div>
-                        <div className="flex items-center">
+                        <div className="flex items-center mb-2">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                           <span className="text-sm">Archivage automatique</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Génération d'exercices, QCM, fiches élèves par phase</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Export PDF et Word des supports générés</span>
                         </div>
                       </div>
                     )}
@@ -423,30 +433,29 @@ export function LandingPage() {
                     {/* ✅ AJOUT : Contenu spécifique pour les Scénarios pédagogiques */}
                     {activeFeature === 7 && (
                       <div className="text-left">
-                        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                          <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-                            🚀 Fonctionnalité en cours de développement
-                          </p>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Vision macro de vos séquences</span>
                         </div>
                         <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Vision macro de vos séquences</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Planification de 2 à 13 séances</span>
                         </div>
                         <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Planification de 2 à 13 séances</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Objectifs, attendus et prérequis par séance</span>
                         </div>
                         <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Objectifs, attendus et prérequis par séance</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Export PDF paysage</span>
                         </div>
                         <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Export PDF paysage</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Sauvegarde dans votre banque</span>
                         </div>
                         <div className="flex items-center">
-                          <CheckCircle className="w-5 h-5 text-amber-500 mr-2" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Sauvegarde dans votre banque</span>
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Copie du thème pour générer une séance en un clic</span>
                         </div>
                       </div>
                     )}
@@ -527,15 +536,16 @@ export function LandingPage() {
             <div className="flex-1 text-center lg:text-left order-1 lg:order-2">
               <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
                 <Map className="w-4 h-4 mr-2" />
-                Bientôt disponible
+                Nouvel outil
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
                 Planifiez vos séquences avec les scénarios pédagogiques
               </h2>
               <p className="text-lg text-amber-100 mb-8 max-w-2xl">
-                Créez une vision macro de vos séquences d'apprentissage ! 
-                Définissez les objectifs, attendus et prérequis pour chaque séance, 
-                et exportez le tout en PDF pour une vue d'ensemble claire.
+                Créez une vision macro de vos séquences d'apprentissage !
+                Définissez les objectifs, attendus et prérequis pour chaque séance,
+                et exportez le tout en PDF. Copiez directement le thème d'une séance
+                depuis votre banque de scénarios pour lancer la génération en un clic.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-white">
@@ -549,6 +559,110 @@ export function LandingPage() {
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
                   <span>Banque de scénarios</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Copie du thème vers le générateur</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section mise en avant des Séances pédagogiques + Génération de supports */}
+      <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 text-center lg:text-left">
+              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Nouveau • Assistant exercices
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Créez vos séances et générez des supports en un clic
+              </h2>
+              <p className="text-lg text-purple-100 mb-8 max-w-2xl">
+                Générez des séances pédagogiques structurées, puis créez instantanément
+                des exercices, QCM, textes à trous, fiches élèves ou grilles d'évaluation
+                pour chaque phase. Exportez en PDF ou Word, prêts à imprimer.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>8 types de supports</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Export PDF et Word</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Génération de contexte</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                <div className="w-32 h-32 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="w-16 h-16 text-white" />
+                </div>
+                <div className="text-center">
+                  <p className="text-white font-semibold mb-2">Exemples de supports :</p>
+                  <p className="text-purple-100 text-sm italic">
+                    QCM, texte à trous, fiche élève, dictée, grille d'évaluation...
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section choix du modèle IA */}
+      <div className="bg-gradient-to-r from-slate-700 via-gray-800 to-slate-900 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-shrink-0 order-2 lg:order-1">
+              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
+                <div className="w-32 h-32 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Cpu className="w-16 h-16 text-white" />
+                </div>
+                <div className="text-center space-y-2">
+                  <p className="text-white font-semibold">3 modèles disponibles :</p>
+                  <div className="flex flex-col gap-1 text-sm">
+                    <span className="text-green-300">GPT-4.1 mini</span>
+                    <span className="text-blue-300">GPT-5 mini</span>
+                    <span className="text-orange-300">Mistral Medium</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 text-center lg:text-left order-1 lg:order-2">
+              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
+                <Settings className="w-4 h-4 mr-2" />
+                Nouveau • Paramètres
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                Choisissez votre modèle d'IA
+              </h2>
+              <p className="text-lg text-gray-300 mb-8 max-w-2xl">
+                Depuis vos paramètres, sélectionnez le modèle d'intelligence artificielle
+                qui vous convient le mieux. GPT-4.1 mini par défaut, ou optez pour
+                GPT-5 mini ou le modèle français Mistral Medium pour varier les résultats.
+              </p>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>GPT-4.1 mini (par défaut)</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>GPT-5 mini</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Mistral Medium (FR)</span>
                 </div>
               </div>
             </div>
