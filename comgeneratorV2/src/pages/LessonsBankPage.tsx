@@ -5,7 +5,10 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import 'katex/dist/katex.min.css';
 import jsPDF from 'jspdf';
 import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
@@ -1039,8 +1042,8 @@ export function LessonsBankPage() {
                     expandedItems.has(lesson.id) ? '' : 'max-h-96 overflow-hidden'
                   }`}>
                     <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw as any]}
+                      remarkPlugins={[remarkGfm, remarkMath]}
+                      rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
                       components={{
                         h1: ({ children }) => (
                           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">

@@ -9,7 +9,10 @@ import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import 'katex/dist/katex.min.css';
 
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
@@ -858,8 +861,8 @@ const MarkdownEditor: React.FC<{
               ),
             }}
             // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw as any]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
           >
             {convertMarkdownTablesToHtml(content)}
           </ReactMarkdown>

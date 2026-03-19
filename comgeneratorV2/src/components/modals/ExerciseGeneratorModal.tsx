@@ -4,7 +4,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import 'katex/dist/katex.min.css';
 import jsPDF from 'jspdf';
 import {
   X,
@@ -168,8 +171,43 @@ export function ExerciseGeneratorModal({
     const maxWidth = pageWidth - 2 * margin;
     let yPosition = margin;
 
-    const cleanText = (text: string): string => {
+    const cleanLatex = (text: string): string => {
       return text
+        // Supprimer les délimiteurs LaTeX \( \) \[ \] $ $$
+        .replace(/\\\(|\\\)/g, '')
+        .replace(/\\\[|\\\]/g, '')
+        .replace(/\$\$(.*?)\$\$/g, '$1')
+        .replace(/\$(.*?)\$/g, '$1')
+        // Convertir les commandes LaTeX courantes en texte lisible
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\pm/g, '±')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\Delta/g, 'Δ')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\int/g, '∫')
+        .replace(/\^(\{[^}]+\}|\w)/g, (_, exp) => `^${exp.replace(/[{}]/g, '')}`)
+        .replace(/_(\{[^}]+\}|\w)/g, (_, sub) => `_${sub.replace(/[{}]/g, '')}`)
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\mathrm\{([^}]+)\}/g, '$1')
+        .replace(/\\left|\\right/g, '')
+        .replace(/\\\\/g, '')
+        .replace(/\\[a-zA-Z]+/g, '');
+    };
+
+    const cleanText = (text: string): string => {
+      return cleanLatex(text)
         .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
         .replace(/[\u{2600}-\u{26FF}]/gu, '')
         .replace(/[\u{2700}-\u{27BF}]/gu, '')
@@ -609,8 +647,8 @@ export function ExerciseGeneratorModal({
               {/* Rendered content */}
               <div className="prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-white dark:bg-gray-900/50">
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw as any]}
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
                   components={{
                     h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 pb-2 border-b border-purple-200 dark:border-purple-800">{children}</h1>,
                     h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-5">{children}</h2>,
@@ -668,8 +706,41 @@ export function ExerciseGeneratorModal({
 // =====================================================
 // Helper : Markdown vers HTML simple (pour export Word)
 // =====================================================
+function cleanLatexForExport(text: string): string {
+  return text
+    .replace(/\\\(|\\\)/g, '')
+    .replace(/\\\[|\\\]/g, '')
+    .replace(/\$\$(.*?)\$\$/g, '$1')
+    .replace(/\$(.*?)\$/g, '$1')
+    .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
+    .replace(/\\times/g, '×')
+    .replace(/\\div/g, '÷')
+    .replace(/\\pm/g, '±')
+    .replace(/\\leq/g, '≤')
+    .replace(/\\geq/g, '≥')
+    .replace(/\\neq/g, '≠')
+    .replace(/\\approx/g, '≈')
+    .replace(/\\infty/g, '∞')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\alpha/g, 'α')
+    .replace(/\\beta/g, 'β')
+    .replace(/\\gamma/g, 'γ')
+    .replace(/\\theta/g, 'θ')
+    .replace(/\\Delta/g, 'Δ')
+    .replace(/\\sum/g, '∑')
+    .replace(/\\int/g, '∫')
+    .replace(/\^(\{[^}]+\}|\w)/g, (_, exp) => `^${exp.replace(/[{}]/g, '')}`)
+    .replace(/_(\{[^}]+\}|\w)/g, (_, sub) => `_${sub.replace(/[{}]/g, '')}`)
+    .replace(/\\text\{([^}]+)\}/g, '$1')
+    .replace(/\\mathrm\{([^}]+)\}/g, '$1')
+    .replace(/\\left|\\right/g, '')
+    .replace(/\\\\/g, '')
+    .replace(/\\[a-zA-Z]+/g, '');
+}
+
 function markdownToSimpleHtml(md: string): string {
-  let html = md;
+  let html = cleanLatexForExport(md);
 
   // Tables
   html = html.replace(/^(\|.+\|)\n(\|[\s\-:|]+\|)\n((?:\|.+\|\n?)*)/gm, (_, headerRow, _sep, bodyRows) => {
