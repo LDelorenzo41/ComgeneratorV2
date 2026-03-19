@@ -24,18 +24,18 @@ export const AI_MODEL_OPTIONS: Array<{
 }> = [
   {
     value: "default",
-    label: "Modèle standard",
-    description: "Recommandé - Modèles optimisés pour ProfAssist"
+    label: "GPT-4.1 mini (standard)",
+    description: "Recommandé — Prompts optimisés pour ce modèle, meilleur rapport qualité/coût"
   },
   {
     value: "gpt-5-mini",
     label: "GPT-5 mini",
-    description: "OpenAI - Dernière génération"
+    description: "OpenAI dernière génération — Rapide et performant"
   },
   {
     value: "mistral-medium",
     label: "Mistral Medium",
-    description: "Mistral AI - Alternative française"
+    description: "Modèle français (Mistral AI) — Alternative souveraine"
   }
 ];
 

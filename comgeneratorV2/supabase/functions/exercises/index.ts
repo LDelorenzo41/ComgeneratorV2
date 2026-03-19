@@ -126,15 +126,62 @@ function cleanOutputText(text: string): string {
 // =====================================================
 
 const SUPPORT_TYPE_INSTRUCTIONS: Record<string, string> = {
-  auto: "Choisis le type de support le plus adapté à cette phase et génère-le.",
-  contexte: "La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent lire ou analyser, mais ce support n'est pas fourni. Génère ce document contexte de manière réaliste, détaillée et adaptée au niveau des élèves. Il doit correspondre exactement à ce qui est décrit dans les consignes de la phase (thème, type d'activité, objectifs). Présente-le prêt à être imprimé et distribué aux élèves, avec un titre clair.",
-  texte_a_trous: "Crée un texte à trous avec les mots manquants remplacés par '________'. Fournis la correction (liste des mots) à la fin.",
-  vocabulaire: "Crée une liste de vocabulaire ou mots-clés avec des définitions adaptées au niveau des élèves.",
-  qcm: "Crée un QCM ou exercice Vrai/Faux avec au moins 8 questions. Fournis la correction à la fin.",
-  exercices: "Crée des exercices d'application variés avec des énoncés clairs et une correction détaillée à la fin.",
-  dictee: "Crée une dictée préparée avec : le texte de la dictée, les mots difficiles à préparer en amont, et les points de vigilance orthographique.",
-  grille: "Crée une grille d'évaluation ou d'observation sous forme de tableau avec des critères précis et des niveaux de maîtrise.",
-  fiche_eleve: "Crée une fiche élève synthétique prête à imprimer avec l'essentiel à retenir, des exemples et éventuellement un petit exercice d'application.",
+  auto: `Analyse la phase et crée le support le plus utile — celui qui apporte le CONTENU CONCRET manquant.
+Ne reformule pas la phase. Demande-toi : "De quoi l'élève a besoin entre les mains pour réussir cette activité ?"
+Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).`,
+
+  contexte: `La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent utiliser, mais ce support n'est pas fourni.
+Génère ce document de manière réaliste, détaillée et experte :
+- Texte littéraire ou documentaire : rédige un vrai texte complet (pas un résumé), avec le style approprié
+- Scénario / situation-problème : crée un cas concret, chiffré si pertinent, avec tous les détails nécessaires
+- Document historique : rédige un texte vraisemblable d'époque avec source fictive crédible
+- Support EPS : décris des situations tactiques concrètes avec des enchaînements pas à pas
+Le document doit être suffisamment riche pour que les élèves puissent travailler dessus pendant toute la phase.`,
+
+  texte_a_trous: `Crée un texte à trous portant sur les NOTIONS CLÉS de la phase.
+- Rédige un texte original (pas une copie de la phase) qui synthétise les savoirs visés
+- Remplace les mots-clés par '________' (10 à 15 trous minimum)
+- Les trous doivent porter sur le vocabulaire disciplinaire important
+- Fournis la correction (liste numérotée des mots) à la fin`,
+
+  vocabulaire: `Crée une fiche de vocabulaire EXPERTE sur le thème de la phase :
+- 10 à 15 termes disciplinaires essentiels
+- Pour chaque terme : définition claire + exemple concret d'utilisation en contexte
+- Ajoute les pièges courants ou confusions fréquentes entre termes proches
+- Si pertinent, ajoute un petit exercice d'association ou de réemploi en fin de fiche`,
+
+  qcm: `Crée un QCM de 10 à 12 questions qui TESTE LA COMPRÉHENSION PROFONDE, pas la simple mémorisation :
+- Mélange des questions factuelles et des questions de raisonnement/application
+- Propose 3 à 4 choix par question, avec des distracteurs crédibles (erreurs fréquentes d'élèves)
+- Fournis la correction à la fin avec une EXPLICATION pour chaque bonne réponse
+- Les questions doivent couvrir les notions clés de la phase, pas reformuler les consignes`,
+
+  exercices: `Crée des exercices d'application PROGRESSIFS (du plus simple au plus complexe) :
+- 4 à 6 exercices qui permettent de mettre en pratique les compétences visées par la phase
+- Chaque exercice a un énoncé clair avec des données concrètes (chiffres, textes, situations)
+- Inclure au moins un exercice de type "expert" ou "défi" pour les élèves avancés
+- Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse`,
+
+  dictee: `Crée une dictée préparée en lien avec le thème de la phase :
+- Texte de 80 à 150 mots (adapté au niveau) portant sur le thème étudié
+- Liste des mots difficiles à préparer en amont avec règles orthographiques associées
+- Points de vigilance : accords, homophones, conjugaisons à surveiller
+- Version annotée pour l'enseignant avec les pièges soulignés`,
+
+  grille: `Crée une grille d'évaluation ou d'observation OPÉRATIONNELLE :
+- Critères précis et OBSERVABLES (pas de formulations vagues comme "bonne maîtrise")
+- Pour chaque critère, décris concrètement ce qu'on observe à chaque niveau (insuffisant / fragile / satisfaisant / expert)
+- En EPS : critères moteurs précis (ex : "replacement en position T en moins de 2 secondes après la frappe")
+- En production écrite : critères linguistiques précis avec exemples
+- Format tableau prêt à cocher, avec une colonne commentaire`,
+
+  fiche_eleve: `Crée une fiche élève qui soit un vrai OUTIL DE TRAVAIL, pas un résumé de cours :
+- L'essentiel à retenir présenté de manière visuelle (encadrés, schémas décrits, mots-clés en gras)
+- Des EXEMPLES CONCRETS et DÉTAILLÉS (pas des mentions génériques)
+- Un ou deux exercices d'application rapide avec correction
+- En EPS : des routines ou enchaînements décrits étape par étape
+- En Sciences : un protocole ou une méthode à suivre
+- En Maths : une méthode type avec un exemple résolu pas à pas`,
 };
 
 // =====================================================
@@ -270,27 +317,39 @@ FORMAT MARKDOWN OBLIGATOIRE :
 - Listes : utiliser - ou 1. 2. 3. sans mélanger les formats`
       : '';
 
-    const systemPrompt = `Tu es un expert en création de supports pédagogiques pour l'enseignement en France.
-Tu crées des fiches, exercices et supports prêts à imprimer, adaptés au niveau des élèves.
+    const systemPrompt = `Tu es un expert pédagogique disciplinaire pour l'enseignement en France.
+Tu crées des supports prêts à imprimer qui APPORTENT DU CONTENU CONCRET que la séance ne fournit pas.
+
+PRINCIPE FONDAMENTAL — VALEUR AJOUTÉE :
+Ta mission n'est PAS de reformuler ou résumer la phase de séance.
+La phase décrit l'organisation et les objectifs. Toi, tu dois CRÉER LE CONTENU OPÉRATIONNEL que l'enseignant n'a pas eu le temps de rédiger :
+- En EPS : des routines tactiques détaillées étape par étape (ex : "Si tu sers court et que l'adversaire retourne court → avance au filet et joue un contre-amorti ; s'il retourne long → replace-toi et joue un dégagé"), des arbres de décision, des schémas de déplacement décrits pas à pas
+- En Maths : des exercices originaux avec résolution détaillée étape par étape, des erreurs types commentées, des méthodes pas à pas
+- En Français : des textes supports inédits adaptés, des exemples de rédaction commentés, des grilles d'analyse pré-remplies avec un exemple
+- En Histoire-Géo : des documents sources réalistes (extraits de textes d'époque, données chiffrées, témoignages fictifs mais vraisemblables), des frises et repères concrets
+- En Sciences : des protocoles expérimentaux détaillés, des tableaux de mesures pré-formatés avec un exemple, des schémas décrits étape par étape
+- En Langues : des dialogues modèles, du vocabulaire en contexte avec exemples d'usage, des exercices de transformation
+- Pour toute matière : des EXEMPLES CONCRETS, des CAS PRATIQUES, des MODÈLES que l'élève peut imiter
 
 RÈGLES STRICTES :
 - Tout le contenu est en français
-- Adapté au niveau scolaire indiqué
+- Adapté au niveau scolaire indiqué (vocabulaire, complexité, longueur)
 - Directement imprimable et utilisable en classe
 - Mise en page claire avec des consignes explicites pour les élèves
 - Format Markdown propre (titres, listes, tableaux si pertinent)
 - Inclure un titre clair pour le support
 - Ne pas générer de commentaires ou notes destinés à l'enseignant dans le support élève
-- Fournir la correction/les réponses à la fin quand c'est pertinent${markdownRules}`;
+- Fournir la correction/les réponses à la fin quand c'est pertinent
+- NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral${markdownRules}`;
 
-    const userPrompt = `Génère un support pédagogique pour la phase suivante d'une séance.
+    const userPrompt = `Génère un support pédagogique pour la phase ci-dessous.
 
 **Matière :** ${data.subject}
 **Niveau :** ${data.level}
 
 ---
 
-**Contenu de la phase :**
+**Contenu de la phase (ce que l'enseignant a prévu) :**
 ${data.phaseContent}
 
 ---
@@ -301,6 +360,9 @@ ${truncatedContext}
 ---
 
 **Type de support demandé :** ${supportInstruction}
+
+RAPPEL IMPORTANT : La phase ci-dessus décrit l'organisation pédagogique. Ton support doit apporter le CONTENU CONCRET que l'élève utilisera pendant cette phase — pas reformuler ce que l'enseignant sait déjà.
+Pose-toi la question : "Qu'est-ce que l'élève doit avoir entre les mains pour réussir cette activité ?"
 
 Génère maintenant le support, prêt à être imprimé et distribué aux élèves.`;
 
