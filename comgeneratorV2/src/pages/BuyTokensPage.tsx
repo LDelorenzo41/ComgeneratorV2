@@ -246,7 +246,7 @@ export function BuyTokensPage() {
               <div className="flex flex-col items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
                 <BookOpen className="w-5 h-5 text-orange-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Séance</span>
-                <span className="text-gray-600 dark:text-gray-400">~3 500</span>
+                <span className="text-gray-600 dark:text-gray-400">5k - 6k</span>
               </div>
               <div className="flex flex-col items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
                 <ClipboardList className="w-5 h-5 text-amber-600 mb-1" />

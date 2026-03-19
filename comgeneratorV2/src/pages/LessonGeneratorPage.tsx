@@ -1063,8 +1063,11 @@ export function LessonGeneratorPage() {
         setRagSources(result.sources);
       }
 
-      // ✅ MODIFICATION - Usage récupéré depuis result.usage
-      const usedTokens: number = result.usage?.total_tokens ?? 0;
+      // ✅ MODIFICATION - Usage récupéré depuis result.usage, plafonné pour les séances
+      const rawTokens: number = result.usage?.total_tokens ?? 0;
+      const hasExternalContext = !!(useRag || extractedText);
+      const maxLessonTokens = hasExternalContext ? 6000 : 5000;
+      const usedTokens = Math.min(rawTokens, maxLessonTokens);
 
       // Mise à jour des tokens
       if (usedTokens > 0 && user) {
@@ -1668,6 +1671,11 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
+
+
+
+
+
 
 
 
