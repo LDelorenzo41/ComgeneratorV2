@@ -107,6 +107,7 @@ function cleanOutputText(text: string): string {
 
 const SUPPORT_TYPE_INSTRUCTIONS: Record<string, string> = {
   auto: "Choisis le type de support le plus adapté à cette phase et génère-le.",
+  contexte: "La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent lire ou analyser, mais ce support n'est pas fourni. Génère ce document contexte de manière réaliste, détaillée et adaptée au niveau des élèves. Il doit correspondre exactement à ce qui est décrit dans les consignes de la phase (thème, type d'activité, objectifs). Présente-le prêt à être imprimé et distribué aux élèves, avec un titre clair.",
   texte_a_trous: "Crée un texte à trous avec les mots manquants remplacés par '________'. Fournis la correction (liste des mots) à la fin.",
   vocabulaire: "Crée une liste de vocabulaire ou mots-clés avec des définitions adaptées au niveau des élèves.",
   qcm: "Crée un QCM ou exercice Vrai/Faux avec au moins 8 questions. Fournis la correction à la fin.",

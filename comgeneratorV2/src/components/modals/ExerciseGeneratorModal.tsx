@@ -35,6 +35,7 @@ interface ExerciseGeneratorModalProps {
 
 const SUPPORT_TYPES = [
   { key: 'auto', label: 'Laisser l\'IA choisir (recommandé)' },
+  { key: 'contexte', label: 'Générer un contexte (scénario, texte, situation...)' },
   { key: 'texte_a_trous', label: 'Texte à trous' },
   { key: 'vocabulaire', label: 'Liste de vocabulaire / mots-clés' },
   { key: 'qcm', label: 'QCM / Vrai-Faux' },
