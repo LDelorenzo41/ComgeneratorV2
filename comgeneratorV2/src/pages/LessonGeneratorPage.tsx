@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
@@ -857,7 +858,8 @@ const MarkdownEditor: React.FC<{
               ),
             }}
             // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
-            rehypePlugins={[rehypeRaw as any]} 
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw as any]}
           >
             {convertMarkdownTablesToHtml(content)}
           </ReactMarkdown>
@@ -1664,4 +1666,5 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
+
 
