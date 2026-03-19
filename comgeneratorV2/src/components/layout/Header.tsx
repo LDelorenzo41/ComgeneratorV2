@@ -162,14 +162,12 @@ export function Header() {
                           >
                             <ClipboardList className="w-4 h-4 mr-2" />
 Scénarios pédagogiques
-<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
 
                           </Link>
                         ) : (
                           <span className={menuItemDisabledClass}>
                             <ClipboardList className="w-4 h-4 mr-2" />
 Scénarios pédagogiques
-<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
 <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
 
                           </span>
@@ -182,6 +180,7 @@ Scénarios pédagogiques
                         >
                           <BookOpen className="w-4 h-4 mr-2" />
                           Séances pédagogiques
+                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 rounded font-semibold">Assistant exercices</span>
                         </Link>
                         <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                         
@@ -194,6 +193,7 @@ Scénarios pédagogiques
                           >
                             <Database className="w-4 h-4 mr-2" />
                             Ma banque de scénarios
+                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouvel outil</span>
                           </Link>
                         ) : (
                           <span className={menuItemDisabledClass}>
@@ -566,14 +566,12 @@ Scénarios pédagogiques
                   >
                     <ClipboardList className="w-4 h-4 mr-2" />
 Scénarios pédagogiques
-<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
 
                   </Link>
                 ) : (
                   <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
                     <ClipboardList className="w-4 h-4 mr-2" />
 Scénarios pédagogiques
-<span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouveau</span>
 <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
 
                   </span>
@@ -586,6 +584,7 @@ Scénarios pédagogiques
                 >
                   <BookOpen className="w-4 h-4 mr-2" />
                   Séances pédagogiques
+                  <span className="ml-2 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 rounded font-semibold">Assistant exercices</span>
                 </Link>
                 <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
                 
@@ -598,6 +597,7 @@ Scénarios pédagogiques
                   >
                     <Database className="w-4 h-4 mr-2" />
                     Ma banque de scénarios
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded font-semibold">Nouvel outil</span>
                   </Link>
                 ) : (
                   <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
@@ -840,6 +840,11 @@ Scénarios pédagogiques
     </header>
   );
 }
+
+
+
+
+
 
 
 

@@ -9,6 +9,9 @@ import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
 
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
@@ -20,6 +23,8 @@ import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
+import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
@@ -195,7 +200,8 @@ const MarkdownEditor: React.FC<{
   onSaveToBank: (content: string) => void;
   isSaving?: boolean;
   tokensAvailable?: number;
-}> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0 }) => {
+  onOpenExerciseModal?: (phaseHeading: string) => void;
+}> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0, onOpenExerciseModal }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(content);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -801,7 +807,25 @@ const MarkdownEditor: React.FC<{
             components={{
               h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">{children}</h1>,
               h2: ({ children }) => <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-6">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
+              h3: ({ children }) => {
+                const text = extractTextFromChildren(children);
+                const isPhase = PHASE_HEADING_PATTERN.test(text);
+                return (
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4 flex items-center gap-2 flex-wrap">
+                    <span>{children}</span>
+                    {isPhase && onOpenExerciseModal && (
+                      <button
+                        onClick={() => onOpenExerciseModal(text)}
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                        title="Générer un support pédagogique pour cette phase"
+                      >
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Générer un support
+                      </button>
+                    )}
+                  </h3>
+                );
+              },
               p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
               ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
               ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
@@ -836,9 +860,10 @@ const MarkdownEditor: React.FC<{
               ),
             }}
             // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
-            rehypePlugins={[rehypeRaw as any]} 
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
           >
-            {convertMarkdownTablesToHtml(content)}
+            {normalizeLatexDelimiters(convertMarkdownTablesToHtml(content))}
           </ReactMarkdown>
 
         </div>
@@ -872,6 +897,11 @@ export function LessonGeneratorPage() {
 
   // États pour les sources RAG
   const [ragSources, setRagSources] = React.useState<RagSource[]>([]);
+
+  // États pour le modal de génération de supports
+  const [exerciseModalOpen, setExerciseModalOpen] = React.useState(false);
+  const [selectedPhaseHeading, setSelectedPhaseHeading] = React.useState('');
+  const [selectedPhaseContent, setSelectedPhaseContent] = React.useState('');
 
   // Charger les dossiers
   React.useEffect(() => {
@@ -1033,8 +1063,11 @@ export function LessonGeneratorPage() {
         setRagSources(result.sources);
       }
 
-      // ✅ MODIFICATION - Usage récupéré depuis result.usage
-      const usedTokens: number = result.usage?.total_tokens ?? 0;
+      // ✅ MODIFICATION - Usage récupéré depuis result.usage, plafonné pour les séances
+      const rawTokens: number = result.usage?.total_tokens ?? 0;
+      const hasExternalContext = !!(useRag || extractedText);
+      const maxLessonTokens = hasExternalContext ? 6000 : 5000;
+      const usedTokens = Math.min(rawTokens, maxLessonTokens);
 
       // Mise à jour des tokens
       if (usedTokens > 0 && user) {
@@ -1091,6 +1124,13 @@ export function LessonGeneratorPage() {
 
   const handleContentChange = (newContent: string) => {
     setGeneratedContent(newContent);
+  };
+
+  const handleOpenExerciseModal = (phaseHeadingText: string) => {
+    const phaseContent = extractPhaseContent(generatedContent, phaseHeadingText);
+    setSelectedPhaseHeading(phaseHeadingText);
+    setSelectedPhaseContent(phaseContent);
+    setExerciseModalOpen(true);
   };
 
   // ✅ FONCTION handleSaveToBank avec vérification d'accès
@@ -1280,13 +1320,13 @@ export function LessonGeneratorPage() {
           <h4 className="font-semibold text-amber-800 dark:text-amber-200">Conseils pour une génération optimale :</h4>
           <ul className="list-disc pl-5 mt-1 text-sm text-amber-700 dark:text-amber-300 space-y-1">
               <li>
-                  <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
+                  <strong>Précisez votre thème :</strong> Détaillez les objectifs, compétences visées et attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité mais son contenu est limité à ~4000 tokens. Pour exploiter un document complet, <strong>ingérez-le dans votre corpus RAG</strong> (Mon chatbot → Documents → Créer un dossier) puis activez "Utiliser mon corpus documentaire personnel" ci-dessous.
+                  <strong>Document de référence :</strong> Joignez un PDF, DOCX ou TXT pour enrichir la génération (contenu limité à ~4 000 caractères). Pour un document plus long, ingérez-le dans votre corpus personnel via <strong>Mon chatbot → Documents</strong>, puis activez l'option "Corpus personnel" ci-dessous.
               </li>
               <li>
-                  <strong>Corpus personnel :</strong> Activez l'option en bas de page pour que la génération s'appuie sur vos documents ingérés. Sélectionnez un dossier spécifique pour cibler les sources pertinentes.
+                  <strong>Générer un support :</strong> Une fois la séance générée, un bouton <strong>"Générer un support"</strong> apparaît à côté de chaque phase. Il permet de créer exercices, QCM, fiches élèves, etc. (coût : 1 000 tokens). <span className="inline-flex items-center px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded font-semibold align-middle">Bêta</span>
               </li>
           </ul>
       </div>
@@ -1573,6 +1613,7 @@ export function LessonGeneratorPage() {
               onSaveToBank={handleSaveToBank}
               isSaving={savingToBank}
               tokensAvailable={tokenCount ?? 0}
+              onOpenExerciseModal={handleOpenExerciseModal}
             />
 
             {/* Sources RAG */}
@@ -1615,9 +1656,28 @@ export function LessonGeneratorPage() {
           </div>
         )}
       </div>
+
+      <ExerciseGeneratorModal
+        isOpen={exerciseModalOpen}
+        onClose={() => setExerciseModalOpen(false)}
+        phaseHeading={selectedPhaseHeading}
+        phaseContent={selectedPhaseContent}
+        fullLessonContent={generatedContent}
+        subject={lastFormData?.subject ?? ''}
+        level={lastFormData?.level ?? ''}
+      />
     </div>
   );
 }
 
 export default LessonGeneratorPage;
+
+
+
+
+
+
+
+
+
 

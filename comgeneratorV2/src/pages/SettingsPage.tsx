@@ -254,10 +254,12 @@ export function SettingsPage() {
               ))}
             </div>
 
-            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <p className="text-sm text-amber-800 dark:text-amber-300">
-                <strong>Note :</strong> Le modèle standard est optimisé pour ProfAssist. 
-                Les autres modèles sont proposés à titre expérimental et peuvent produire des résultats différents.
+            <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg space-y-2">
+              <p className="text-sm text-indigo-800 dark:text-indigo-300">
+                <strong>Pourquoi des modèles "mini" ?</strong> Nos prompts sont spécialement optimisés pour tirer le meilleur parti de ces modèles rapides et économiques. Résultat : vous générez plus de contenus avec le même budget tokens, tout en réduisant l'empreinte carbone de chaque génération.
+              </p>
+              <p className="text-sm text-indigo-700 dark:text-indigo-400">
+                Mistral Medium est une alternative française (Mistral AI), idéale pour varier les styles de rédaction.
               </p>
             </div>
           </div>
@@ -499,4 +501,5 @@ export function SettingsPage() {
     </div>
   );
 }
+
 
