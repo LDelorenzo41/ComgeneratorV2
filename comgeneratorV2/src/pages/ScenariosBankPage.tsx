@@ -571,12 +571,12 @@ export function ScenariosBankPage() {
         </div>
 
         {/* Info-bulle pour expliquer le bouton Copier thème */}
-        <div className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
+        <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
           <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+            <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                <strong>Astuce :</strong> Utilisez le bouton <span className="inline-flex items-center px-2 py-0.5 bg-indigo-100 dark:bg-indigo-800/50 rounded text-xs font-medium"><Copy className="w-3 h-3 mr-1" />Copier thème</span> pour générer un prompt optimisé à coller dans le champ "Thème" du <Link to="/generate" className="underline hover:no-underline font-medium">générateur de séance</Link>.
+              <p className="text-sm text-green-800 dark:text-green-200">
+                <strong>Astuce :</strong> Utilisez le bouton <span className="inline-flex items-center px-2 py-0.5 bg-green-100 dark:bg-green-800/50 rounded text-xs font-medium"><Copy className="w-3 h-3 mr-1" />Copier thème</span> pour générer un prompt optimisé à coller dans le champ "Thème" du <Link to="/generate" className="underline hover:no-underline font-medium">générateur de séance</Link>.
               </p>
             </div>
           </div>
@@ -808,6 +808,36 @@ export function ScenariosBankPage() {
 }
 
 export default ScenariosBankPage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

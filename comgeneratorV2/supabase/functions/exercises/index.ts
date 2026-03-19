@@ -91,13 +91,33 @@ async function deductTokens(
 
 function cleanOutputText(text: string): string {
   if (!text) return text;
-  // Supprimer les blocs de code markdown englobants
   let cleaned = text.trim();
+
+  // Supprimer les blocs de code markdown englobants (```markdown ... ``` ou ``` ... ```)
   if (cleaned.startsWith('```markdown')) {
     cleaned = cleaned.replace(/^```markdown\s*\n?/, '').replace(/\n?```\s*$/, '');
   } else if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
   }
+
+  // Corriger les tableaux markdown mal formatés
+  // Double pipes || → |
+  cleaned = cleaned.replace(/\|\|+/g, '|');
+  // Lignes de séparateur cassées (ex: |---|---|  ou  | --- | --- |) : normaliser
+  cleaned = cleaned.replace(/^\|[\s\-:|]+\|$/gm, (match) => {
+    const cols = match.split('|').filter(c => c.trim() !== '');
+    return '|' + cols.map(() => ' --- ').join('|') + '|';
+  });
+
+  // Supprimer les lignes vides parasites à l'intérieur des tableaux
+  // (une ligne vide entre deux lignes commençant par | casse le tableau)
+  cleaned = cleaned.replace(/(\|.*\|)\n\n+(\|.*\|)/g, '$1\n$2');
+
+  // Supprimer les balises HTML parasites parfois injectées par certains modèles
+  cleaned = cleaned.replace(/<\/?br\s*\/?>/gi, '\n');
+  cleaned = cleaned.replace(/<\/?div[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/?span[^>]*>/gi, '');
+
   return cleaned.trim();
 }
 
@@ -238,6 +258,18 @@ const exercisesHandler = async (req: Request): Promise<Response> => {
       ? data.fullLessonContext.substring(0, 2000) + '\n\n[... contexte tronqué ...]'
       : data.fullLessonContext;
 
+    // Instructions markdown renforcées pour les modèles sujets à des artefacts
+    const markdownRules = aiConfig.model !== 'gpt-4.1-mini'
+      ? `
+FORMAT MARKDOWN OBLIGATOIRE :
+- Utilise exclusivement du Markdown standard, PAS de HTML
+- Tableaux : chaque ligne commence et finit par | avec un seul | entre chaque colonne
+- Tableaux : la 2e ligne doit être le séparateur | --- | --- | (autant de colonnes que l'en-tête)
+- Ne jamais insérer de ligne vide entre les lignes d'un même tableau
+- Ne jamais entourer la réponse de blocs \`\`\`markdown ou \`\`\`
+- Listes : utiliser - ou 1. 2. 3. sans mélanger les formats`
+      : '';
+
     const systemPrompt = `Tu es un expert en création de supports pédagogiques pour l'enseignement en France.
 Tu crées des fiches, exercices et supports prêts à imprimer, adaptés au niveau des élèves.
 
@@ -249,7 +281,7 @@ RÈGLES STRICTES :
 - Format Markdown propre (titres, listes, tableaux si pertinent)
 - Inclure un titre clair pour le support
 - Ne pas générer de commentaires ou notes destinés à l'enseignant dans le support élève
-- Fournir la correction/les réponses à la fin quand c'est pertinent`;
+- Fournir la correction/les réponses à la fin quand c'est pertinent${markdownRules}`;
 
     const userPrompt = `Génère un support pédagogique pour la phase suivante d'une séance.
 
@@ -289,10 +321,12 @@ Génère maintenant le support, prêt à être imprimé et distribué aux élèv
         }
       };
     } else if (aiConfig.model === 'mistral-medium-latest') {
-      const fullPrompt = `${systemPrompt}\n\n---\n\n${userPrompt}`;
       requestBody = {
         model: aiConfig.model,
-        messages: [{ role: 'user', content: fullPrompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
         temperature: 0.7,
         max_tokens: 4000
       };
