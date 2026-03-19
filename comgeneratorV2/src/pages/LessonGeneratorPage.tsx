@@ -9,7 +9,9 @@ import { z } from 'zod';
 import { Navigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
 
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
@@ -21,7 +23,7 @@ import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
-import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
@@ -859,9 +861,9 @@ const MarkdownEditor: React.FC<{
             }}
             // On utilise 'as any' pour contourner le conflit de types TypeScript entre les versions de vfile
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw as any]}
+            rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
           >
-            {convertMarkdownTablesToHtml(content)}
+            {normalizeLatexDelimiters(convertMarkdownTablesToHtml(content))}
           </ReactMarkdown>
 
         </div>
@@ -1666,5 +1668,8 @@ export function LessonGeneratorPage() {
 }
 
 export default LessonGeneratorPage;
+
+
+
 
 
