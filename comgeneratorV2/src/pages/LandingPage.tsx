@@ -644,17 +644,20 @@ export function LandingPage() {
                 Nouveau • Paramètres
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Choisissez votre modèle d'IA
+                3 modèles d'IA, un seul objectif : la qualité
               </h2>
+              <p className="text-lg text-gray-300 mb-4 max-w-2xl">
+                Nos prompts sont optimisés pour tirer le meilleur parti de modèles rapides et économiques.
+                Résultat : plus de générations avec le même budget tokens, et une empreinte carbone réduite.
+              </p>
               <p className="text-lg text-gray-300 mb-8 max-w-2xl">
-                Depuis vos paramètres, sélectionnez le modèle d'intelligence artificielle
-                qui vous convient le mieux. GPT-4.1 mini par défaut, ou optez pour
-                GPT-5 mini ou le modèle français Mistral Medium pour varier les résultats.
+                Depuis vos paramètres, choisissez le modèle qui vous convient — dont le français Mistral,
+                une alternative souveraine signée Mistral AI.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>GPT-4.1 mini (par défaut)</span>
+                  <span>GPT-4.1 mini (recommandé)</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
@@ -663,6 +666,10 @@ export function LandingPage() {
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
                   <span>Mistral Medium (FR)</span>
+                </div>
+                <div className="flex items-center text-white">
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
+                  <span>Prompts optimisés, coût maîtrisé</span>
                 </div>
               </div>
             </div>
