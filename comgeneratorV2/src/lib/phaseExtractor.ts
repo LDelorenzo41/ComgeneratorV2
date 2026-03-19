@@ -99,7 +99,7 @@ export function extractPhaseContent(fullMarkdown: string, phaseHeading: string):
 export function normalizeLatexDelimiters(text: string): string {
   return text
     .replace(/\\\((.+?)\\\)/g, (_match, expr) => `$${expr}$`)
-    .replace(/\\\[(.+?)\\\]/gs, (_match, expr) => `$$${expr}$$`);
+    .replace(/\\\[(.+?)\\\]/gs, (_match, expr) => `\n$$\n${expr}\n$$\n`);
 }
 
 /**

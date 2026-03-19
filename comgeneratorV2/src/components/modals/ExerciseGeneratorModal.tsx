@@ -27,6 +27,26 @@ import copyToClipboard from '../../lib/copyToClipboard';
 import { convertMarkdownTablesToHtml, normalizeLatexDelimiters } from '../../lib/phaseExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../layout/Header';
 
+class MarkdownErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallbackContent: string },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+            {this.props.fallbackContent}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 interface ExerciseGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -646,40 +666,42 @@ export function ExerciseGeneratorModal({
 
               {/* Rendered content */}
               <div className="prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-white dark:bg-gray-900/50">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
-                  components={{
-                    h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 pb-2 border-b border-purple-200 dark:border-purple-800">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-5">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
-                    p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
-                    em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
-                    blockquote: ({ children }) => <blockquote className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-purple-50 dark:bg-purple-900/20 py-2 rounded-r-lg">{children}</blockquote>,
-                    table: ({ children }) => (
-                      <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">{children}</table>
-                    ),
-                    thead: ({ children }) => (
-                      <thead className="bg-purple-100 dark:bg-purple-900/40">{children}</thead>
-                    ),
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => (
-                      <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
-                    ),
-                    th: ({ children }) => (
-                      <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-purple-50 dark:bg-purple-900/30">{children}</th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{children}</td>
-                    ),
-                  }}
-                >
-                  {normalizeLatexDelimiters(convertMarkdownTablesToHtml(generatedContent))}
-                </ReactMarkdown>
+                <MarkdownErrorBoundary fallbackContent={generatedContent}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
+                    components={{
+                      h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 pb-2 border-b border-purple-200 dark:border-purple-800">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-5">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
+                      p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                      strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
+                      blockquote: ({ children }) => <blockquote className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-purple-50 dark:bg-purple-900/20 py-2 rounded-r-lg">{children}</blockquote>,
+                      table: ({ children }) => (
+                        <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">{children}</table>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-purple-100 dark:bg-purple-900/40">{children}</thead>
+                      ),
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => (
+                        <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
+                      ),
+                      th: ({ children }) => (
+                        <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-purple-50 dark:bg-purple-900/30">{children}</th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{children}</td>
+                      ),
+                    }}
+                  >
+                    {normalizeLatexDelimiters(convertMarkdownTablesToHtml(generatedContent))}
+                  </ReactMarkdown>
+                </MarkdownErrorBoundary>
               </div>
             </>
           )}
