@@ -1,8 +1,6 @@
 import React from 'react';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
-import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
@@ -210,88 +208,6 @@ export function LessonsBankPage() {
         }
       };
 
-      // ✅ Fonction pour écrire du texte avec segments gras/normal
-      const writeTextWithBold = (text: string, fontSize: number, baseIndent: number = 0) => {
-        const cleaned = cleanText(text);
-        if (!cleaned) return;
-
-        pdf.setFontSize(fontSize);
-        const lineHeight = fontSize * 0.45;
-        const availableWidth = maxWidth - baseIndent;
-
-        // Découper le texte en segments (gras ou normal)
-        const segments: { text: string; bold: boolean }[] = [];
-        let remaining = cleaned;
-        
-        // Pattern pour trouver **texte** ou le texte sans **
-        const boldPattern = /\*\*([^*]+)\*\*/g;
-        let lastIndex = 0;
-        let match;
-
-        while ((match = boldPattern.exec(cleaned)) !== null) {
-          // Texte avant le gras
-          if (match.index > lastIndex) {
-            segments.push({ text: cleaned.slice(lastIndex, match.index), bold: false });
-          }
-          // Texte en gras (sans les **)
-          segments.push({ text: match[1], bold: true });
-          lastIndex = match.index + match[0].length;
-        }
-        // Texte restant après le dernier gras
-        if (lastIndex < cleaned.length) {
-          segments.push({ text: cleaned.slice(lastIndex), bold: false });
-        }
-
-        // Si pas de segments (pas de gras trouvé), tout est normal
-        if (segments.length === 0) {
-          segments.push({ text: cleaned, bold: false });
-        }
-
-        // Reconstruire le texte complet sans les ** pour le wrapping
-        const fullText = segments.map(s => s.text).join('');
-        
-        // Calculer les lignes avec wrapping
-        pdf.setFont('helvetica', 'normal');
-        const wrappedLines = pdf.splitTextToSize(fullText, availableWidth);
-
-        wrappedLines.forEach((line: string) => {
-          checkNewPage();
-          
-          let xPos = margin + baseIndent;
-          let lineRemaining = line;
-          
-          // Pour chaque ligne, on doit déterminer quelles parties sont en gras
-          // On parcourt les segments et on écrit chaque partie
-          let charIndex = 0;
-          
-          // Trouver où on en est dans les segments
-          for (const segment of segments) {
-            if (lineRemaining.length === 0) break;
-            
-            const segmentText = segment.text;
-            let toWrite = '';
-            
-            // Trouver combien de ce segment est dans cette ligne
-            for (let i = 0; i < segmentText.length && lineRemaining.length > 0; i++) {
-              if (segmentText[i] === lineRemaining[0]) {
-                toWrite += lineRemaining[0];
-                lineRemaining = lineRemaining.slice(1);
-              }
-            }
-            
-            if (toWrite) {
-              pdf.setFont('helvetica', segment.bold ? 'bold' : 'normal');
-              pdf.text(toWrite, xPos, yPosition);
-              xPos += pdf.getTextWidth(toWrite);
-            }
-          }
-          
-          yPosition += lineHeight;
-        });
-
-        yPosition += 1;
-      };
-
       // ✅ Fonction simplifiée pour le texte simple (sans parsing complexe)
       const addSimpleText = (text: string, fontSize: number, isBold: boolean = false, indent: number = 0) => {
         const cleaned = cleanText(text).replace(/\*\*/g, ''); // Retire les ** pour le texte simple
@@ -308,74 +224,6 @@ export function LessonsBankPage() {
         lines.forEach((line: string) => {
           checkNewPage();
           pdf.text(line, margin + indent, yPosition);
-          yPosition += lineHeight;
-        });
-
-        yPosition += 1;
-      };
-
-      // ✅ Fonction pour le texte avec markdown inline
-      const addMarkdownText = (text: string, fontSize: number, indent: number = 0) => {
-        const cleaned = cleanText(text);
-        if (!cleaned) return;
-
-        checkNewPage();
-        pdf.setFontSize(fontSize);
-
-        const availableWidth = maxWidth - indent;
-        const lineHeight = fontSize * 0.45;
-
-        // Retirer les ** pour calculer le wrapping
-        const textWithoutMd = cleaned.replace(/\*\*/g, '');
-        const wrappedLines = pdf.splitTextToSize(textWithoutMd, availableWidth);
-
-        // Pour chaque ligne wrappée, on réécrit avec le bon formatage
-        let globalPos = 0; // Position dans le texte original sans **
-
-        wrappedLines.forEach((wrappedLine: string) => {
-          checkNewPage();
-          
-          let xPos = margin + indent;
-          let lineText = wrappedLine;
-          
-          // Trouver les parties bold dans cette ligne
-          // On doit mapper la ligne wrappée au texte original avec **
-          
-          // Approche simple: écrire la ligne et chercher les mots en gras
-          const parts = cleaned.split(/(\*\*[^*]+\*\*)/g);
-          let currentLinePos = 0;
-          
-          parts.forEach(part => {
-            if (!part) return;
-            
-            const isBold = part.startsWith('**') && part.endsWith('**');
-            const partText = isBold ? part.slice(2, -2) : part;
-            
-            // Vérifier si cette partie est dans la ligne actuelle
-            const partInLine = lineText.includes(partText) || 
-                              partText.split(' ').some(word => lineText.includes(word));
-            
-            if (partInLine) {
-              // Trouver quelle portion de partText est dans lineText
-              let toWrite = '';
-              for (const char of partText) {
-                if (lineText.startsWith(char) || lineText.includes(char)) {
-                  const idx = lineText.indexOf(char);
-                  if (idx === 0 || idx <= 2) {
-                    toWrite += char;
-                    lineText = lineText.slice(idx + 1);
-                  }
-                }
-              }
-              
-              if (toWrite.trim()) {
-                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-                pdf.text(toWrite, xPos, yPosition);
-                xPos += pdf.getTextWidth(toWrite);
-              }
-            }
-          });
-          
           yPosition += lineHeight;
         });
 
