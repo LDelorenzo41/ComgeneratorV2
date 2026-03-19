@@ -93,13 +93,20 @@ export function extractPhaseContent(fullMarkdown: string, phaseHeading: string):
 }
 
 /**
- * Normalise les délimiteurs LaTeX pour compatibilité avec remark-math/KaTeX.
- * Convertit \(...\) → $...$ et \[...\] → $$...$$
+ * Normalise les délimiteurs LaTeX pour compatibilité avec rehype-katex.
+ * Convertit tous les formats LaTeX en HTML avec classes math que rehype-katex traite directement.
+ * Cela évite d'utiliser remark-math (qui a un bug mathFlowInside).
  */
 export function normalizeLatexDelimiters(text: string): string {
   return text
-    .replace(/\\\((.+?)\\\)/g, (_match, expr) => `$${expr}$`)
-    .replace(/\\\[(.+?)\\\]/gs, (_match, expr) => `\n$$\n${expr}\n$$\n`);
+    // Display math: \[...\] → <div class="math math-display">...</div>
+    .replace(/\\\[(.+?)\\\]/gs, (_match, expr) => `<div class="math math-display">${expr.trim()}</div>`)
+    // Display math: $$...$$ (multiline) → <div class="math math-display">...</div>
+    .replace(/\$\$(.+?)\$\$/gs, (_match, expr) => `<div class="math math-display">${expr.trim()}</div>`)
+    // Inline math: \(...\) → <span class="math math-inline">...</span>
+    .replace(/\\\((.+?)\\\)/g, (_match, expr) => `<span class="math math-inline">${expr.trim()}</span>`)
+    // Inline math: $...$ (single line, not $$) → <span class="math math-inline">...</span>
+    .replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, (_match, expr) => `<span class="math math-inline">${expr.trim()}</span>`);
 }
 
 /**
