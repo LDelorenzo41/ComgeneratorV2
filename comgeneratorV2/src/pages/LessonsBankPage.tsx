@@ -5,6 +5,7 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import jsPDF from 'jspdf';
 import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
@@ -1038,6 +1039,7 @@ export function LessonsBankPage() {
                     expandedItems.has(lesson.id) ? '' : 'max-h-96 overflow-hidden'
                   }`}>
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeRaw as any]}
                       components={{
                         h1: ({ children }) => (

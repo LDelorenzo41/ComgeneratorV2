@@ -4,6 +4,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import jsPDF from 'jspdf';
 import {
   X,
@@ -608,6 +609,7 @@ export function ExerciseGeneratorModal({
               {/* Rendered content */}
               <div className="prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-white dark:bg-gray-900/50">
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw as any]}
                   components={{
                     h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 pb-2 border-b border-purple-200 dark:border-purple-800">{children}</h1>,

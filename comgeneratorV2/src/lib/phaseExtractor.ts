@@ -93,6 +93,16 @@ export function extractPhaseContent(fullMarkdown: string, phaseHeading: string):
 }
 
 /**
+ * Convertit le markdown inline (bold, italic, code) en HTML
+ */
+function convertInlineMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>');
+}
+
+/**
  * Convertit les tableaux markdown en HTML pour un meilleur rendu avec ReactMarkdown + rehypeRaw
  */
 export function convertMarkdownTablesToHtml(markdown: string): string {
@@ -114,14 +124,14 @@ export function convertMarkdownTablesToHtml(markdown: string): string {
     const headers = parseRow(headerLine);
 
     let html = '<table class="markdown-table"><thead><tr>';
-    headers.forEach(h => { html += `<th>${h}</th>`; });
+    headers.forEach(h => { html += `<th>${convertInlineMarkdown(h)}</th>`; });
     html += '</tr></thead><tbody>';
 
     dataLines.forEach(line => {
       if (line.trim()) {
         const cells = parseRow(line);
         html += '<tr>';
-        cells.forEach(c => { html += `<td>${c}</td>`; });
+        cells.forEach(c => { html += `<td>${convertInlineMarkdown(c)}</td>`; });
         html += '</tr>';
       }
     });
