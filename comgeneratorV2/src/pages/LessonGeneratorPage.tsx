@@ -24,7 +24,7 @@ import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
-import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
@@ -864,7 +864,7 @@ const MarkdownEditor: React.FC<{
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
           >
-            {convertMarkdownTablesToHtml(content)}
+            {normalizeLatexDelimiters(convertMarkdownTablesToHtml(content))}
           </ReactMarkdown>
 
         </div>

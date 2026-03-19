@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css';
 import jsPDF from 'jspdf';
-import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent } from '../lib/phaseExtractor';
+import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import { 
   BookOpen, 
@@ -991,11 +991,11 @@ export function LessonsBankPage() {
                         ),
                       }}
                     >
-                      {convertMarkdownTablesToHtml(
-                        expandedItems.has(lesson.id) 
-                          ? lesson.content 
+                      {normalizeLatexDelimiters(convertMarkdownTablesToHtml(
+                        expandedItems.has(lesson.id)
+                          ? lesson.content
                           : getTruncatedContent(lesson.content, viewMode === 'grid' ? 200 : 300)
-                      )}
+                      ))}
                     </ReactMarkdown>
                   </div>
                   

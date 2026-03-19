@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
-import { convertMarkdownTablesToHtml } from '../../lib/phaseExtractor';
+import { convertMarkdownTablesToHtml, normalizeLatexDelimiters } from '../../lib/phaseExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../layout/Header';
 
 interface ExerciseGeneratorModalProps {
@@ -678,7 +678,7 @@ export function ExerciseGeneratorModal({
                     ),
                   }}
                 >
-                  {convertMarkdownTablesToHtml(generatedContent)}
+                  {normalizeLatexDelimiters(convertMarkdownTablesToHtml(generatedContent))}
                 </ReactMarkdown>
               </div>
             </>

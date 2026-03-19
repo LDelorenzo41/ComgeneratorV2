@@ -93,6 +93,16 @@ export function extractPhaseContent(fullMarkdown: string, phaseHeading: string):
 }
 
 /**
+ * Normalise les délimiteurs LaTeX pour compatibilité avec remark-math/KaTeX.
+ * Convertit \(...\) → $...$ et \[...\] → $$...$$
+ */
+export function normalizeLatexDelimiters(text: string): string {
+  return text
+    .replace(/\\\((.+?)\\\)/g, (_match, expr) => `$${expr}$`)
+    .replace(/\\\[(.+?)\\\]/gs, (_match, expr) => `$$${expr}$$`);
+}
+
+/**
  * Convertit le markdown inline (bold, italic, code) en HTML
  */
 function convertInlineMarkdown(text: string): string {
