@@ -1313,13 +1313,13 @@ export function LessonGeneratorPage() {
           <h4 className="font-semibold text-amber-800 dark:text-amber-200">Conseils pour une génération optimale :</h4>
           <ul className="list-disc pl-5 mt-1 text-sm text-amber-700 dark:text-amber-300 space-y-1">
               <li>
-                  <strong>Précisez votre thème :</strong> Soyez spécifique dans le champ "Thème". Mentionnez les objectifs, les compétences visées et les attendus pour un résultat plus pertinent.
+                  <strong>Précisez votre thème :</strong> Détaillez les objectifs, compétences visées et attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> L'ajout d'un PDF améliore la qualité mais son contenu est limité à ~4000 tokens. Pour exploiter un document complet, <strong>ingérez-le dans votre corpus RAG</strong> (Mon chatbot → Documents → Créer un dossier) puis activez "Utiliser mon corpus documentaire personnel" ci-dessous.
+                  <strong>Document de référence :</strong> Joignez un PDF, DOCX ou TXT pour enrichir la génération (contenu limité à ~4 000 caractères). Pour un document plus long, ingérez-le dans votre corpus personnel via <strong>Mon chatbot → Documents</strong>, puis activez l'option "Corpus personnel" ci-dessous.
               </li>
               <li>
-                  <strong>Corpus personnel :</strong> Activez l'option en bas de page pour que la génération s'appuie sur vos documents ingérés. Sélectionnez un dossier spécifique pour cibler les sources pertinentes.
+                  <strong>Générer un support :</strong> Une fois la séance générée, un bouton <strong>"Générer un support"</strong> apparaît à côté de chaque phase. Il permet de créer exercices, QCM, fiches élèves, etc. (coût : 1 000 tokens). <span className="inline-flex items-center px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded font-semibold align-middle">Bêta</span>
               </li>
           </ul>
       </div>

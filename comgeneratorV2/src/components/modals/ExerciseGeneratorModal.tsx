@@ -16,6 +16,7 @@ import {
   CheckCircle,
   GripHorizontal,
   Minimize2,
+  Info,
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
@@ -465,6 +466,16 @@ export function ExerciseGeneratorModal({
             </div>
           </div>
         </div>
+
+        {/* Bandeau info coût */}
+        {!isMinimized && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 px-5 py-2.5 flex items-center gap-2 shrink-0">
+            <Info className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              Chaque génération consomme <strong>1 000 tokens</strong> de votre solde.
+            </p>
+          </div>
+        )}
 
         {/* Body + Footer — masqués si minimisé */}
         {!isMinimized && (
