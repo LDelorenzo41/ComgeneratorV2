@@ -1319,7 +1319,7 @@ export function LessonGeneratorPage() {
                   <strong>Document de référence :</strong> Joignez un PDF, DOCX ou TXT pour enrichir la génération (contenu limité à ~4 000 caractères). Pour un document plus long, ingérez-le dans votre corpus personnel via <strong>Mon chatbot → Documents</strong>, puis activez l'option "Corpus personnel" ci-dessous.
               </li>
               <li>
-                  <strong>Générer un support :</strong> Une fois la séance générée, un bouton <strong>"Générer un support"</strong> apparaît à côté de chaque phase. Il permet de créer exercices, QCM, fiches élèves, etc. (coût : 1 000 tokens).
+                  <strong>Générer un support :</strong> Une fois la séance générée, un bouton <strong>"Générer un support"</strong> apparaît à côté de chaque phase. Il permet de créer exercices, QCM, fiches élèves, etc. (coût : 1 000 tokens). <span className="inline-flex items-center px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded font-semibold align-middle">Bêta</span>
               </li>
           </ul>
       </div>
