@@ -207,9 +207,7 @@ export function ExerciseGeneratorModal({
     const capturedImages: string[] = [];
     if (contentAreaRef.current) {
       const { toJpeg } = await import('html-to-image');
-      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
-      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
-      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
+      const allVisuals = Array.from(contentAreaRef.current.querySelectorAll('[data-mermaid], [data-chart]'));
       for (const el of allVisuals) {
         try {
           const dataUrl = await toJpeg(el as HTMLElement, {
@@ -433,7 +431,15 @@ export function ExerciseGeneratorModal({
           try {
             const imgData = capturedImages[visualIndex];
             const imgWidth = maxWidth * 0.8;
-            const imgHeight = imgWidth * 0.6; // approximate aspect ratio
+            // Calculate real aspect ratio from captured image
+            const img = new Image();
+            img.src = imgData;
+            await new Promise<void>((resolve) => {
+              if (img.naturalWidth) resolve();
+              else img.onload = () => resolve();
+            });
+            const aspectRatio = img.naturalHeight / img.naturalWidth;
+            const imgHeight = imgWidth * (aspectRatio || 0.6);
             checkNewPage(imgHeight + 10);
             pdf.addImage(imgData, 'JPEG', margin + (maxWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
             yPosition += imgHeight + 6;
@@ -553,9 +559,7 @@ export function ExerciseGeneratorModal({
     const capturedImages: string[] = [];
     if (contentAreaRef.current) {
       const { toPng } = await import('html-to-image');
-      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
-      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
-      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
+      const allVisuals = Array.from(contentAreaRef.current.querySelectorAll('[data-mermaid], [data-chart]'));
       for (const el of allVisuals) {
         try {
           const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
