@@ -129,7 +129,7 @@ const SUPPORT_TYPE_INSTRUCTIONS: Record<string, string> = {
   auto: `Analyse la phase et crée le support le plus utile — celui qui apporte le CONTENU CONCRET manquant.
 Ne reformule pas la phase. Demande-toi : "De quoi l'élève a besoin entre les mains pour réussir cette activité ?"
 Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).
-Inclus OBLIGATOIREMENT au moins un diagramme mermaid (pour les processus, méthodes, arbres de décision) ou un graphique chart (pour les courbes, données chiffrées) adapté à la matière et au contenu.`,
+Si la phase implique des processus, des méthodes en étapes, des données chiffrées, ou des situations spatiales (EPS, géométrie), inclus un diagramme mermaid ou un graphique chart pour les visualiser.`,
 
   contexte: `La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent utiliser, mais ce support n'est pas fourni.
 Génère ce document de manière réaliste, détaillée et experte :
@@ -163,8 +163,8 @@ Si le contexte implique des données chiffrées ou une chronologie, inclus un gr
 - Chaque exercice a un énoncé clair avec des données concrètes (chiffres, textes, situations)
 - Inclure au moins un exercice de type "expert" ou "défi" pour les élèves avancés
 - Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse
-- Inclus OBLIGATOIREMENT un graphique Chart.js pour visualiser les données ou résultats (courbe de fonction en maths, graphique de mesures en sciences, etc.)
-- Ajoute un diagramme mermaid si l'exercice implique une méthode en plusieurs étapes ou un arbre de décision`,
+- Si les exercices impliquent des courbes, des données chiffrées, ou de la géométrie, inclus un graphique Chart.js
+- Si une méthode en étapes est au cœur de l'exercice, ajoute un diagramme mermaid`,
 
   dictee: `Crée une dictée préparée en lien avec le thème de la phase :
 - Texte de 80 à 150 mots (adapté au niveau) portant sur le thème étudié
@@ -186,7 +186,7 @@ Si le contexte implique des données chiffrées ou une chronologie, inclus un gr
 - En EPS : des routines ou enchaînements décrits étape par étape
 - En Sciences : un protocole ou une méthode à suivre
 - En Maths : une méthode type avec un exemple résolu pas à pas
-- OBLIGATOIRE : inclus au moins un diagramme mermaid (processus, arbre de décision, méthode étape par étape) ET/OU un graphique chart (courbe, données, comparaison). La fiche ne doit PAS être uniquement du texte.`,
+- Si le contenu implique des processus, des méthodes en étapes, des données chiffrées, ou des situations spatiales, enrichis la fiche avec un diagramme mermaid et/ou un graphique chart.`,
 };
 
 // =====================================================
@@ -348,8 +348,15 @@ RÈGLES STRICTES :
 - Fournir la correction/les réponses à la fin quand c'est pertinent
 - NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral
 
-ILLUSTRATIONS VISUELLES OBLIGATOIRES :
-Tu DOIS inclure au moins un élément visuel (diagramme mermaid ou graphique chart) dans chaque support généré.
+ILLUSTRATIONS VISUELLES — UNIQUEMENT QUAND ELLES ONT UN INTÉRÊT PÉDAGOGIQUE :
+Inclus un diagramme mermaid ou un graphique chart quand cela aide réellement l'élève à comprendre. Ne force PAS un visuel quand le contenu est purement textuel (dictée, vocabulaire, QCM simple).
+Quand inclure un visuel :
+- EPS : schémas d'organisation des situations, arbres de décision tactiques → TOUJOURS pertinent
+- Maths : courbes de fonctions, schémas de géométrie, méthode en étapes → pertinent
+- Sciences : protocoles, graphiques de mesures, schémas d'expérience → pertinent
+- Histoire-Géo : chronologies, données chiffrées → pertinent
+Quand NE PAS inclure de visuel :
+- Dictée, texte à trous, vocabulaire, QCM factuel → le texte suffit
 
 ■ Diagramme mermaid — pour les méthodes, processus, arbres de décision :
   \`\`\`mermaid
@@ -409,7 +416,7 @@ ${truncatedContext}
 RAPPEL IMPORTANT : La phase ci-dessus décrit l'organisation pédagogique. Ton support doit apporter le CONTENU CONCRET que l'élève utilisera pendant cette phase — pas reformuler ce que l'enseignant sait déjà.
 Pose-toi la question : "Qu'est-ce que l'élève doit avoir entre les mains pour réussir cette activité ?"
 
-OBLIGATION VISUELLE : Tu DOIS inclure au moins un bloc \`\`\`mermaid (diagramme de processus, méthode, arbre de décision) OU un bloc \`\`\`chart (courbe, graphique, camembert) dans ta réponse. Le support ne doit PAS être uniquement du texte et des tableaux. ATTENTION à la syntaxe mermaid : TOUS les textes de nœuds doivent être entre guillemets doubles (ex: A["L'élève observe"]).
+Si le contenu a un intérêt pédagogique à être visualisé (courbe, schéma, processus, organisation spatiale), inclus un diagramme \`\`\`mermaid ou un graphique \`\`\`chart. Ne force pas de visuel sur un contenu purement textuel. ATTENTION à la syntaxe mermaid : les textes de nœuds doivent être entre guillemets doubles (ex: A["L'élève observe"]).
 
 Génère maintenant le support, prêt à être imprimé et distribué aux élèves.`;
 
