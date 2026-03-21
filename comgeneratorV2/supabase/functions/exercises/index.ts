@@ -96,7 +96,7 @@ function cleanOutputText(text: string): string {
   // Supprimer les blocs de code markdown englobants (```markdown ... ``` ou ``` ... ```)
   if (cleaned.startsWith('```markdown')) {
     cleaned = cleaned.replace(/^```markdown\s*\n?/, '').replace(/\n?```\s*$/, '');
-  } else if (cleaned.startsWith('```')) {
+  } else if (cleaned.startsWith('```') && !cleaned.startsWith('```mermaid') && !cleaned.startsWith('```chart')) {
     cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
   }
 
@@ -128,7 +128,8 @@ function cleanOutputText(text: string): string {
 const SUPPORT_TYPE_INSTRUCTIONS: Record<string, string> = {
   auto: `Analyse la phase et crée le support le plus utile — celui qui apporte le CONTENU CONCRET manquant.
 Ne reformule pas la phase. Demande-toi : "De quoi l'élève a besoin entre les mains pour réussir cette activité ?"
-Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).`,
+Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).
+Si la phase implique des processus, des méthodes en étapes, des données chiffrées, ou des situations spatiales (EPS, géométrie), inclus un diagramme mermaid ou un graphique chart pour les visualiser.`,
 
   contexte: `La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent utiliser, mais ce support n'est pas fourni.
 Génère ce document de manière réaliste, détaillée et experte :
@@ -136,7 +137,8 @@ Génère ce document de manière réaliste, détaillée et experte :
 - Scénario / situation-problème : crée un cas concret, chiffré si pertinent, avec tous les détails nécessaires
 - Document historique : rédige un texte vraisemblable d'époque avec source fictive crédible
 - Support EPS : décris des situations tactiques concrètes avec des enchaînements pas à pas
-Le document doit être suffisamment riche pour que les élèves puissent travailler dessus pendant toute la phase.`,
+Le document doit être suffisamment riche pour que les élèves puissent travailler dessus pendant toute la phase.
+Si le contexte implique des données chiffrées ou une chronologie, inclus un graphique Chart.js ou un diagramme mermaid pour les visualiser.`,
 
   texte_a_trous: `Crée un texte à trous portant sur les NOTIONS CLÉS de la phase.
 - Rédige un texte original (pas une copie de la phase) qui synthétise les savoirs visés
@@ -160,7 +162,9 @@ Le document doit être suffisamment riche pour que les élèves puissent travail
 - 4 à 6 exercices qui permettent de mettre en pratique les compétences visées par la phase
 - Chaque exercice a un énoncé clair avec des données concrètes (chiffres, textes, situations)
 - Inclure au moins un exercice de type "expert" ou "défi" pour les élèves avancés
-- Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse`,
+- Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse
+- Si les exercices impliquent des courbes, des données chiffrées, ou de la géométrie, inclus un graphique Chart.js
+- Si une méthode en étapes est au cœur de l'exercice, ajoute un diagramme mermaid`,
 
   dictee: `Crée une dictée préparée en lien avec le thème de la phase :
 - Texte de 80 à 150 mots (adapté au niveau) portant sur le thème étudié
@@ -181,7 +185,8 @@ Le document doit être suffisamment riche pour que les élèves puissent travail
 - Un ou deux exercices d'application rapide avec correction
 - En EPS : des routines ou enchaînements décrits étape par étape
 - En Sciences : un protocole ou une méthode à suivre
-- En Maths : une méthode type avec un exemple résolu pas à pas`,
+- En Maths : une méthode type avec un exemple résolu pas à pas
+- Si le contenu implique des processus, des méthodes en étapes, des données chiffrées, ou des situations spatiales, enrichis la fiche avec un diagramme mermaid et/ou un graphique chart.`,
 };
 
 // =====================================================
@@ -314,7 +319,8 @@ FORMAT MARKDOWN OBLIGATOIRE :
 - Tableaux : la 2e ligne doit être le séparateur | --- | --- | (autant de colonnes que l'en-tête)
 - Ne jamais insérer de ligne vide entre les lignes d'un même tableau
 - Ne jamais entourer la réponse de blocs \`\`\`markdown ou \`\`\`
-- Listes : utiliser - ou 1. 2. 3. sans mélanger les formats`
+- Listes : utiliser - ou 1. 2. 3. sans mélanger les formats
+- Les blocs mermaid et chart doivent être correctement délimités par triple backticks avec le tag de langage`
       : '';
 
     const systemPrompt = `Tu es un expert pédagogique disciplinaire pour l'enseignement en France.
@@ -340,7 +346,56 @@ RÈGLES STRICTES :
 - Inclure un titre clair pour le support
 - Ne pas générer de commentaires ou notes destinés à l'enseignant dans le support élève
 - Fournir la correction/les réponses à la fin quand c'est pertinent
-- NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral${markdownRules}`;
+- NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral
+- NE JAMAIS insérer de liens vers des images externes (imgur, wikimedia, etc.) — elles ne s'afficheront pas
+- Pour les graphiques et courbes, utiliser UNIQUEMENT les blocs \`\`\`chart avec du JSON Chart.js
+- Pour les schémas et diagrammes, utiliser UNIQUEMENT les blocs \`\`\`mermaid
+
+ILLUSTRATIONS VISUELLES — UNIQUEMENT QUAND ELLES ONT UN INTÉRÊT PÉDAGOGIQUE :
+Inclus un diagramme mermaid ou un graphique chart quand cela aide réellement l'élève à comprendre. Ne force PAS un visuel quand le contenu est purement textuel (dictée, vocabulaire, QCM simple).
+Quand inclure un visuel :
+- EPS : schémas d'organisation des situations, arbres de décision tactiques → TOUJOURS pertinent
+- Maths : courbes de fonctions, schémas de géométrie, méthode en étapes → pertinent
+- Sciences : protocoles, graphiques de mesures, schémas d'expérience → pertinent
+- Histoire-Géo : chronologies, données chiffrées → pertinent
+Quand NE PAS inclure de visuel :
+- Dictée, texte à trous, vocabulaire, QCM factuel → le texte suffit
+
+■ Diagramme mermaid — pour les méthodes, processus, arbres de décision :
+  \`\`\`mermaid
+  flowchart TD
+    A["Étape 1"] --> B{"Condition ?"}
+    B -->|Oui| C["Action 1"]
+    B -->|Non| D["Action 2"]
+  \`\`\`
+  Exemples par matière :
+  - Maths : flowchart de la méthode (Calculer f' → Résoudre f'=0 → Signer → Conclure)
+  - Sciences : protocole expérimental étape par étape
+  - EPS : arbre de décision tactique (adversaire recule → frappe longue / adversaire avance → amorti)
+  - Français : structure du plan de rédaction, analyse de texte
+
+■ Graphique Chart.js — pour les courbes, données chiffrées, comparaisons :
+  \`\`\`chart
+  {"type":"line","data":{"labels":["-3","-2","-1","0","1","2","3"],"datasets":[{"label":"f(x)","data":[-17,-5,3,1,-1,3,19],"borderColor":"#3b82f6","fill":false}]}}
+  \`\`\`
+  Exemples par matière :
+  - Maths : courbe de la fonction étudiée, courbe de la dérivée
+  - Sciences : graphique des résultats expérimentaux attendus
+  - Histoire-Géo : évolution chronologique, répartition en camembert
+  - Économie : courbes d'offre/demande, histogrammes
+
+SYNTAXE MERMAID — RÈGLES STRICTES :
+- TOUS les textes de nœuds DOIVENT être entre guillemets doubles : A["texte ici"]
+- Correct : A["L'élève observe"] B{"Est-il prêt ?"}
+- Incorrect : A[L'élève observe] B{Est-il prêt ?}
+- Ne jamais utiliser de parenthèses () à l'intérieur des labels de nœuds
+- Garder les labels courts (max 8 mots par nœud)
+- Maximum 15 nœuds par diagramme
+
+Règles techniques graphiques :
+- Labels en français
+- Le JSON du bloc chart doit être valide et sur une seule ligne
+- Privilégier 1-2 visuels bien choisis plutôt que 3 visuels médiocres${markdownRules}`;
 
     const userPrompt = `Génère un support pédagogique pour la phase ci-dessous.
 
@@ -363,6 +418,8 @@ ${truncatedContext}
 
 RAPPEL IMPORTANT : La phase ci-dessus décrit l'organisation pédagogique. Ton support doit apporter le CONTENU CONCRET que l'élève utilisera pendant cette phase — pas reformuler ce que l'enseignant sait déjà.
 Pose-toi la question : "Qu'est-ce que l'élève doit avoir entre les mains pour réussir cette activité ?"
+
+Si le contenu a un intérêt pédagogique à être visualisé (courbe, schéma, processus, organisation spatiale), inclus un diagramme \`\`\`mermaid ou un graphique \`\`\`chart. Ne force pas de visuel sur un contenu purement textuel. ATTENTION à la syntaxe mermaid : les textes de nœuds doivent être entre guillemets doubles (ex: A["L'élève observe"]).
 
 Génère maintenant le support, prêt à être imprimé et distribué aux élèves.`;
 
