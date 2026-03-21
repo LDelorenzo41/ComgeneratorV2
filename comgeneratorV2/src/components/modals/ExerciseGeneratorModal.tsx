@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import jsPDF from 'jspdf';
+import katex from 'katex';
 import EnhancedMarkdownRenderer from '../ui/EnhancedMarkdownRenderer';
 import {
   X,
@@ -16,6 +17,7 @@ import {
   GripHorizontal,
   Minimize2,
   Info,
+  UserRound,
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
@@ -40,6 +42,18 @@ class MarkdownErrorBoundary extends React.Component<
     }
     return this.props.children;
   }
+}
+
+/**
+ * Strip correction/answer sections from generated content for student exports.
+ */
+function stripCorrections(content: string): string {
+  const correctionPattern = /^#{1,4}\s*(Correction|Corrigé|Corrigés|Réponse|Réponses|Solution|Solutions)[\s:]*$/im;
+  const match = content.match(correctionPattern);
+  if (match && match.index !== undefined) {
+    return content.substring(0, match.index).trim();
+  }
+  return content;
 }
 
 interface ExerciseGeneratorModalProps {
@@ -179,299 +193,190 @@ export function ExerciseGeneratorModal({
   // =====================================================
   // Export PDF
   // =====================================================
-  const handleExportPDF = async () => {
-    if (!generatedContent) return;
+  // =====================================================
+  // Shared PDF export logic
+  // =====================================================
+  const exportPDF = async (options: {
+    content: string;
+    includeStudentHeader: boolean;
+    filename: string;
+  }) => {
+    const { content, includeStudentHeader, filename } = options;
+    if (!content || !contentAreaRef.current) return;
 
-    // Capture rendered mermaid/chart visuals from the DOM
-    const capturedImages: string[] = [];
-    if (contentAreaRef.current) {
-      const { toPng } = await import('html-to-image');
-      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
-      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
-      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
-      for (const el of allVisuals) {
-        try {
-          const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
-          capturedImages.push(dataUrl);
-        } catch {
-          capturedImages.push('');
+    const { toPng } = await import('html-to-image');
+
+    const targetElement: HTMLElement = contentAreaRef.current;
+
+    // For student PDF, temporarily remove correction sections from the original DOM
+    const removedNodes: { parent: Node; nodes: Node[] }[] = [];
+    if (includeStudentHeader) {
+      const headings = contentAreaRef.current.querySelectorAll('h1, h2, h3, h4');
+      const correctionPattern = /^(Correction|Corrigé|Corrigés|Réponse|Réponses|Solution|Solutions)/i;
+      for (const heading of Array.from(headings)) {
+        if (correctionPattern.test(heading.textContent?.trim() || '')) {
+          const parent = heading.parentNode!;
+          const nodesToRemove: Node[] = [heading];
+          let sibling: ChildNode | null = heading.nextSibling;
+          while (sibling) {
+            nodesToRemove.push(sibling);
+            sibling = sibling.nextSibling;
+          }
+          nodesToRemove.forEach(n => parent.removeChild(n));
+          removedNodes.push({ parent, nodes: nodesToRemove });
+          break;
         }
       }
     }
 
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    const maxWidth = pageWidth - 2 * margin;
-    let yPosition = margin;
-
-    const cleanLatex = (text: string): string => {
-      return text
-        // Supprimer les délimiteurs LaTeX \( \) \[ \] $ $$
-        .replace(/\\\(|\\\)/g, '')
-        .replace(/\\\[|\\\]/g, '')
-        .replace(/\$\$(.*?)\$\$/g, '$1')
-        .replace(/\$(.*?)\$/g, '$1')
-        // Convertir les commandes LaTeX courantes en texte lisible
-        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
-        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
-        .replace(/\\times/g, '×')
-        .replace(/\\div/g, '÷')
-        .replace(/\\pm/g, '±')
-        .replace(/\\leq/g, '≤')
-        .replace(/\\geq/g, '≥')
-        .replace(/\\neq/g, '≠')
-        .replace(/\\approx/g, '≈')
-        .replace(/\\infty/g, '∞')
-        .replace(/\\pi/g, 'π')
-        .replace(/\\alpha/g, 'α')
-        .replace(/\\beta/g, 'β')
-        .replace(/\\gamma/g, 'γ')
-        .replace(/\\theta/g, 'θ')
-        .replace(/\\Delta/g, 'Δ')
-        .replace(/\\sum/g, '∑')
-        .replace(/\\int/g, '∫')
-        .replace(/\^(\{[^}]+\}|\w)/g, (_, exp) => `^${exp.replace(/[{}]/g, '')}`)
-        .replace(/_(\{[^}]+\}|\w)/g, (_, sub) => `_${sub.replace(/[{}]/g, '')}`)
-        .replace(/\\text\{([^}]+)\}/g, '$1')
-        .replace(/\\mathrm\{([^}]+)\}/g, '$1')
-        .replace(/\\left|\\right/g, '')
-        .replace(/\\\\/g, '')
-        .replace(/\\[a-zA-Z]+/g, '');
+    // Save and apply print-friendly styles
+    const originalStyles = {
+      width: contentAreaRef.current.style.width,
+      maxHeight: contentAreaRef.current.style.maxHeight,
+      overflow: contentAreaRef.current.style.overflow,
+      backgroundColor: contentAreaRef.current.style.backgroundColor,
+      color: contentAreaRef.current.style.color,
     };
 
-    const cleanText = (text: string): string => {
-      return cleanLatex(text)
-        .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
-        .replace(/[\u{2600}-\u{26FF}]/gu, '')
-        .replace(/[\u{2700}-\u{27BF}]/gu, '')
-        .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
-        .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
-        .replace(/[""]/g, '"')
-        .replace(/['']/g, "'")
-        .replace(/…/g, '...')
-        .replace(/[–—]/g, '-')
-        .replace(/[\x00-\x1F\x7F]/g, '')
-        .trim();
-    };
+    targetElement.style.width = '794px';
+    targetElement.style.maxHeight = 'none';
+    targetElement.style.overflow = 'visible';
+    targetElement.style.backgroundColor = '#ffffff';
+    targetElement.style.color = '#000000';
 
-    const checkNewPage = (neededHeight: number = 25) => {
-      if (yPosition > pageHeight - neededHeight) {
-        pdf.addPage();
-        yPosition = margin;
-      }
-    };
+    // Strip dark: classes temporarily for light-mode capture
+    const allEls = targetElement.querySelectorAll('[class*="dark:"]');
+    allEls.forEach((el) => {
+      const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
+      darkCls.forEach(c => el.classList.remove(c));
+      (el as HTMLElement).dataset.removedDarkClasses = darkCls.join(' ');
+    });
 
-    const addSimpleText = (text: string, fontSize: number, isBold: boolean = false, indent: number = 0) => {
-      const cleaned = cleanText(text).replace(/\*\*/g, '');
-      if (!cleaned) return;
-      checkNewPage();
-      pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
-      pdf.setFontSize(fontSize);
-      const availableWidth = maxWidth - indent;
-      const lines = pdf.splitTextToSize(cleaned, availableWidth);
-      const lineHeight = fontSize * 0.45;
-      lines.forEach((line: string) => {
-        checkNewPage();
-        pdf.text(line, margin + indent, yPosition);
-        yPosition += lineHeight;
+    try {
+      // Capture the rendered DOM at high resolution
+      const dataUrl = await toPng(targetElement, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
       });
-      yPosition += 1;
-    };
 
-    const renderTablePDF = (headers: string[], rows: string[][]) => {
-      if (headers.length === 0 && rows.length === 0) return;
-      const colCount = headers.length || (rows[0]?.length || 0);
-      const tableWidth = maxWidth;
-      const colWidth = tableWidth / colCount;
-      const cellPadding = 2;
-      const fontSize = 8;
-      const lineHeight = fontSize * 0.4;
-      pdf.setFontSize(fontSize);
+      // Load image to get dimensions
+      const fullImage = new window.Image();
+      fullImage.src = dataUrl;
+      await new Promise<void>((resolve) => {
+        if (fullImage.naturalWidth) resolve();
+        else fullImage.onload = () => resolve();
+      });
 
-      const calculateRowHeight = (cells: string[]): number => {
-        let maxLines = 1;
-        cells.forEach((cell) => {
-          const cleaned = cleanText(cell).replace(/\*\*/g, '');
-          pdf.setFont('helvetica', 'normal');
-          const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
-          maxLines = Math.max(maxLines, lines.length);
-        });
-        return maxLines * (lineHeight + 2) + cellPadding * 2;
-      };
+      const imgWidth = fullImage.naturalWidth;
+      const imgHeight = fullImage.naturalHeight;
 
-      const drawRow = (cells: string[], rowY: number, rowHeight: number, isHeader: boolean = false) => {
-        cells.forEach((cell, colIndex) => {
-          const cellX = margin + colIndex * colWidth;
-          const cleaned = cleanText(cell).replace(/\*\*/g, '');
-          if (isHeader) {
-            pdf.setFillColor(230, 240, 255);
-            pdf.rect(cellX, rowY, colWidth, rowHeight, 'F');
-          }
+      // PDF setup
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();   // 210
+      const pageHeight = pdf.internal.pageSize.getHeight();  // 297
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;               // 180
+      const contentHeightMM = pageHeight - 2 * margin;       // 267
+
+      // Scale: map image pixels to mm
+      const scale = maxWidth / imgWidth;
+
+      // Student header height
+      let headerHeightMM = 0;
+      if (includeStudentHeader) {
+        const fieldY = margin;
+        const halfWidth = maxWidth / 2 - 2;
+        const dotLine = (x: number, y: number, w: number) => {
           pdf.setDrawColor(180, 180, 180);
-          pdf.setLineWidth(0.2);
-          pdf.rect(cellX, rowY, colWidth, rowHeight, 'S');
-          pdf.setFont('helvetica', isHeader ? 'bold' : 'normal');
-          pdf.setTextColor(0, 0, 0);
-          const lines = pdf.splitTextToSize(cleaned, colWidth - cellPadding * 2);
-          let textY = rowY + cellPadding + fontSize * 0.35;
-          lines.forEach((line: string) => {
-            if (textY < rowY + rowHeight - cellPadding) {
-              pdf.text(line, cellX + cellPadding, textY);
-              textY += lineHeight + 2;
-            }
-          });
-        });
-      };
+          pdf.setLineWidth(0.3);
+          pdf.line(x, y, x + w, y);
+        };
 
-      if (headers.length > 0) {
-        const headerHeight = calculateRowHeight(headers);
-        checkNewPage(headerHeight + 20);
-        drawRow(headers, yPosition, headerHeight, true);
-        yPosition += headerHeight;
-      }
-      rows.forEach((row) => {
-        const rowHeight = calculateRowHeight(row);
-        checkNewPage(rowHeight + 10);
-        drawRow(row, yPosition, rowHeight, false);
-        yPosition += rowHeight;
-      });
-      yPosition += 6;
-    };
-
-    // Parse markdown to PDF
-    const lines = generatedContent.split('\n');
-    let inTable = false;
-    let tableRows: string[][] = [];
-    let tableHeaders: string[] = [];
-    let inCodeBlock = false;
-    let codeBlockLang = '';
-    let visualIndex = 0;
-
-    const flushTable = () => {
-      if (tableHeaders.length > 0 || tableRows.length > 0) {
-        renderTablePDF(tableHeaders, tableRows);
-        tableHeaders = [];
-        tableRows = [];
-      }
-      inTable = false;
-    };
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-
-      // Handle mermaid/chart code blocks
-      if (trimmedLine === '```mermaid' || trimmedLine === '```chart') {
-        if (inTable) flushTable();
-        inCodeBlock = true;
-        codeBlockLang = trimmedLine === '```mermaid' ? 'mermaid' : 'chart';
-        continue;
-      }
-      if (inCodeBlock && trimmedLine === '```') {
-        // End of visual code block — insert captured image
-        if (capturedImages[visualIndex]) {
-          try {
-            const imgData = capturedImages[visualIndex];
-            const imgWidth = maxWidth * 0.8;
-            const imgHeight = imgWidth * 0.6; // approximate aspect ratio
-            checkNewPage(imgHeight + 10);
-            pdf.addImage(imgData, 'PNG', margin + (maxWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
-            yPosition += imgHeight + 6;
-          } catch {
-            addSimpleText(`[Diagramme ${codeBlockLang}]`, 9, true);
-          }
-        } else {
-          addSimpleText(`[Diagramme ${codeBlockLang}]`, 9, true);
-        }
-        visualIndex++;
-        inCodeBlock = false;
-        codeBlockLang = '';
-        continue;
-      }
-      if (inCodeBlock) continue; // skip content inside visual code blocks
-
-      if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
-        if (trimmedLine.match(/^\|[\s\-:|]+\|$/)) {
-          inTable = true;
-          continue;
-        }
-        const cells = trimmedLine.slice(1, -1).split('|').map(c => c.trim());
-        if (!inTable) {
-          tableHeaders = cells;
-          inTable = true;
-        } else {
-          tableRows.push(cells);
-        }
-        continue;
-      }
-
-      if (inTable && !trimmedLine.startsWith('|')) {
-        flushTable();
-      }
-
-      if (trimmedLine === '' || trimmedLine === '---') {
-        yPosition += 3;
-        continue;
-      }
-
-      if (trimmedLine.startsWith('# ')) {
-        yPosition += 4;
-        addSimpleText(trimmedLine.substring(2), 16, true);
-        yPosition += 2;
-      } else if (trimmedLine.startsWith('## ')) {
-        yPosition += 3;
-        addSimpleText(trimmedLine.substring(3), 13, true);
-        yPosition += 1;
-      } else if (trimmedLine.startsWith('### ')) {
-        yPosition += 2;
-        addSimpleText(trimmedLine.substring(4), 11, true);
-      } else if (trimmedLine.startsWith('#### ')) {
-        yPosition += 2;
-        addSimpleText(trimmedLine.substring(5), 10, true);
-      } else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-        const content = trimmedLine.replace(/^[-*]\s*/, '');
-        checkNewPage();
-        pdf.setFontSize(9);
         pdf.setFont('helvetica', 'normal');
-        pdf.text('\u2022', margin + 3, yPosition);
-        const cleaned = cleanText(content).replace(/\*\*/g, '');
-        const textLines = pdf.splitTextToSize(cleaned, maxWidth - 7);
-        textLines.forEach((l: string, idx: number) => {
-          if (idx > 0) checkNewPage();
-          pdf.text(l, margin + 7, yPosition);
-          yPosition += 9 * 0.45;
-        });
-        yPosition += 1;
-      } else if (/^\d+\.\s/.test(trimmedLine)) {
-        const match = trimmedLine.match(/^(\d+\.)\s*(.*)/);
-        if (match) {
-          checkNewPage();
-          pdf.setFontSize(9);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(match[1], margin + 3, yPosition);
-          pdf.setFont('helvetica', 'normal');
-          const cleaned = cleanText(match[2]).replace(/\*\*/g, '');
-          const textLines = pdf.splitTextToSize(cleaned, maxWidth - 12);
-          textLines.forEach((l: string, idx: number) => {
-            if (idx > 0) checkNewPage();
-            pdf.text(l, margin + 12, yPosition);
-            yPosition += 9 * 0.45;
-          });
-          yPosition += 1;
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+
+        // Row 1: Nom / Prénom
+        pdf.text('Nom :', margin, fieldY + 4);
+        dotLine(margin + 14, fieldY + 4, halfWidth - 16);
+        pdf.text('Prénom :', margin + halfWidth + 4, fieldY + 4);
+        dotLine(margin + halfWidth + 22, fieldY + 4, halfWidth - 22);
+
+        // Row 2: Classe / Date
+        pdf.text('Classe :', margin, fieldY + 12);
+        dotLine(margin + 16, fieldY + 12, halfWidth - 18);
+        pdf.text('Date :', margin + halfWidth + 4, fieldY + 12);
+        dotLine(margin + halfWidth + 18, fieldY + 12, halfWidth - 18);
+
+        // Separator line
+        const sepY = fieldY + 18;
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, sepY, margin + maxWidth, sepY);
+
+        headerHeightMM = 24;
+      }
+
+      // Paginate: slice the tall image into A4-sized pages
+      const firstPageContentMM = contentHeightMM - headerHeightMM;
+      const firstPageHeightPx = firstPageContentMM / scale;
+      const normalPageHeightPx = contentHeightMM / scale;
+
+      let sourceY = 0;
+      let pageNum = 0;
+
+      while (sourceY < imgHeight) {
+        if (pageNum > 0) pdf.addPage();
+
+        const isFirstPage = pageNum === 0;
+        const pageHeightPx = isFirstPage ? firstPageHeightPx : normalPageHeightPx;
+        const yOffset = isFirstPage ? margin + headerHeightMM : margin;
+
+        const sliceHeight = Math.min(pageHeightPx, imgHeight - sourceY);
+        const sliceHeightMM = sliceHeight * scale;
+
+        // Create canvas for this page slice
+        const canvas = document.createElement('canvas');
+        canvas.width = imgWidth;
+        canvas.height = Math.ceil(sliceHeight);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(fullImage, 0, sourceY, imgWidth, sliceHeight, 0, 0, imgWidth, sliceHeight);
+
+        const sliceDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        pdf.addImage(sliceDataUrl, 'JPEG', margin, yOffset, maxWidth, sliceHeightMM);
+
+        sourceY += pageHeightPx;
+        pageNum++;
+      }
+
+      pdf.save(`${filename}-${Date.now()}.pdf`);
+    } finally {
+      // Restore original styles
+      Object.assign(contentAreaRef.current.style, originalStyles);
+      // Restore dark: classes that were temporarily removed
+      targetElement.querySelectorAll('[data-removed-dark-classes]').forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const classes = htmlEl.dataset.removedDarkClasses?.split(' ') || [];
+        classes.forEach(c => c && htmlEl.classList.add(c));
+        delete htmlEl.dataset.removedDarkClasses;
+      });
+      // Restore removed correction sections
+      for (const { parent, nodes } of removedNodes) {
+        for (const node of nodes) {
+          parent.appendChild(node);
         }
-      } else if (trimmedLine.startsWith('>')) {
-        const content = trimmedLine.replace(/^>\s*/, '');
-        addSimpleText(content, 9, false, 5);
-      } else {
-        addSimpleText(trimmedLine, 9);
       }
     }
+  };
 
-    // Flush remaining table
-    if (inTable) flushTable();
+  const handleExportPDF = () => {
+    if (!generatedContent) return;
+    exportPDF({ content: generatedContent, includeStudentHeader: false, filename: 'support-pedagogique' });
+  };
 
-    pdf.save(`support-pedagogique-${Date.now()}.pdf`);
+  const handleExportPDFEleve = () => {
+    if (!generatedContent) return;
+    exportPDF({ content: stripCorrections(generatedContent), includeStudentHeader: true, filename: 'fiche-eleve' });
   };
 
   // =====================================================
@@ -484,9 +389,7 @@ export function ExerciseGeneratorModal({
     const capturedImages: string[] = [];
     if (contentAreaRef.current) {
       const { toPng } = await import('html-to-image');
-      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
-      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
-      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
+      const allVisuals = Array.from(contentAreaRef.current.querySelectorAll('[data-mermaid], [data-chart]'));
       for (const el of allVisuals) {
         try {
           const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
@@ -499,7 +402,7 @@ export function ExerciseGeneratorModal({
 
     const htmlContent = markdownToSimpleHtmlWithImages(generatedContent, capturedImages);
 
-    const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>Support pédagogique</title>
 <style>
   body { font-family: Calibri, sans-serif; font-size: 11pt; line-height: 1.5; }
@@ -714,6 +617,13 @@ export function ExerciseGeneratorModal({
                   Exporter PDF
                 </button>
                 <button
+                  onClick={handleExportPDFEleve}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <UserRound className="w-4 h-4" />
+                  PDF Élève
+                </button>
+                <button
                   onClick={handleExportDOCX}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
@@ -760,41 +670,40 @@ export function ExerciseGeneratorModal({
 // =====================================================
 // Helper : Markdown vers HTML simple (pour export Word)
 // =====================================================
-function cleanLatexForExport(text: string): string {
-  return text
-    .replace(/\\\(|\\\)/g, '')
-    .replace(/\\\[|\\\]/g, '')
-    .replace(/\$\$(.*?)\$\$/g, '$1')
-    .replace(/\$(.*?)\$/g, '$1')
-    .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
-    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1/$2)')
-    .replace(/\\times/g, '×')
-    .replace(/\\div/g, '÷')
-    .replace(/\\pm/g, '±')
-    .replace(/\\leq/g, '≤')
-    .replace(/\\geq/g, '≥')
-    .replace(/\\neq/g, '≠')
-    .replace(/\\approx/g, '≈')
-    .replace(/\\infty/g, '∞')
-    .replace(/\\pi/g, 'π')
-    .replace(/\\alpha/g, 'α')
-    .replace(/\\beta/g, 'β')
-    .replace(/\\gamma/g, 'γ')
-    .replace(/\\theta/g, 'θ')
-    .replace(/\\Delta/g, 'Δ')
-    .replace(/\\sum/g, '∑')
-    .replace(/\\int/g, '∫')
-    .replace(/\^(\{[^}]+\}|\w)/g, (_, exp) => `^${exp.replace(/[{}]/g, '')}`)
-    .replace(/_(\{[^}]+\}|\w)/g, (_, sub) => `_${sub.replace(/[{}]/g, '')}`)
-    .replace(/\\text\{([^}]+)\}/g, '$1')
-    .replace(/\\mathrm\{([^}]+)\}/g, '$1')
-    .replace(/\\left|\\right/g, '')
-    .replace(/\\\\/g, '')
-    .replace(/\\[a-zA-Z]+/g, '');
+/**
+ * Render LaTeX expressions in text to MathML (supported natively by Word).
+ * Handles display math (\[...\], $$...$$) and inline math (\(...\), $...$).
+ */
+function renderLatexToMathML(text: string): string {
+  // Display math: \[...\] and $$...$$
+  let result = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { throwOnError: false, output: 'mathml', displayMode: true });
+    } catch { return expr; }
+  });
+  result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { throwOnError: false, output: 'mathml', displayMode: true });
+    } catch { return expr; }
+  });
+
+  // Inline math: \(...\) and $...$
+  result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { throwOnError: false, output: 'mathml' });
+    } catch { return expr; }
+  });
+  result = result.replace(/\$([^\$\n]+?)\$/g, (_, expr) => {
+    try {
+      return katex.renderToString(expr.trim(), { throwOnError: false, output: 'mathml' });
+    } catch { return expr; }
+  });
+
+  return result;
 }
 
 function markdownToSimpleHtml(md: string): string {
-  let html = cleanLatexForExport(md);
+  let html = renderLatexToMathML(md);
 
   // Tables
   html = html.replace(/^(\|.+\|)\n(\|[\s\-:|]+\|)\n((?:\|.+\|\n?)*)/gm, (_, headerRow, _sep, bodyRows) => {
