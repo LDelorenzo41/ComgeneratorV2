@@ -96,7 +96,7 @@ function cleanOutputText(text: string): string {
   // Supprimer les blocs de code markdown englobants (```markdown ... ``` ou ``` ... ```)
   if (cleaned.startsWith('```markdown')) {
     cleaned = cleaned.replace(/^```markdown\s*\n?/, '').replace(/\n?```\s*$/, '');
-  } else if (cleaned.startsWith('```')) {
+  } else if (cleaned.startsWith('```') && !cleaned.startsWith('```mermaid') && !cleaned.startsWith('```chart')) {
     cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
   }
 
@@ -128,7 +128,8 @@ function cleanOutputText(text: string): string {
 const SUPPORT_TYPE_INSTRUCTIONS: Record<string, string> = {
   auto: `Analyse la phase et crée le support le plus utile — celui qui apporte le CONTENU CONCRET manquant.
 Ne reformule pas la phase. Demande-toi : "De quoi l'élève a besoin entre les mains pour réussir cette activité ?"
-Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).`,
+Exemples : une fiche avec des routines tactiques illustrées (EPS), un texte source à analyser (Français/HG), un protocole expérimental détaillé (Sciences), des exercices progressifs avec méthode (Maths), un dialogue modèle (Langues).
+Si la phase implique des processus, des arbres de décision ou des données chiffrées, utilise des diagrammes mermaid ou des graphiques Chart.js pour les visualiser.`,
 
   contexte: `La phase mentionne un document, un scénario, un texte ou une situation que les élèves doivent utiliser, mais ce support n'est pas fourni.
 Génère ce document de manière réaliste, détaillée et experte :
@@ -160,7 +161,8 @@ Le document doit être suffisamment riche pour que les élèves puissent travail
 - 4 à 6 exercices qui permettent de mettre en pratique les compétences visées par la phase
 - Chaque exercice a un énoncé clair avec des données concrètes (chiffres, textes, situations)
 - Inclure au moins un exercice de type "expert" ou "défi" pour les élèves avancés
-- Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse`,
+- Correction détaillée à la fin avec la MÉTHODE pas à pas, pas juste la réponse
+- Si pertinent, inclus un diagramme mermaid pour illustrer un processus ou un arbre de décision`,
 
   dictee: `Crée une dictée préparée en lien avec le thème de la phase :
 - Texte de 80 à 150 mots (adapté au niveau) portant sur le thème étudié
@@ -181,7 +183,8 @@ Le document doit être suffisamment riche pour que les élèves puissent travail
 - Un ou deux exercices d'application rapide avec correction
 - En EPS : des routines ou enchaînements décrits étape par étape
 - En Sciences : un protocole ou une méthode à suivre
-- En Maths : une méthode type avec un exemple résolu pas à pas`,
+- En Maths : une méthode type avec un exemple résolu pas à pas
+- Utilise des diagrammes mermaid pour les schémas de processus, arbres de décision ou cycles. Utilise des graphiques (bloc chart) pour visualiser des données chiffrées.`,
 };
 
 // =====================================================
@@ -314,7 +317,8 @@ FORMAT MARKDOWN OBLIGATOIRE :
 - Tableaux : la 2e ligne doit être le séparateur | --- | --- | (autant de colonnes que l'en-tête)
 - Ne jamais insérer de ligne vide entre les lignes d'un même tableau
 - Ne jamais entourer la réponse de blocs \`\`\`markdown ou \`\`\`
-- Listes : utiliser - ou 1. 2. 3. sans mélanger les formats`
+- Listes : utiliser - ou 1. 2. 3. sans mélanger les formats
+- Les blocs mermaid et chart doivent être correctement délimités par triple backticks avec le tag de langage`
       : '';
 
     const systemPrompt = `Tu es un expert pédagogique disciplinaire pour l'enseignement en France.
@@ -340,7 +344,27 @@ RÈGLES STRICTES :
 - Inclure un titre clair pour le support
 - Ne pas générer de commentaires ou notes destinés à l'enseignant dans le support élève
 - Fournir la correction/les réponses à la fin quand c'est pertinent
-- NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral${markdownRules}`;
+- NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral
+
+DIAGRAMMES ET GRAPHIQUES (quand c'est pertinent) :
+- Pour les arbres de décision, organigrammes, processus séquentiels, cycles : utilise un bloc mermaid
+  Exemple :
+  \`\`\`mermaid
+  flowchart TD
+    A[Début] --> B{Condition}
+    B -->|Oui| C[Action 1]
+    B -->|Non| D[Action 2]
+  \`\`\`
+- Pour les données chiffrées, comparaisons, évolutions, répartitions : utilise un bloc chart avec une config JSON Chart.js
+  Exemple :
+  \`\`\`chart
+  {"type":"bar","data":{"labels":["A","B","C"],"datasets":[{"label":"Valeurs","data":[10,20,30]}]}}
+  \`\`\`
+- N'utilise ces formats que quand ils apportent une vraie valeur pédagogique
+- Ne force pas un diagramme quand un tableau ou une liste suffit
+- Les diagrammes mermaid doivent rester simples (pas plus de 15 nœuds) pour être lisibles
+- Les graphiques doivent avoir des labels en français
+- Le JSON du bloc chart doit être valide et minimal${markdownRules}`;
 
     const userPrompt = `Génère un support pédagogique pour la phase ci-dessous.
 
