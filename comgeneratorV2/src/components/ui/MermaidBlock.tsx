@@ -10,13 +10,50 @@ let mermaidInitialized = false;
 function sanitizeMermaid(code: string): string {
   let sanitized = code;
 
-  // Wrap square-bracket labels containing special chars in double quotes
+  // First pass: escape problematic characters inside already-quoted bracket labels
+  // A["text with [0;3] inside"] → A["text with &#91;0&#59;3&#93; inside"]
+  sanitized = sanitized.replace(
+    /(\w+)\["([^"]*?)"\]/g,
+    (_match, id, label) => {
+      const escaped = label
+        .replace(/\[/g, '&#91;')
+        .replace(/\]/g, '&#93;')
+        .replace(/;/g, '&#59;');
+      return `${id}["${escaped}"]`;
+    }
+  );
+
+  // Same for already-quoted curly-brace labels: B{"text"}
+  sanitized = sanitized.replace(
+    /(\w+)\{"([^"]*?)"\}/g,
+    (_match, id, label) => {
+      const escaped = label
+        .replace(/\{/g, '&#123;')
+        .replace(/\}/g, '&#125;')
+        .replace(/;/g, '&#59;');
+      return `${id}{"${escaped}"}`;
+    }
+  );
+
+  // Same for already-quoted round-bracket labels: C("text")
+  sanitized = sanitized.replace(
+    /(\w+)\("([^"]*?)"\)/g,
+    (_match, id, label) => {
+      const escaped = label
+        .replace(/\(/g, '&#40;')
+        .replace(/\)/g, '&#41;')
+        .replace(/;/g, '&#59;');
+      return `${id}("${escaped}")`;
+    }
+  );
+
+  // Wrap unquoted square-bracket labels containing special chars in double quotes
   // A[L'élève observe] → A["L'élève observe"]
-  // But skip already-quoted labels: A["already quoted"]
+  // Skip already-quoted labels (handled above)
   sanitized = sanitized.replace(
     /(\w+)\[([^\]"]+)\]/g,
     (_match, id, label) => {
-      if (/['"?!(){};<>&]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
+      if (/['"?!(){};<>&≥≤]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
         return `${id}["${label}"]`;
       }
       return _match;
@@ -28,7 +65,7 @@ function sanitizeMermaid(code: string): string {
   sanitized = sanitized.replace(
     /(\w+)\{([^}"]+)\}/g,
     (_match, id, label) => {
-      if (/['"?!();<>&]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
+      if (/['"?!();<>&≥≤]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
         return `${id}{"${label}"}`;
       }
       return _match;
@@ -39,12 +76,16 @@ function sanitizeMermaid(code: string): string {
   sanitized = sanitized.replace(
     /(\w+)\(([^)"]+)\)/g,
     (_match, id, label) => {
-      if (/['"?!{}[\];<>&]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
+      if (/['"?!{}[\];<>&≥≤]/.test(label) || /[\u00C0-\u024F]/.test(label)) {
         return `${id}("${label}")`;
       }
       return _match;
     }
   );
+
+  // Replace mathematical comparison symbols that Mermaid can't handle
+  sanitized = sanitized.replace(/≥/g, '>=');
+  sanitized = sanitized.replace(/≤/g, '<=');
 
   return sanitized;
 }
