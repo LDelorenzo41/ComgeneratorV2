@@ -2,12 +2,8 @@
 // Modal pour générer des supports pédagogiques (exercices, fiches, QCM...) à partir d'une phase
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeKatex from 'rehype-katex';
-import remarkGfm from 'remark-gfm';
-import 'katex/dist/katex.min.css';
 import jsPDF from 'jspdf';
+import EnhancedMarkdownRenderer from '../ui/EnhancedMarkdownRenderer';
 import {
   X,
   Loader2,
@@ -23,7 +19,7 @@ import {
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
-import { convertMarkdownTablesToHtml, normalizeLatexDelimiters } from '../../lib/phaseExtractor';
+
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../layout/Header';
 
 class MarkdownErrorBoundary extends React.Component<
@@ -83,6 +79,9 @@ export function ExerciseGeneratorModal({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Content area ref for capturing visuals
+  const contentAreaRef = useRef<HTMLDivElement>(null);
 
   // Drag state
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -180,8 +179,25 @@ export function ExerciseGeneratorModal({
   // =====================================================
   // Export PDF
   // =====================================================
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!generatedContent) return;
+
+    // Capture rendered mermaid/chart visuals from the DOM
+    const capturedImages: string[] = [];
+    if (contentAreaRef.current) {
+      const { toPng } = await import('html-to-image');
+      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
+      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
+      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
+      for (const el of allVisuals) {
+        try {
+          const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
+          capturedImages.push(dataUrl);
+        } catch {
+          capturedImages.push('');
+        }
+      }
+    }
 
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -329,6 +345,9 @@ export function ExerciseGeneratorModal({
     let inTable = false;
     let tableRows: string[][] = [];
     let tableHeaders: string[] = [];
+    let inCodeBlock = false;
+    let codeBlockLang = '';
+    let visualIndex = 0;
 
     const flushTable = () => {
       if (tableHeaders.length > 0 || tableRows.length > 0) {
@@ -339,13 +358,43 @@ export function ExerciseGeneratorModal({
       inTable = false;
     };
 
-    lines.forEach((line) => {
+    for (const line of lines) {
       const trimmedLine = line.trim();
+
+      // Handle mermaid/chart code blocks
+      if (trimmedLine === '```mermaid' || trimmedLine === '```chart') {
+        if (inTable) flushTable();
+        inCodeBlock = true;
+        codeBlockLang = trimmedLine === '```mermaid' ? 'mermaid' : 'chart';
+        continue;
+      }
+      if (inCodeBlock && trimmedLine === '```') {
+        // End of visual code block — insert captured image
+        if (capturedImages[visualIndex]) {
+          try {
+            const imgData = capturedImages[visualIndex];
+            const imgWidth = maxWidth * 0.8;
+            const imgHeight = imgWidth * 0.6; // approximate aspect ratio
+            checkNewPage(imgHeight + 10);
+            pdf.addImage(imgData, 'PNG', margin + (maxWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
+            yPosition += imgHeight + 6;
+          } catch {
+            addSimpleText(`[Diagramme ${codeBlockLang}]`, 9, true);
+          }
+        } else {
+          addSimpleText(`[Diagramme ${codeBlockLang}]`, 9, true);
+        }
+        visualIndex++;
+        inCodeBlock = false;
+        codeBlockLang = '';
+        continue;
+      }
+      if (inCodeBlock) continue; // skip content inside visual code blocks
 
       if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
         if (trimmedLine.match(/^\|[\s\-:|]+\|$/)) {
           inTable = true;
-          return;
+          continue;
         }
         const cells = trimmedLine.slice(1, -1).split('|').map(c => c.trim());
         if (!inTable) {
@@ -354,7 +403,7 @@ export function ExerciseGeneratorModal({
         } else {
           tableRows.push(cells);
         }
-        return;
+        continue;
       }
 
       if (inTable && !trimmedLine.startsWith('|')) {
@@ -363,7 +412,7 @@ export function ExerciseGeneratorModal({
 
       if (trimmedLine === '' || trimmedLine === '---') {
         yPosition += 3;
-        return;
+        continue;
       }
 
       if (trimmedLine.startsWith('# ')) {
@@ -417,7 +466,7 @@ export function ExerciseGeneratorModal({
       } else {
         addSimpleText(trimmedLine, 9);
       }
-    });
+    }
 
     // Flush remaining table
     if (inTable) flushTable();
@@ -428,10 +477,27 @@ export function ExerciseGeneratorModal({
   // =====================================================
   // Export DOCX (HTML-to-Blob)
   // =====================================================
-  const handleExportDOCX = () => {
+  const handleExportDOCX = async () => {
     if (!generatedContent) return;
 
-    const htmlContent = markdownToSimpleHtml(generatedContent);
+    // Capture rendered mermaid/chart visuals from the DOM
+    const capturedImages: string[] = [];
+    if (contentAreaRef.current) {
+      const { toPng } = await import('html-to-image');
+      const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
+      const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
+      const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
+      for (const el of allVisuals) {
+        try {
+          const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
+          capturedImages.push(dataUrl);
+        } catch {
+          capturedImages.push('');
+        }
+      }
+    }
+
+    const htmlContent = markdownToSimpleHtmlWithImages(generatedContent, capturedImages);
 
     const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>Support pédagogique</title>
@@ -664,42 +730,9 @@ export function ExerciseGeneratorModal({
               </div>
 
               {/* Rendered content */}
-              <div className="prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-white dark:bg-gray-900/50">
+              <div ref={contentAreaRef} className="prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-white dark:bg-gray-900/50">
                 <MarkdownErrorBoundary fallbackContent={generatedContent}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    rehypePlugins={[rehypeRaw as any, rehypeKatex as any]}
-                    components={{
-                      h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 pb-2 border-b border-purple-200 dark:border-purple-800">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-5">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">{children}</h3>,
-                      p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 mb-3 leading-relaxed">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal pl-6 mb-3 text-gray-700 dark:text-gray-300">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      strong: ({ children }) => <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>,
-                      em: ({ children }) => <em className="italic text-gray-800 dark:text-gray-200">{children}</em>,
-                      blockquote: ({ children }) => <blockquote className="border-l-4 border-purple-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4 bg-purple-50 dark:bg-purple-900/20 py-2 rounded-r-lg">{children}</blockquote>,
-                      table: ({ children }) => (
-                        <table className="w-full border-collapse my-4 text-sm border border-gray-300 dark:border-gray-600">{children}</table>
-                      ),
-                      thead: ({ children }) => (
-                        <thead className="bg-purple-100 dark:bg-purple-900/40">{children}</thead>
-                      ),
-                      tbody: ({ children }) => <tbody>{children}</tbody>,
-                      tr: ({ children }) => (
-                        <tr className="border-b border-gray-200 dark:border-gray-700">{children}</tr>
-                      ),
-                      th: ({ children }) => (
-                        <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 bg-purple-50 dark:bg-purple-900/30">{children}</th>
-                      ),
-                      td: ({ children }) => (
-                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{children}</td>
-                      ),
-                    }}
-                  >
-                    {normalizeLatexDelimiters(convertMarkdownTablesToHtml(generatedContent))}
-                  </ReactMarkdown>
+                  <EnhancedMarkdownRenderer content={generatedContent} />
                 </MarkdownErrorBoundary>
               </div>
             </>
@@ -803,4 +836,17 @@ function markdownToSimpleHtml(md: string): string {
   html = html.replace(/\n{2,}/g, '\n');
 
   return html;
+}
+
+function markdownToSimpleHtmlWithImages(md: string, capturedImages: string[]): string {
+  // Replace mermaid/chart code blocks with captured images before converting
+  let imageIndex = 0;
+  const processed = md.replace(/```(?:mermaid|chart)\n[\s\S]*?```/g, () => {
+    const imgData = capturedImages[imageIndex++];
+    if (imgData) {
+      return `<p><img src="${imgData}" style="max-width:100%;height:auto;" /></p>`;
+    }
+    return '<p><em>[Diagramme non disponible]</em></p>';
+  });
+  return markdownToSimpleHtml(processed);
 }
