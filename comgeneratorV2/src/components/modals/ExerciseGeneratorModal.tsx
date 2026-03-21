@@ -218,6 +218,20 @@ export function ExerciseGeneratorModal({
       clonedElement.style.width = '794px';
       clonedElement.style.backgroundColor = '#ffffff';
       clonedElement.style.color = '#000000';
+      clonedElement.style.maxHeight = 'none';
+      clonedElement.style.overflow = 'visible';
+
+      // Strip all dark: classes to force light-mode rendering
+      const stripDarkClasses = (el: Element) => {
+        const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
+        darkCls.forEach(c => el.classList.remove(c));
+        el.querySelectorAll('*').forEach(child => {
+          const childDarkCls = Array.from(child.classList).filter(c => c.startsWith('dark:'));
+          childDarkCls.forEach(c => child.classList.remove(c));
+        });
+      };
+      stripDarkClasses(clonedElement);
+
       document.body.appendChild(clonedElement);
 
       // Remove correction sections from clone
@@ -257,14 +271,16 @@ export function ExerciseGeneratorModal({
       targetElement.style.color = '#000000';
     }
 
-    // Force light mode colors on all child elements for capture
-    const darkElements = targetElement.querySelectorAll('[class*="dark:"]');
-    darkElements.forEach((el) => {
-      const htmlEl = el as HTMLElement;
-      const computed = window.getComputedStyle(htmlEl);
-      htmlEl.style.color = computed.color;
-      htmlEl.style.backgroundColor = computed.backgroundColor;
-    });
+    // For non-clone (regular PDF), strip dark: classes temporarily for light-mode capture
+    if (!clonedElement) {
+      const allEls = targetElement.querySelectorAll('[class*="dark:"]');
+      allEls.forEach((el) => {
+        const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
+        darkCls.forEach(c => el.classList.remove(c));
+        // Store removed classes to restore later
+        (el as HTMLElement).dataset.removedDarkClasses = darkCls.join(' ');
+      });
+    }
 
     try {
       // Capture the rendered DOM at high resolution
@@ -368,11 +384,12 @@ export function ExerciseGeneratorModal({
       // Restore original styles
       if (!clonedElement) {
         Object.assign(contentAreaRef.current.style, originalStyles);
-        // Remove inline styles forced for light mode
-        darkElements.forEach((el) => {
+        // Restore dark: classes that were temporarily removed
+        targetElement.querySelectorAll('[data-removed-dark-classes]').forEach((el) => {
           const htmlEl = el as HTMLElement;
-          htmlEl.style.color = '';
-          htmlEl.style.backgroundColor = '';
+          const classes = htmlEl.dataset.removedDarkClasses?.split(' ') || [];
+          classes.forEach(c => c && htmlEl.classList.add(c));
+          delete htmlEl.dataset.removedDarkClasses;
         });
       }
       // Clean up cloned element
