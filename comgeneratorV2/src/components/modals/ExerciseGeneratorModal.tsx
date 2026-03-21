@@ -206,52 +206,27 @@ export function ExerciseGeneratorModal({
 
     const { toPng } = await import('html-to-image');
 
-    // For student PDF, clone the DOM and remove correction sections
-    let targetElement: HTMLElement = contentAreaRef.current;
-    let clonedElement: HTMLElement | null = null;
+    const targetElement: HTMLElement = contentAreaRef.current;
 
+    // For student PDF, temporarily remove correction sections from the original DOM
+    const removedNodes: { parent: Node; nodes: Node[] }[] = [];
     if (includeStudentHeader) {
-      clonedElement = contentAreaRef.current.cloneNode(true) as HTMLElement;
-      clonedElement.style.position = 'absolute';
-      clonedElement.style.left = '-9999px';
-      clonedElement.style.top = '0';
-      clonedElement.style.width = '794px';
-      clonedElement.style.backgroundColor = '#ffffff';
-      clonedElement.style.color = '#000000';
-      clonedElement.style.maxHeight = 'none';
-      clonedElement.style.overflow = 'visible';
-
-      // Strip all dark: classes to force light-mode rendering
-      const stripDarkClasses = (el: Element) => {
-        const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
-        darkCls.forEach(c => el.classList.remove(c));
-        el.querySelectorAll('*').forEach(child => {
-          const childDarkCls = Array.from(child.classList).filter(c => c.startsWith('dark:'));
-          childDarkCls.forEach(c => child.classList.remove(c));
-        });
-      };
-      stripDarkClasses(clonedElement);
-
-      document.body.appendChild(clonedElement);
-
-      // Remove correction sections from clone
-      const headings = clonedElement.querySelectorAll('h1, h2, h3, h4');
+      const headings = contentAreaRef.current.querySelectorAll('h1, h2, h3, h4');
       const correctionPattern = /^(Correction|Corrigé|Corrigés|Réponse|Réponses|Solution|Solutions)/i;
       for (const heading of Array.from(headings)) {
         if (correctionPattern.test(heading.textContent?.trim() || '')) {
-          // Remove this heading and all following siblings
+          const parent = heading.parentNode!;
+          const nodesToRemove: Node[] = [heading];
           let sibling: ChildNode | null = heading.nextSibling;
           while (sibling) {
-            const next: ChildNode | null = sibling.nextSibling;
-            sibling.parentNode?.removeChild(sibling);
-            sibling = next;
+            nodesToRemove.push(sibling);
+            sibling = sibling.nextSibling;
           }
-          heading.parentNode?.removeChild(heading);
+          nodesToRemove.forEach(n => parent.removeChild(n));
+          removedNodes.push({ parent, nodes: nodesToRemove });
           break;
         }
       }
-
-      targetElement = clonedElement;
     }
 
     // Save and apply print-friendly styles
@@ -263,24 +238,19 @@ export function ExerciseGeneratorModal({
       color: contentAreaRef.current.style.color,
     };
 
-    if (!clonedElement) {
-      targetElement.style.width = '794px';
-      targetElement.style.maxHeight = 'none';
-      targetElement.style.overflow = 'visible';
-      targetElement.style.backgroundColor = '#ffffff';
-      targetElement.style.color = '#000000';
-    }
+    targetElement.style.width = '794px';
+    targetElement.style.maxHeight = 'none';
+    targetElement.style.overflow = 'visible';
+    targetElement.style.backgroundColor = '#ffffff';
+    targetElement.style.color = '#000000';
 
-    // For non-clone (regular PDF), strip dark: classes temporarily for light-mode capture
-    if (!clonedElement) {
-      const allEls = targetElement.querySelectorAll('[class*="dark:"]');
-      allEls.forEach((el) => {
-        const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
-        darkCls.forEach(c => el.classList.remove(c));
-        // Store removed classes to restore later
-        (el as HTMLElement).dataset.removedDarkClasses = darkCls.join(' ');
-      });
-    }
+    // Strip dark: classes temporarily for light-mode capture
+    const allEls = targetElement.querySelectorAll('[class*="dark:"]');
+    allEls.forEach((el) => {
+      const darkCls = Array.from(el.classList).filter(c => c.startsWith('dark:'));
+      darkCls.forEach(c => el.classList.remove(c));
+      (el as HTMLElement).dataset.removedDarkClasses = darkCls.join(' ');
+    });
 
     try {
       // Capture the rendered DOM at high resolution
@@ -382,19 +352,19 @@ export function ExerciseGeneratorModal({
       pdf.save(`${filename}-${Date.now()}.pdf`);
     } finally {
       // Restore original styles
-      if (!clonedElement) {
-        Object.assign(contentAreaRef.current.style, originalStyles);
-        // Restore dark: classes that were temporarily removed
-        targetElement.querySelectorAll('[data-removed-dark-classes]').forEach((el) => {
-          const htmlEl = el as HTMLElement;
-          const classes = htmlEl.dataset.removedDarkClasses?.split(' ') || [];
-          classes.forEach(c => c && htmlEl.classList.add(c));
-          delete htmlEl.dataset.removedDarkClasses;
-        });
-      }
-      // Clean up cloned element
-      if (clonedElement && clonedElement.parentNode) {
-        document.body.removeChild(clonedElement);
+      Object.assign(contentAreaRef.current.style, originalStyles);
+      // Restore dark: classes that were temporarily removed
+      targetElement.querySelectorAll('[data-removed-dark-classes]').forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        const classes = htmlEl.dataset.removedDarkClasses?.split(' ') || [];
+        classes.forEach(c => c && htmlEl.classList.add(c));
+        delete htmlEl.dataset.removedDarkClasses;
+      });
+      // Restore removed correction sections
+      for (const { parent, nodes } of removedNodes) {
+        for (const node of nodes) {
+          parent.appendChild(node);
+        }
       }
     }
   };
