@@ -16,6 +16,7 @@ import {
   GripHorizontal,
   Minimize2,
   Info,
+  UserRound,
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
@@ -40,6 +41,18 @@ class MarkdownErrorBoundary extends React.Component<
     }
     return this.props.children;
   }
+}
+
+/**
+ * Strip correction/answer sections from generated content for student exports.
+ */
+function stripCorrections(content: string): string {
+  const correctionPattern = /^#{1,4}\s*(Correction|Corrigé|Corrigés|Réponse|Réponses|Solution|Solutions)[\s:]*$/im;
+  const match = content.match(correctionPattern);
+  if (match && match.index !== undefined) {
+    return content.substring(0, match.index).trim();
+  }
+  return content;
 }
 
 interface ExerciseGeneratorModalProps {
@@ -179,19 +192,31 @@ export function ExerciseGeneratorModal({
   // =====================================================
   // Export PDF
   // =====================================================
-  const handleExportPDF = async () => {
-    if (!generatedContent) return;
+  // =====================================================
+  // Shared PDF export logic
+  // =====================================================
+  const exportPDF = async (options: {
+    content: string;
+    includeStudentHeader: boolean;
+    filename: string;
+  }) => {
+    const { content, includeStudentHeader, filename } = options;
+    if (!content) return;
 
     // Capture rendered mermaid/chart visuals from the DOM
     const capturedImages: string[] = [];
     if (contentAreaRef.current) {
-      const { toPng } = await import('html-to-image');
+      const { toJpeg } = await import('html-to-image');
       const mermaidElements = contentAreaRef.current.querySelectorAll('[data-mermaid]');
       const chartElements = contentAreaRef.current.querySelectorAll('[data-chart]');
       const allVisuals = [...Array.from(mermaidElements), ...Array.from(chartElements)];
       for (const el of allVisuals) {
         try {
-          const dataUrl = await toPng(el as HTMLElement, { backgroundColor: '#ffffff' });
+          const dataUrl = await toJpeg(el as HTMLElement, {
+            backgroundColor: '#ffffff',
+            quality: 0.7,
+            pixelRatio: 1.5,
+          });
           capturedImages.push(dataUrl);
         } catch {
           capturedImages.push('');
@@ -205,6 +230,40 @@ export function ExerciseGeneratorModal({
     const margin = 15;
     const maxWidth = pageWidth - 2 * margin;
     let yPosition = margin;
+
+    // Student header (Nom, Prénom, Classe, Date)
+    if (includeStudentHeader) {
+      const fieldY = yPosition;
+      const halfWidth = maxWidth / 2 - 2;
+      const dotLine = (x: number, y: number, w: number) => {
+        pdf.setDrawColor(180, 180, 180);
+        pdf.setLineWidth(0.3);
+        pdf.line(x, y, x + w, y);
+      };
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(0, 0, 0);
+
+      // Row 1: Nom / Prénom
+      pdf.text('Nom :', margin, fieldY + 4);
+      dotLine(margin + 14, fieldY + 4, halfWidth - 16);
+      pdf.text('Prénom :', margin + halfWidth + 4, fieldY + 4);
+      dotLine(margin + halfWidth + 22, fieldY + 4, halfWidth - 22);
+
+      // Row 2: Classe / Date
+      pdf.text('Classe :', margin, fieldY + 12);
+      dotLine(margin + 16, fieldY + 12, halfWidth - 18);
+      pdf.text('Date :', margin + halfWidth + 4, fieldY + 12);
+      dotLine(margin + halfWidth + 18, fieldY + 12, halfWidth - 18);
+
+      // Separator line
+      yPosition = fieldY + 18;
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, yPosition, margin + maxWidth, yPosition);
+      yPosition += 6;
+    }
 
     const cleanLatex = (text: string): string => {
       return text
@@ -341,7 +400,7 @@ export function ExerciseGeneratorModal({
     };
 
     // Parse markdown to PDF
-    const lines = generatedContent.split('\n');
+    const lines = content.split('\n');
     let inTable = false;
     let tableRows: string[][] = [];
     let tableHeaders: string[] = [];
@@ -376,7 +435,7 @@ export function ExerciseGeneratorModal({
             const imgWidth = maxWidth * 0.8;
             const imgHeight = imgWidth * 0.6; // approximate aspect ratio
             checkNewPage(imgHeight + 10);
-            pdf.addImage(imgData, 'PNG', margin + (maxWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
+            pdf.addImage(imgData, 'JPEG', margin + (maxWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
             yPosition += imgHeight + 6;
           } catch {
             addSimpleText(`[Diagramme ${codeBlockLang}]`, 9, true);
@@ -471,7 +530,17 @@ export function ExerciseGeneratorModal({
     // Flush remaining table
     if (inTable) flushTable();
 
-    pdf.save(`support-pedagogique-${Date.now()}.pdf`);
+    pdf.save(`${filename}-${Date.now()}.pdf`);
+  };
+
+  const handleExportPDF = () => {
+    if (!generatedContent) return;
+    exportPDF({ content: generatedContent, includeStudentHeader: false, filename: 'support-pedagogique' });
+  };
+
+  const handleExportPDFEleve = () => {
+    if (!generatedContent) return;
+    exportPDF({ content: stripCorrections(generatedContent), includeStudentHeader: true, filename: 'fiche-eleve' });
   };
 
   // =====================================================
@@ -712,6 +781,13 @@ export function ExerciseGeneratorModal({
                 >
                   <FileDown className="w-4 h-4" />
                   Exporter PDF
+                </button>
+                <button
+                  onClick={handleExportPDFEleve}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <UserRound className="w-4 h-4" />
+                  PDF Élève
                 </button>
                 <button
                   onClick={handleExportDOCX}

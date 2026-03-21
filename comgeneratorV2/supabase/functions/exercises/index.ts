@@ -347,6 +347,9 @@ RÈGLES STRICTES :
 - Ne pas générer de commentaires ou notes destinés à l'enseignant dans le support élève
 - Fournir la correction/les réponses à la fin quand c'est pertinent
 - NE PAS recopier les consignes organisationnelles de la phase (groupes, rotations, durées) — l'élève les aura à l'oral
+- NE JAMAIS insérer de liens vers des images externes (imgur, wikimedia, etc.) — elles ne s'afficheront pas
+- Pour les graphiques et courbes, utiliser UNIQUEMENT les blocs \`\`\`chart avec du JSON Chart.js
+- Pour les schémas et diagrammes, utiliser UNIQUEMENT les blocs \`\`\`mermaid
 
 ILLUSTRATIONS VISUELLES — UNIQUEMENT QUAND ELLES ONT UN INTÉRÊT PÉDAGOGIQUE :
 Inclus un diagramme mermaid ou un graphique chart quand cela aide réellement l'élève à comprendre. Ne force PAS un visuel quand le contenu est purement textuel (dictée, vocabulaire, QCM simple).
