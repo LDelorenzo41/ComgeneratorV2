@@ -103,6 +103,7 @@ export async function fetchFeedbackSynthesis(): Promise<FeedbackSynthesisData> {
     'ux_design',
     'pricing',
     'general',
+    'general_preferee',
   ];
 
   const allSectionLabels: Record<string, string> = {
@@ -110,6 +111,7 @@ export async function fetchFeedbackSynthesis(): Promise<FeedbackSynthesisData> {
     ux_design: 'UX / Design / Navigation',
     pricing: 'Tarification',
     general: 'Satisfaction Générale',
+    general_preferee: 'Fonctionnalité préférée',
   };
 
   const sections: SectionSynthesis[] = allSectionKeys.map(sectionKey => {
