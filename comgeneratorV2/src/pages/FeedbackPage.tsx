@@ -13,6 +13,9 @@ import { FEEDBACK_SECTIONS } from '../types/feedback';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
+import { useHasSubmittedFeedback } from '../hooks/useHasSubmittedFeedback';
+import { CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const FEATURE_DESCRIPTIONS: Record<string, string> = {
   appreciations: 'Génération automatique d\'appréciations personnalisées pour les élèves, avec gestion de matières et critères.',
@@ -53,6 +56,7 @@ export function FeedbackPage() {
   } = useFeedbackStore();
 
   const { user } = useAuthStore();
+  const { hasSubmitted, isLoading: isCheckingFeedback } = useHasSubmittedFeedback();
   const [error, setError] = React.useState<string | null>(null);
 
   // Pas de reset au montage → on reprend là où le user en était (persisté dans localStorage)
@@ -205,6 +209,29 @@ export function FeedbackPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Garde : feedback déjà soumis (accès direct par URL)
+  if (!isCheckingFeedback && hasSubmitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 py-8 px-4">
+        <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+            Vous avez déjà donné votre avis
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Merci pour votre participation ! Vos retours nous sont précieux.
+          </p>
+          <Link
+            to="/landing"
+            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+          >
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     return (

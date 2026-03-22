@@ -30,6 +30,7 @@ import useTokenBalance from '../../hooks/useTokenBalance';
 import { FEATURES } from '../../lib/features';
 import { checkIsAdmin } from '../../lib/ragApi';
 import { RedeemCodeModal } from '../modals/RedeemCodeModal';
+import { useHasSubmittedFeedback } from '../../hooks/useHasSubmittedFeedback';
 
 // Event pour notifier les changements de tokens
 export const tokenUpdateEvent = new EventTarget();
@@ -43,6 +44,7 @@ export function Header() {
   const [isSettingsDropdownOpen, setIsSettingsDropdownOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isRedeemModalOpen, setIsRedeemModalOpen] = React.useState(false);
+  const { hasSubmitted: hasSubmittedFeedback } = useHasSubmittedFeedback();
   const location = useLocation();
 
   // États pour les 4 menus déroulants
@@ -493,14 +495,21 @@ Scénarios pédagogiques
                           J'ai un code !
                         </button>
 
-                        <Link
-                          to="/feedback"
-                          className="flex items-center px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          onClick={() => setIsSettingsDropdownOpen(false)}
-                        >
-                          <ClipboardList className="w-4 h-4 mr-2" />
-                          Donner votre avis
-                        </Link>
+                        {hasSubmittedFeedback ? (
+                          <span className="flex items-center px-4 py-2 text-sm text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                            <ClipboardList className="w-4 h-4 mr-2" />
+                            Avis envoyé
+                          </span>
+                        ) : (
+                          <Link
+                            to="/feedback"
+                            className="flex items-center px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={() => setIsSettingsDropdownOpen(false)}
+                          >
+                            <ClipboardList className="w-4 h-4 mr-2" />
+                            Donner votre avis
+                          </Link>
+                        )}
 
                         <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
 
@@ -822,14 +831,21 @@ Scénarios pédagogiques
                 <span>J'ai un code !</span>
               </button>
 
-              <Link
-                to="/feedback"
-                className="flex items-center w-full px-3 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <ClipboardList className="h-5 w-5 mr-2" />
-                <span>Donner votre avis</span>
-              </Link>
+              {hasSubmittedFeedback ? (
+                <span className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed rounded-md">
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  <span>Avis envoyé</span>
+                </span>
+              ) : (
+                <Link
+                  to="/feedback"
+                  className="flex items-center w-full px-3 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  <span>Donner votre avis</span>
+                </Link>
+              )}
 
               <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
 
