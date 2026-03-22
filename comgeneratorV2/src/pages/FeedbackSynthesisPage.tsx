@@ -283,8 +283,20 @@ export function FeedbackSynthesisPage() {
     FEEDBACK_SECTIONS.some(fs => fs.key === s.section)
   );
 
+  const SHORT_LABELS: Record<string, string> = {
+    'Appréciations Intelligentes': 'Appréciations',
+    'Synthèses de Bulletins': 'Synthèses',
+    'Communications Professionnelles': 'Communications',
+    'Séances Pédagogiques': 'Séances',
+    'Scénarios Pédagogiques': 'Scénarios',
+    'Banques Personnalisées': 'Banques',
+    'Veille Éducative': 'Veille',
+    'Chatbot Personnel': 'Chatbot',
+    'Choix du Modèle LLM': 'Modèle LLM',
+  };
+
   const radarData = {
-    labels: featureSections.map(s => s.label),
+    labels: featureSections.map(s => SHORT_LABELS[s.label] || s.label),
     datasets: [
       {
         label: 'Utilité',
@@ -411,15 +423,17 @@ export function FeedbackSynthesisPage() {
           {/* Radar */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <h3 className="font-semibold text-gray-800 dark:text-white mb-4">Utilité perçue par fonctionnalité</h3>
-            <div className="aspect-square max-h-80 mx-auto">
+            <div className="mx-auto" style={{ maxHeight: '420px', aspectRatio: '1' }}>
               <Radar
                 data={radarData}
                 options={{
+                  layout: { padding: 20 },
                   scales: {
                     r: {
                       beginAtZero: true,
                       max: 5,
                       ticks: { stepSize: 1 },
+                      pointLabels: { font: { size: 12 } },
                     },
                   },
                   plugins: { legend: { display: false } },
