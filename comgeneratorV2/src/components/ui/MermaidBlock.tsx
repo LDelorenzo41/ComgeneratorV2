@@ -10,6 +10,10 @@ let mermaidInitialized = false;
 function sanitizeMermaid(code: string): string {
   let sanitized = code;
 
+  // Normalize smart/curly quotes to straight quotes (LLMs often generate these)
+  sanitized = sanitized.replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"');
+  sanitized = sanitized.replace(/[\u2018\u2019\u201A\u201B]/g, "'");
+
   // First pass: escape problematic characters inside already-quoted bracket labels
   // A["text with [0;3] inside"] → A["text with &#91;0&#59;3&#93; inside"]
   sanitized = sanitized.replace(
@@ -100,9 +104,9 @@ const MermaidBlock: React.FC<{ chart: string }> = ({ chart }) => {
     let cancelled = false;
 
     const renderChart = async () => {
-      try {
-        const mermaid = (await import('mermaid')).default;
+      const mermaid = (await import('mermaid')).default;
 
+      try {
         if (!mermaidInitialized) {
           const isDark = document.documentElement.classList.contains('dark');
           mermaid.initialize({
