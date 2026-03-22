@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface FeedbackFormState {
   // Étape courante
@@ -63,51 +64,70 @@ const initialGeneralTexts = {
   commentaire_final: '',
 };
 
-export const useFeedbackStore = create<FeedbackFormState>((set) => ({
-  currentStep: 0,
-  setCurrentStep: (step) => set({ currentStep: step }),
-
-  profile: { ...initialProfile },
-  setProfile: (partial) =>
-    set((state) => ({ profile: { ...state.profile, ...partial } })),
-
-  ratings: {},
-  setRating: (section, questionKey, rating) =>
-    set((state) => ({
-      ratings: {
-        ...state.ratings,
-        [section]: {
-          ...(state.ratings[section] || {}),
-          [questionKey]: rating,
-        },
-      },
-    })),
-
-  comments: {},
-  setComment: (section, comment) =>
-    set((state) => ({
-      comments: { ...state.comments, [section]: comment },
-    })),
-
-  generalTexts: { ...initialGeneralTexts },
-  setGeneralText: (key, value) =>
-    set((state) => ({
-      generalTexts: { ...state.generalTexts, [key]: value },
-    })),
-
-  isSubmitting: false,
-  setIsSubmitting: (v) => set({ isSubmitting: v }),
-  isSubmitted: false,
-  setIsSubmitted: (v) => set({ isSubmitted: v }),
-
-  reset: () =>
-    set({
+export const useFeedbackStore = create<FeedbackFormState>()(
+  persist(
+    (set) => ({
       currentStep: 0,
+      setCurrentStep: (step) => set({ currentStep: step }),
+
       profile: { ...initialProfile },
+      setProfile: (partial) =>
+        set((state) => ({ profile: { ...state.profile, ...partial } })),
+
       ratings: {},
+      setRating: (section, questionKey, rating) =>
+        set((state) => ({
+          ratings: {
+            ...state.ratings,
+            [section]: {
+              ...(state.ratings[section] || {}),
+              [questionKey]: rating,
+            },
+          },
+        })),
+
       comments: {},
+      setComment: (section, comment) =>
+        set((state) => ({
+          comments: { ...state.comments, [section]: comment },
+        })),
+
       generalTexts: { ...initialGeneralTexts },
+      setGeneralText: (key, value) =>
+        set((state) => ({
+          generalTexts: { ...state.generalTexts, [key]: value },
+        })),
+
       isSubmitting: false,
+      setIsSubmitting: (v) => set({ isSubmitting: v }),
       isSubmitted: false,
+      setIsSubmitted: (v) => set({ isSubmitted: v }),
+
+      reset: () => {
+        set({
+          currentStep: 0,
+          profile: { ...initialProfile },
+          ratings: {},
+          comments: {},
+          generalTexts: { ...initialGeneralTexts },
+          isSubmitting: false,
+          isSubmitted: false,
+        });
+        // Nettoyer le localStorage après soumission réussie
+        localStorage.removeItem('feedback-form-storage');
+      },
     }),
-}));
+    {
+      name: 'feedback-form-storage',
+      // Ne pas persister les états transitoires
+      partialize: (state) => ({
+        currentStep: state.currentStep,
+        profile: state.profile,
+        ratings: state.ratings,
+        comments: state.comments,
+        generalTexts: state.generalTexts,
+        isSubmitted: state.isSubmitted,
+      }),
+    }
+  )
+);

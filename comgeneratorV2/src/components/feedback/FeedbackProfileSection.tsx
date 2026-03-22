@@ -1,17 +1,39 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useFeedbackStore } from '../../lib/feedbackStore';
-import { User, Mail, BookOpen, GraduationCap, Clock, Coins } from 'lucide-react';
+import { useAuthStore } from '../../lib/store';
+import { User, Mail, BookOpen, GraduationCap, Clock, Coins, Gift } from 'lucide-react';
 
 export function FeedbackProfileSection() {
   const { profile, setProfile } = useFeedbackStore();
+  const { user } = useAuthStore();
+
+  // Pré-remplir l'email avec celui du compte connecté (uniquement si le champ est vide)
+  useEffect(() => {
+    if (user?.email && !profile.tester_email) {
+      setProfile({ tester_email: user.email });
+    }
+  }, [user]);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-1">Votre profil</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Ces informations sont optionnelles mais nous aident à mieux comprendre vos retours.
+          Les champs marqués d'un <span className="text-red-500">*</span> sont obligatoires.
         </p>
+      </div>
+
+      {/* Bandeau récompense */}
+      <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+        <Gift className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+            Merci pour votre aide !
+          </p>
+          <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-0.5">
+            En remerciement, <strong>30 000 tokens gratuits</strong> seront automatiquement crédités sur votre compte à l'envoi du questionnaire.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -42,12 +64,15 @@ export function FeedbackProfileSection() {
             placeholder="exemple@email.com"
             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Utilisez l'email de votre compte ProfAssist pour recevoir vos tokens de récompense.
+          </p>
         </div>
 
         {/* Matière */}
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            <BookOpen className="w-4 h-4" /> Matière enseignée
+            <BookOpen className="w-4 h-4" /> Matière enseignée <span className="text-red-500 text-xs">*</span>
           </label>
           <input
             type="text"
@@ -61,7 +86,7 @@ export function FeedbackProfileSection() {
         {/* Niveau */}
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            <GraduationCap className="w-4 h-4" /> Niveau d'enseignement
+            <GraduationCap className="w-4 h-4" /> Niveau d'enseignement <span className="text-red-500 text-xs">*</span>
           </label>
           <select
             value={profile.niveau}
@@ -81,7 +106,7 @@ export function FeedbackProfileSection() {
         {/* Ancienneté */}
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            <Clock className="w-4 h-4" /> Années d'expérience
+            <Clock className="w-4 h-4" /> Années d'expérience <span className="text-red-500 text-xs">*</span>
           </label>
           <input
             type="number"

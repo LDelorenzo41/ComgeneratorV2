@@ -10,6 +10,12 @@ import { FeedbackThankYou } from '../components/feedback/FeedbackThankYou';
 import { useFeedbackStore } from '../lib/feedbackStore';
 import { submitFeedback } from '../lib/feedbackApi';
 import { FEEDBACK_SECTIONS } from '../types/feedback';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../lib/store';
+import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
+import { useHasSubmittedFeedback } from '../hooks/useHasSubmittedFeedback';
+import { CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const FEATURE_DESCRIPTIONS: Record<string, string> = {
   appreciations: 'Génération automatique d\'appréciations personnalisées pour les élèves, avec gestion de matières et critères.',
@@ -32,6 +38,8 @@ const STEP_LABELS = [
 
 const TOTAL_STEPS = STEP_LABELS.length;
 
+const FEEDBACK_REWARD_TOKENS = 30000;
+
 export function FeedbackPage() {
   const {
     currentStep,
@@ -47,14 +55,40 @@ export function FeedbackPage() {
     reset,
   } = useFeedbackStore();
 
+  const { user } = useAuthStore();
+  const { hasSubmitted, isLoading: isCheckingFeedback } = useHasSubmittedFeedback();
   const [error, setError] = React.useState<string | null>(null);
 
-  // Reset on mount
-  React.useEffect(() => {
-    reset();
-  }, []);
+  // Pas de reset au montage → on reprend là où le user en était (persisté dans localStorage)
+
+  const validateProfileStep = (): string | null => {
+    if (!profile.tester_email || !profile.tester_email.trim()) {
+      return 'L\'adresse email est obligatoire.';
+    }
+    if (!profile.matiere || !profile.matiere.trim()) {
+      return 'La matière enseignée est obligatoire.';
+    }
+    if (!profile.niveau) {
+      return 'Le niveau d\'enseignement est obligatoire.';
+    }
+    if (profile.anciennete === null || profile.anciennete === undefined) {
+      return 'Les années d\'expérience sont obligatoires.';
+    }
+    return null;
+  };
 
   const handleNext = () => {
+    setError(null);
+
+    // Validation à l'étape profil (step 0)
+    if (currentStep === 0) {
+      const validationError = validateProfileStep();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
+
     if (currentStep < TOTAL_STEPS - 1) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -62,16 +96,47 @@ export function FeedbackPage() {
   };
 
   const handlePrev = () => {
+    setError(null);
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
+  // Créditer les tokens de récompense
+  const creditRewardTokens = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profileData, error: fetchError } = await supabase
+        .from('profiles')
+        .select('tokens')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          tokens: (profileData?.tokens || 0) + FEEDBACK_REWARD_TOKENS,
+        })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Notifier le Header pour mettre à jour le solde affiché
+      tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+    } catch (err) {
+      console.error('Erreur lors du crédit des tokens de récompense:', err);
+    }
+  };
+
   const handleSubmit = async () => {
-    // Validation email obligatoire
-    if (!profile.tester_email || !profile.tester_email.trim()) {
-      setError('L\'adresse email est obligatoire pour soumettre le feedback.');
+    // Validation profil (au cas où le user revient en arrière et modifie)
+    const validationError = validateProfileStep();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -128,6 +193,12 @@ export function FeedbackPage() {
       );
 
       if (result.success) {
+        // Créditer les tokens de récompense
+        await creditRewardTokens();
+        setIsSubmitted(true);
+        // Nettoyer le localStorage (le reset du store s'en charge)
+        reset();
+        // Remettre isSubmitted après le reset
         setIsSubmitted(true);
       } else {
         setError(result.error || 'Une erreur est survenue lors de l\'envoi.');
@@ -138,6 +209,29 @@ export function FeedbackPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Garde : feedback déjà soumis (accès direct par URL)
+  if (!isCheckingFeedback && hasSubmitted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 py-8 px-4">
+        <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+            Vous avez déjà donné votre avis
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Merci pour votre participation ! Vos retours nous sont précieux.
+          </p>
+          <Link
+            to="/landing"
+            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+          >
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     return (
