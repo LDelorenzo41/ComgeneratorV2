@@ -22,10 +22,12 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   syntheses: 'Upload de bulletins PDF, extraction OCR et synthèse automatique par l\'IA.',
   communications: 'Rédaction de messages professionnels (parents, collègues) et réponses assistées par l\'IA.',
   seances: 'Création de séances pédagogiques structurées avec export PDF et choix du type de pédagogie.',
+  supports: 'Génération automatique de supports de cours, exercices, évaluations et fiches d\'activités.',
   scenarios: 'Planification de séquences pédagogiques multi-séances avec objectifs et évaluations.',
   banques: 'Sauvegarde, recherche et réutilisation de vos appréciations, séances, scénarios et réponses chatbot.',
   veille: 'Fil d\'actualités éducatives (RSS) : Café Pédagogique, Éduscol, VousNousIls, etc.',
   chatbot: 'Chatbot personnel basé sur vos propres documents (RAG) avec corpus officiel et personnel.',
+  choix_modele: 'Possibilité de choisir le modèle d\'IA (GPT-4o, Claude, Gemini, etc.) pour chaque génération.',
 };
 
 const STEP_LABELS = [

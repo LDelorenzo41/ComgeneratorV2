@@ -239,13 +239,66 @@ export function FeedbackSynthesisPage() {
   const avgRecommandation = generalSection?.ratings?.recommandation?.average || 0;
   const avgPretAPayer = pricingSection?.ratings?.pret_a_payer?.average || 0;
 
+  // Fonctionnalité préférée (histogram data)
+  const prefereeSection = data.sections.find(s => s.section === 'general_preferee');
+  const prefereeCounts: Record<string, number> = {};
+  FEEDBACK_SECTIONS.forEach(fs => { prefereeCounts[fs.label] = 0; });
+  if (prefereeSection) {
+    prefereeSection.comments.forEach(c => {
+      const label = c.comment.trim();
+      if (label in prefereeCounts) {
+        prefereeCounts[label] += 1;
+      }
+    });
+  }
+  const prefereeLabels = Object.keys(prefereeCounts);
+  const prefereeValues = Object.values(prefereeCounts);
+
+  const prefereeData = {
+    labels: prefereeLabels.map(l => {
+      const words = l.split(' ');
+      return words.length > 2 ? words.slice(0, 2).join(' ') + '...' : l;
+    }),
+    datasets: [
+      {
+        label: 'Votes',
+        data: prefereeValues,
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.7)',
+          'rgba(16, 185, 129, 0.7)',
+          'rgba(245, 158, 11, 0.7)',
+          'rgba(239, 68, 68, 0.7)',
+          'rgba(139, 92, 246, 0.7)',
+          'rgba(236, 72, 153, 0.7)',
+          'rgba(20, 184, 166, 0.7)',
+          'rgba(249, 115, 22, 0.7)',
+          'rgba(100, 116, 139, 0.7)',
+          'rgba(34, 197, 94, 0.7)',
+        ],
+      },
+    ],
+  };
+
   // Radar data (utilité par feature)
   const featureSections = data.sections.filter(s =>
     FEEDBACK_SECTIONS.some(fs => fs.key === s.section)
   );
 
+  const SHORT_LABELS: Record<string, string> = {
+    'Appréciations Intelligentes': 'Appréciations',
+    'Synthèses de Bulletins': 'Synthèses',
+    'Communications Professionnelles': 'Communications',
+    'Séances Pédagogiques': 'Séances',
+    'Génération de Supports/Exercices': 'Supports/Exos',
+    'Scénarios Pédagogiques': 'Scénarios',
+    'Banques Personnalisées': 'Banques',
+    'Veille Éducative': 'Veille',
+    'Chatbot Personnel': 'Chatbot',
+    'Choix du Modèle LLM': 'Modèle LLM',
+  };
+
   const radarData = {
-    labels: featureSections.map(s => s.label),
+    labels: featureSections.map(s => SHORT_LABELS[s.label] || s.label),
     datasets: [
       {
         label: 'Utilité',
@@ -372,15 +425,17 @@ export function FeedbackSynthesisPage() {
           {/* Radar */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <h3 className="font-semibold text-gray-800 dark:text-white mb-4">Utilité perçue par fonctionnalité</h3>
-            <div className="aspect-square max-h-80 mx-auto">
+            <div className="mx-auto" style={{ maxHeight: '420px', aspectRatio: '1' }}>
               <Radar
                 data={radarData}
                 options={{
+                  layout: { padding: 20 },
                   scales: {
                     r: {
                       beginAtZero: true,
                       max: 5,
                       ticks: { stepSize: 1 },
+                      pointLabels: { font: { size: 12 } },
                     },
                   },
                   plugins: { legend: { display: false } },
@@ -406,6 +461,28 @@ export function FeedbackSynthesisPage() {
               }}
             />
           </div>
+        </div>
+
+        {/* Histogramme fonctionnalité préférée */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+          <h3 className="font-semibold text-gray-800 dark:text-white mb-4">Quelle est votre fonctionnalité préférée ?</h3>
+          <Bar
+            data={prefereeData}
+            options={{
+              indexAxis: 'y',
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  ticks: { stepSize: 1, precision: 0 },
+                  title: { display: true, text: 'Nombre de votes' },
+                },
+              },
+              plugins: {
+                legend: { display: false },
+              },
+              maintainAspectRatio: true,
+            }}
+          />
         </div>
 
         {/* Feature Cards */}

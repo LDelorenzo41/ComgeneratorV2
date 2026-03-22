@@ -2,14 +2,14 @@
 
 export interface FeedbackSession {
   id?: string;
-  tester_name: string;
-  tester_email: string;
-  matiere: string;
-  niveau: string;
+  tester_name: string | null;
+  tester_email: string | null;
+  matiere: string | null;
+  niveau: string | null;
   anciennete: number | null;
   a_achete_tokens: boolean | null;
-  prevoit_acheter: string;
-  raison_achat: string;
+  prevoit_acheter: string | null;
+  raison_achat: string | null;
   completed: boolean;
   created_at?: string;
 }
@@ -37,10 +37,12 @@ export const FEEDBACK_SECTIONS = [
   { key: 'syntheses', label: 'Synthèses de Bulletins', icon: 'FileText' },
   { key: 'communications', label: 'Communications Professionnelles', icon: 'Mail' },
   { key: 'seances', label: 'Séances Pédagogiques', icon: 'BookOpen' },
+  { key: 'supports', label: 'Génération de Supports/Exercices', icon: 'ClipboardList' },
   { key: 'scenarios', label: 'Scénarios Pédagogiques', icon: 'Layers' },
   { key: 'banques', label: 'Banques Personnalisées', icon: 'Database' },
   { key: 'veille', label: 'Veille Éducative', icon: 'TrendingUp' },
   { key: 'chatbot', label: 'Chatbot Personnel', icon: 'Bot' },
+  { key: 'choix_modele', label: 'Choix du Modèle LLM', icon: 'Cpu' },
 ] as const;
 
 export type FeatureSectionKey = typeof FEEDBACK_SECTIONS[number]['key'];
