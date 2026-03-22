@@ -22,6 +22,7 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   syntheses: 'Upload de bulletins PDF, extraction OCR et synthèse automatique par l\'IA.',
   communications: 'Rédaction de messages professionnels (parents, collègues) et réponses assistées par l\'IA.',
   seances: 'Création de séances pédagogiques structurées avec export PDF et choix du type de pédagogie.',
+  supports: 'Génération automatique de supports de cours, exercices, évaluations et fiches d\'activités.',
   scenarios: 'Planification de séquences pédagogiques multi-séances avec objectifs et évaluations.',
   banques: 'Sauvegarde, recherche et réutilisation de vos appréciations, séances, scénarios et réponses chatbot.',
   veille: 'Fil d\'actualités éducatives (RSS) : Café Pédagogique, Éduscol, VousNousIls, etc.',

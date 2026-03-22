@@ -37,6 +37,7 @@ export const FEEDBACK_SECTIONS = [
   { key: 'syntheses', label: 'Synthèses de Bulletins', icon: 'FileText' },
   { key: 'communications', label: 'Communications Professionnelles', icon: 'Mail' },
   { key: 'seances', label: 'Séances Pédagogiques', icon: 'BookOpen' },
+  { key: 'supports', label: 'Génération de Supports/Exercices', icon: 'ClipboardList' },
   { key: 'scenarios', label: 'Scénarios Pédagogiques', icon: 'Layers' },
   { key: 'banques', label: 'Banques Personnalisées', icon: 'Database' },
   { key: 'veille', label: 'Veille Éducative', icon: 'TrendingUp' },
