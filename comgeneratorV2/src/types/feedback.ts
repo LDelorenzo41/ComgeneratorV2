@@ -2,14 +2,14 @@
 
 export interface FeedbackSession {
   id?: string;
-  tester_name: string;
-  tester_email: string;
-  matiere: string;
-  niveau: string;
+  tester_name: string | null;
+  tester_email: string | null;
+  matiere: string | null;
+  niveau: string | null;
   anciennete: number | null;
   a_achete_tokens: boolean | null;
-  prevoit_acheter: string;
-  raison_achat: string;
+  prevoit_acheter: string | null;
+  raison_achat: string | null;
   completed: boolean;
   created_at?: string;
 }

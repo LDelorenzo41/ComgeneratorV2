@@ -22,7 +22,7 @@ export function useHasSubmittedFeedback() {
         const { count, error } = await supabase
           .from('feedback_sessions')
           .select('id', { count: 'exact', head: true })
-          .eq('tester_email', user.email)
+          .eq('tester_email', user.email!)
           .eq('completed', true);
 
         if (!error && count !== null && count > 0) {
