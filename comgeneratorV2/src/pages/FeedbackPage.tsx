@@ -164,7 +164,7 @@ export function FeedbackPage() {
             Aidez-nous à améliorer ProfAssist
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-            Ce questionnaire prend environ 10 minutes. Vos réponses sont anonymes.
+            Ce questionnaire prend entre 5 et 10 minutes. Vos réponses sont anonymes.
           </p>
         </div>
 
