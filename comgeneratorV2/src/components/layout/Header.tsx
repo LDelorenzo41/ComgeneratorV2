@@ -492,9 +492,18 @@ Scénarios pédagogiques
                           <Gift className="w-4 h-4 mr-2" />
                           J'ai un code !
                         </button>
-                        
+
+                        <Link
+                          to="/feedback"
+                          className="flex items-center px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setIsSettingsDropdownOpen(false)}
+                        >
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Donner votre avis
+                        </Link>
+
                         <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
-                        
+
                         <Link
                           to="/settings"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -812,9 +821,18 @@ Scénarios pédagogiques
                 <Gift className="h-5 w-5 mr-2" />
                 <span>J'ai un code !</span>
               </button>
-              
+
+              <Link
+                to="/feedback"
+                className="flex items-center w-full px-3 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <ClipboardList className="h-5 w-5 mr-2" />
+                <span>Donner votre avis</span>
+              </Link>
+
               <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
-              
+
               <Link
                 to="/settings"
                 className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
@@ -856,6 +874,17 @@ Scénarios pédagogiques
     </header>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

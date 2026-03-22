@@ -1,7 +1,7 @@
 import React from 'react';
 import { StarRating } from './StarRating';
 import { useFeedbackStore } from '../../lib/feedbackStore';
-import { GENERAL_RATING_QUESTIONS } from '../../types/feedback';
+import { GENERAL_RATING_QUESTIONS, FEEDBACK_SECTIONS } from '../../types/feedback';
 
 export function FeedbackGeneralSection() {
   const { ratings, setRating, comments, setComment, generalTexts, setGeneralText } = useFeedbackStore();
@@ -32,13 +32,16 @@ export function FeedbackGeneralSection() {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Quelle est votre fonctionnalité préférée ?
           </label>
-          <textarea
+          <select
             value={generalTexts.fonctionnalite_preferee}
             onChange={(e) => setGeneralText('fonctionnalite_preferee', e.target.value)}
-            placeholder="La fonctionnalité que vous utilisez le plus ou qui vous plaît le plus..."
-            rows={2}
             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+          >
+            <option value="">-- Sélectionnez une fonctionnalité --</option>
+            {FEEDBACK_SECTIONS.map((s) => (
+              <option key={s.key} value={s.label}>{s.label}</option>
+            ))}
+          </select>
         </div>
 
         <div>
