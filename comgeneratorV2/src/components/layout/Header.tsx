@@ -468,11 +468,19 @@ Scénarios pédagogiques
                               <Megaphone className="w-4 h-4 mr-2" />
                               Campagnes promo
                             </Link>
+                            <Link
+                              to="/admin/feedback"
+                              className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              onClick={() => setIsSettingsDropdownOpen(false)}
+                            >
+                              <ClipboardList className="w-4 h-4 mr-2" />
+                              Feedback testeurs
+                            </Link>
                             <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                           </>
                         )}
 
-                        
+
                         {/* J'ai un code - pour tous les users */}
                         <button
                           onClick={() => {
@@ -780,6 +788,14 @@ Scénarios pédagogiques
                     <Megaphone className="h-5 w-5 mr-2" />
                     <span>Campagnes promo</span>
                   </Link>
+                  <Link
+                    to="/admin/feedback"
+                    className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <ClipboardList className="h-5 w-5 mr-2" />
+                    <span>Feedback testeurs</span>
+                  </Link>
                   <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
                 </>
               )}
@@ -840,6 +856,17 @@ Scénarios pédagogiques
     </header>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
