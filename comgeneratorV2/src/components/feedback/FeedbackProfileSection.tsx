@@ -32,10 +32,11 @@ export function FeedbackProfileSection() {
         {/* Email */}
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            <Mail className="w-4 h-4" /> Votre email <span className="text-gray-400 text-xs">(optionnel)</span>
+            <Mail className="w-4 h-4" /> Votre email <span className="text-red-500 text-xs">*</span>
           </label>
           <input
             type="email"
+            required
             value={profile.tester_email}
             onChange={(e) => setProfile({ tester_email: e.target.value })}
             placeholder="exemple@email.com"

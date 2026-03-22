@@ -69,6 +69,12 @@ export function FeedbackPage() {
   };
 
   const handleSubmit = async () => {
+    // Validation email obligatoire
+    if (!profile.tester_email || !profile.tester_email.trim()) {
+      setError('L\'adresse email est obligatoire pour soumettre le feedback.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 

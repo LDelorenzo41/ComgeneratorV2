@@ -17,6 +17,10 @@ export async function submitFeedback(
       .single();
 
     if (sessionError || !sessionData) {
+      // Doublon email → l'utilisateur a déjà répondu
+      if (sessionError?.code === '23505') {
+        return { success: false, error: 'Vous avez déjà soumis un feedback avec cette adresse email.' };
+      }
       throw new Error(sessionError?.message || 'Erreur lors de la création de la session');
     }
 
