@@ -45,6 +45,10 @@ import { UnsubscribePage } from './pages/UnsubscribePage';
 // Import de la page Admin Campagnes
 import { AdminCampaignsPage } from './pages/AdminCampaignsPage';
 
+// Import des pages Feedback testeurs
+import { FeedbackPage } from './pages/FeedbackPage';
+import { FeedbackSynthesisPage } from './pages/FeedbackSynthesisPage';
+
 // Import des composants cookies
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
@@ -152,6 +156,11 @@ function App() {
 
               {/* Route publique de désabonnement */}
               <Route path="/unsubscribe" element={<UnsubscribePage />} />
+
+              {/* Route publique feedback testeurs */}
+              {FEATURES.FEEDBACK_ENABLED && (
+                <Route path="/feedback" element={<FeedbackPage />} />
+              )}
               
               {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
               <Route element={<AuthLayout />}>
@@ -241,6 +250,13 @@ function App() {
                 <Route path="/admin/dashboard" element={
                   <EmailConfirmationGuard>
                     <AdminDashboardPage />
+                  </EmailConfirmationGuard>
+                } />
+
+                {/* Route admin feedback testeurs */}
+                <Route path="/admin/feedback" element={
+                  <EmailConfirmationGuard>
+                    <FeedbackSynthesisPage />
                   </EmailConfirmationGuard>
                 } />
 

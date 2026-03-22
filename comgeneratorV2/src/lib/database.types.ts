@@ -14,6 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
+      feedback_sessions: {
+        Row: {
+          id: string
+          tester_name: string | null
+          tester_email: string | null
+          matiere: string | null
+          niveau: string | null
+          anciennete: number | null
+          a_achete_tokens: boolean | null
+          prevoit_acheter: string | null
+          raison_achat: string | null
+          completed: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tester_name?: string | null
+          tester_email?: string | null
+          matiere?: string | null
+          niveau?: string | null
+          anciennete?: number | null
+          a_achete_tokens?: boolean | null
+          prevoit_acheter?: string | null
+          raison_achat?: string | null
+          completed?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tester_name?: string | null
+          tester_email?: string | null
+          matiere?: string | null
+          niveau?: string | null
+          anciennete?: number | null
+          a_achete_tokens?: boolean | null
+          prevoit_acheter?: string | null
+          raison_achat?: string | null
+          completed?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      feedback_ratings: {
+        Row: {
+          id: string
+          session_id: string
+          section: string
+          question_key: string
+          rating: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          section: string
+          question_key: string
+          rating: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          section?: string
+          question_key?: string
+          rating?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_ratings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_sessions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      feedback_comments: {
+        Row: {
+          id: string
+          session_id: string
+          section: string
+          comment: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          section: string
+          comment: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          section?: string
+          comment?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_comments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_sessions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       appreciations: {
         Row: {
           created_at: string

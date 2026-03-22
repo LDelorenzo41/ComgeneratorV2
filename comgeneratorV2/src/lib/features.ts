@@ -9,6 +9,9 @@ export const FEATURES = {
   // Scénario pédagogique - à activer quand prêt
   SCENARIO_ENABLED: true,
   
+  // Formulaire de feedback testeurs
+  FEEDBACK_ENABLED: true,
+
   // Autres features à venir...
 } as const;
 
