@@ -272,6 +272,7 @@ export function FeedbackSynthesisPage() {
           'rgba(236, 72, 153, 0.7)',
           'rgba(20, 184, 166, 0.7)',
           'rgba(249, 115, 22, 0.7)',
+          'rgba(100, 116, 139, 0.7)',
         ],
       },
     ],

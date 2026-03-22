@@ -41,6 +41,7 @@ export const FEEDBACK_SECTIONS = [
   { key: 'banques', label: 'Banques Personnalisées', icon: 'Database' },
   { key: 'veille', label: 'Veille Éducative', icon: 'TrendingUp' },
   { key: 'chatbot', label: 'Chatbot Personnel', icon: 'Bot' },
+  { key: 'choix_modele', label: 'Choix du Modèle LLM', icon: 'Cpu' },
 ] as const;
 
 export type FeatureSectionKey = typeof FEEDBACK_SECTIONS[number]['key'];

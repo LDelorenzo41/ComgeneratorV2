@@ -26,6 +26,7 @@ const FEATURE_DESCRIPTIONS: Record<string, string> = {
   banques: 'Sauvegarde, recherche et réutilisation de vos appréciations, séances, scénarios et réponses chatbot.',
   veille: 'Fil d\'actualités éducatives (RSS) : Café Pédagogique, Éduscol, VousNousIls, etc.',
   chatbot: 'Chatbot personnel basé sur vos propres documents (RAG) avec corpus officiel et personnel.',
+  choix_modele: 'Possibilité de choisir le modèle d\'IA (GPT-4o, Claude, Gemini, etc.) pour chaque génération.',
 };
 
 const STEP_LABELS = [
