@@ -93,17 +93,17 @@ export const testSupabaseConnection = async () => {
 // Helper function to check if the project is paused
 export const checkProjectStatus = async () => {
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-      method: 'HEAD',
+    const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      method: 'GET',
       headers: {
         'apikey': supabaseAnonKey || '',
       },
     });
-    
+
     if (response.status === 503) {
       throw new Error('Votre projet Supabase est en pause. Veuillez le réactiver depuis votre tableau de bord Supabase.');
     }
-    
+
     return response.ok;
   } catch (error: any) {
     if (error.message.includes('en pause')) {
