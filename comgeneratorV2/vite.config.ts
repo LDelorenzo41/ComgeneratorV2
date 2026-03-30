@@ -9,11 +9,9 @@ export default defineConfig({
     wasm(),
     topLevelAwait()
   ],
-  build: {
-    target: 'esnext',
-  },
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
 });
+
 
