@@ -22,8 +22,10 @@ import {
   ArrowLeft,
   Copy,
   Check,
-  Sparkles
+  Sparkles,
+  Maximize2
 } from 'lucide-react';
+import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 
 // ============================================================================
 // TYPES
@@ -66,6 +68,9 @@ export function ScenariosBankPage() {
   
   // État pour le feedback de copie du thème
   const [copiedRowKey, setCopiedRowKey] = React.useState<string | null>(null);
+
+  // Scénario affiché en plein écran (format classique large)
+  const [fullScreenScenario, setFullScreenScenario] = React.useState<ScenarioItem | null>(null);
 
   React.useEffect(() => {
     const fetchScenarios = async () => {
@@ -686,6 +691,16 @@ export function ScenariosBankPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            setFullScreenScenario(scenario);
+                          }}
+                          className="p-2 text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
+                          title="Afficher en plein écran (format classique)"
+                        >
+                          <Maximize2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             handleExportPDF(scenario);
                           }}
                           className="p-2 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
@@ -803,6 +818,54 @@ export function ScenariosBankPage() {
           </div>
         )}
       </div>
+
+      <FullScreenViewModal
+        isOpen={fullScreenScenario !== null}
+        onClose={() => setFullScreenScenario(null)}
+        title={fullScreenScenario?.theme ?? 'Scénario'}
+        subtitle={
+          fullScreenScenario
+            ? `${fullScreenScenario.matiere} · ${fullScreenScenario.niveau} · ${fullScreenScenario.nombre_seances} séances · ${fullScreenScenario.duree_seance} min`
+            : undefined
+        }
+      >
+        {fullScreenScenario && (() => {
+          const rows = parseMarkdownTable(fullScreenScenario.content);
+          if (rows.length === 0) {
+            return (
+              <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                {fullScreenScenario.content}
+              </pre>
+            );
+          }
+          return (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase w-32">Séance</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Phase &amp; Objectif</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Obstacles &amp; Diff.</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Activités &amp; Dispositifs</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-indigo-700 dark:text-indigo-300 uppercase">Évaluation &amp; Critères</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {rows.map((row, index) => (
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-3 py-3 align-top text-sm font-medium text-gray-900 dark:text-white">{renderMarkdown(row.numero)}</td>
+                      <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.phaseObjectif)}</td>
+                      <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.obstaclesDiff)}</td>
+                      <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.activitesDispositifs)}</td>
+                      <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300 align-top">{renderMarkdown(row.evaluationCriteres)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+      </FullScreenViewModal>
     </div>
   );
 }
