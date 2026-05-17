@@ -29,7 +29,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
-import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
+import LessonMarkdownRenderer from '../components/ui/LessonMarkdownRenderer';
 
 type LessonBank = {
   id: string;
@@ -1087,9 +1087,18 @@ export function LessonsBankPage() {
             : undefined
         }
       >
-        <EnhancedMarkdownRenderer
+        <LessonMarkdownRenderer
           content={fullScreenLesson?.content ?? ''}
           className="prose prose-base max-w-none dark:prose-invert"
+          onOpenExerciseModal={
+            fullScreenLesson
+              ? (phaseHeading) => {
+                  const lesson = fullScreenLesson;
+                  setFullScreenLesson(null);
+                  handleOpenExerciseModal(phaseHeading, lesson);
+                }
+              : undefined
+          }
         />
       </FullScreenViewModal>
     </div>

@@ -26,7 +26,7 @@ import { getFolders } from '../lib/ragApi';
 import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
-import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
+import LessonMarkdownRenderer from '../components/ui/LessonMarkdownRenderer';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
@@ -903,9 +903,17 @@ const MarkdownEditor: React.FC<{
         title="Aperçu de la séance"
         subtitle="Lecture plein écran"
       >
-        <EnhancedMarkdownRenderer
+        <LessonMarkdownRenderer
           content={content}
           className="prose prose-base max-w-none dark:prose-invert"
+          onOpenExerciseModal={
+            onOpenExerciseModal
+              ? (phaseHeading) => {
+                  setShowFullScreen(false);
+                  onOpenExerciseModal(phaseHeading);
+                }
+              : undefined
+          }
         />
       </FullScreenViewModal>
     </div>
