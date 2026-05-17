@@ -27,6 +27,7 @@ import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, no
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 import LessonMarkdownRenderer from '../components/ui/LessonMarkdownRenderer';
+import { mergeSupportsIntoLesson } from '../lib/lessonSupports';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
@@ -1713,6 +1714,10 @@ export function LessonGeneratorPage() {
         fullLessonContent={generatedContent}
         subject={lastFormData?.subject ?? ''}
         level={lastFormData?.level ?? ''}
+        lessonKey={lastFormData?.topic ?? 'generator'}
+        onAttachSupportsToLesson={(items) => {
+          setGeneratedContent((prev) => mergeSupportsIntoLesson(prev, items));
+        }}
       />
     </div>
   );

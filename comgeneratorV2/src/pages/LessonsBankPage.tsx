@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 import LessonMarkdownRenderer from '../components/ui/LessonMarkdownRenderer';
+import { mergeSupportsIntoLesson } from '../lib/lessonSupports';
 
 type LessonBank = {
   id: string;
@@ -1075,6 +1076,27 @@ export function LessonsBankPage() {
         fullLessonContent={selectedLessonForExercise?.content ?? ''}
         subject={selectedLessonForExercise?.subject ?? ''}
         level={selectedLessonForExercise?.level ?? ''}
+        lessonKey={selectedLessonForExercise?.id}
+        onAttachSupportsToLesson={async (items) => {
+          const target = selectedLessonForExercise;
+          if (!target || !user) throw new Error('Séance introuvable');
+          const newContent = mergeSupportsIntoLesson(target.content, items);
+          const { error } = await supabase
+            .from('lessons_bank')
+            .update({ content: newContent })
+            .eq('id', target.id)
+            .eq('user_id', user.id);
+          if (error) throw error;
+          setLessons((prev) =>
+            prev.map((l) => (l.id === target.id ? { ...l, content: newContent } : l))
+          );
+          setSelectedLessonForExercise((prev) =>
+            prev && prev.id === target.id ? { ...prev, content: newContent } : prev
+          );
+          setFullScreenLesson((prev) =>
+            prev && prev.id === target.id ? { ...prev, content: newContent } : prev
+          );
+        }}
       />
 
       <FullScreenViewModal

@@ -18,6 +18,11 @@ import {
   Minimize2,
   Info,
   UserRound,
+  Pin,
+  Trash2,
+  Eye,
+  EyeOff,
+  BookmarkPlus,
 } from 'lucide-react';
 import { secureApi } from '../../lib/secureApi';
 import copyToClipboard from '../../lib/copyToClipboard';
@@ -64,6 +69,26 @@ interface ExerciseGeneratorModalProps {
   fullLessonContent: string;
   subject: string;
   level: string;
+  /**
+   * Identifiant logique de la séance courante. Quand il change, la
+   * collection de supports épinglés est réinitialisée (évite de mélanger
+   * les supports d'une séance avec une autre).
+   */
+  lessonKey?: string;
+  /**
+   * Si fourni, un bouton "Ajouter à la séance" est proposé. Le parent
+   * décide comment persister (mémoire pour la génération, UPDATE pour la
+   * banque).
+   */
+  onAttachSupportsToLesson?: (
+    items: { heading: string; content: string }[]
+  ) => void | Promise<void>;
+}
+
+interface PinnedSupport {
+  id: string;
+  heading: string;
+  content: string;
 }
 
 const SUPPORT_TYPES = [
@@ -86,6 +111,8 @@ export function ExerciseGeneratorModal({
   fullLessonContent,
   subject,
   level,
+  lessonKey,
+  onAttachSupportsToLesson,
 }: ExerciseGeneratorModalProps) {
   const [supportType, setSupportType] = useState('auto');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -93,6 +120,88 @@ export function ExerciseGeneratorModal({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Collection de supports épinglés (durée de vie : session de la page)
+  const [pinnedSupports, setPinnedSupports] = useState<PinnedSupport[]>([]);
+  const [generatedHeading, setGeneratedHeading] = useState<string>('');
+  const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [showPinnedPanel, setShowPinnedPanel] = useState(true);
+
+  const cleanSupportLabel = (key: string) => {
+    if (key === 'auto') return 'Support pédagogique';
+    return SUPPORT_TYPES.find((t) => t.key === key)?.label ?? 'Support pédagogique';
+  };
+
+  // Réinitialise les épinglés quand on change de séance
+  useEffect(() => {
+    setPinnedSupports([]);
+    setExpandedPinnedId(null);
+  }, [lessonKey]);
+
+  const isCurrentPinned =
+    !!generatedContent && pinnedSupports.some((p) => p.content === generatedContent);
+
+  const showToast = (message: string) => {
+    const el = document.createElement('div');
+    el.className =
+      'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-[80] transition-all duration-300';
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }, 2500);
+  };
+
+  const handleTogglePin = () => {
+    if (!generatedContent) return;
+    const existing = pinnedSupports.find((p) => p.content === generatedContent);
+    if (existing) {
+      setPinnedSupports((prev) => prev.filter((p) => p.id !== existing.id));
+      return;
+    }
+    setPinnedSupports((prev) => [
+      ...prev,
+      {
+        id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        heading: generatedHeading || phaseHeading,
+        content: generatedContent,
+      },
+    ]);
+  };
+
+  const handleUnpin = (id: string) => {
+    setPinnedSupports((prev) => prev.filter((p) => p.id !== id));
+    setExpandedPinnedId((cur) => (cur === id ? null : cur));
+  };
+
+  const handleReshow = (content: string) => {
+    setError(null);
+    setGeneratedContent(content);
+  };
+
+  const handleCopyPinned = async (content: string) => {
+    await copyToClipboard(content);
+    showToast('Support copié');
+  };
+
+  const handleAttach = async (items: { heading: string; content: string }[]) => {
+    if (!onAttachSupportsToLesson || items.length === 0) return;
+    setIsAttaching(true);
+    try {
+      await onAttachSupportsToLesson(items);
+      showToast(
+        items.length > 1
+          ? `${items.length} supports ajoutés à la séance`
+          : 'Support ajouté à la séance'
+      );
+    } catch (err: any) {
+      showToast("Échec de l'ajout à la séance");
+    } finally {
+      setIsAttaching(false);
+    }
+  };
 
   // Content area ref for capturing visuals
   const contentAreaRef = useRef<HTMLDivElement>(null);
@@ -161,6 +270,7 @@ export function ExerciseGeneratorModal({
       });
 
       setGeneratedContent(result.content);
+      setGeneratedHeading(`${phaseHeading} — ${cleanSupportLabel(supportType)}`);
 
       // Rafraîchir le solde de tokens
       tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
@@ -523,6 +633,106 @@ export function ExerciseGeneratorModal({
             </div>
           )}
 
+          {/* Supports épinglés */}
+          {pinnedSupports.length > 0 && (
+            <div className="mb-4 border-2 border-purple-200 dark:border-purple-800 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowPinnedPanel((v) => !v)}
+                className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <Pin className="w-4 h-4" />
+                  Supports épinglés ({pinnedSupports.length})
+                </span>
+                <span className="flex items-center gap-2">
+                  {onAttachSupportsToLesson && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAttach(
+                          pinnedSupports.map((p) => ({ heading: p.heading, content: p.content }))
+                        );
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    >
+                      <BookmarkPlus className="w-3.5 h-3.5" />
+                      Tout ajouter à la séance
+                    </span>
+                  )}
+                  {showPinnedPanel ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </span>
+              </button>
+
+              {showPinnedPanel && (
+                <ul className="divide-y divide-purple-100 dark:divide-purple-900/40">
+                  {pinnedSupports.map((p) => (
+                    <li key={p.id} className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          onClick={() =>
+                            setExpandedPinnedId((id) => (id === p.id ? null : p.id))
+                          }
+                          className="text-left text-sm font-medium text-gray-800 dark:text-gray-200 flex-1 min-w-0 truncate"
+                          title={p.heading}
+                        >
+                          {p.heading}
+                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleReshow(p.content)}
+                            title="Réafficher dans la zone principale"
+                            className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleCopyPinned(p.content)}
+                            title="Copier"
+                            className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          {onAttachSupportsToLesson && (
+                            <button
+                              onClick={() =>
+                                handleAttach([{ heading: p.heading, content: p.content }])
+                              }
+                              disabled={isAttaching}
+                              title="Ajouter ce support à la séance"
+                              className="p-1.5 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg disabled:opacity-50"
+                            >
+                              <BookmarkPlus className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleUnpin(p.id)}
+                            title="Retirer des épinglés"
+                            className="p-1.5 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      {expandedPinnedId === p.id && (
+                        <div className="mt-2 prose prose-sm max-w-none dark:prose-invert border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-900/40 max-h-64 overflow-auto">
+                          <MarkdownErrorBoundary fallbackContent={p.content}>
+                            <EnhancedMarkdownRenderer content={p.content} />
+                          </MarkdownErrorBoundary>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* Form view (before generation) */}
           {!generatedContent && !isGenerating && (
             <>
@@ -602,6 +812,37 @@ export function ExerciseGeneratorModal({
             <>
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2 mb-4">
+                <button
+                  onClick={handleTogglePin}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    isCurrentPinned
+                      ? 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50'
+                      : 'text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50'
+                  }`}
+                  title={
+                    isCurrentPinned
+                      ? 'Ce support est conservé. Cliquez pour le retirer des épinglés.'
+                      : 'Conserver ce support pour en générer un autre sans le perdre'
+                  }
+                >
+                  {isCurrentPinned ? <CheckCircle className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+                  {isCurrentPinned ? 'Épinglé' : 'Épingler'}
+                </button>
+                {onAttachSupportsToLesson && (
+                  <button
+                    onClick={() =>
+                      handleAttach([
+                        { heading: generatedHeading || phaseHeading, content: generatedContent! },
+                      ])
+                    }
+                    disabled={isAttaching}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-indigo-600 rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-colors disabled:opacity-50"
+                    title="Ajouter ce support à la fin de la séance"
+                  >
+                    <BookmarkPlus className="w-4 h-4" />
+                    Ajouter à la séance
+                  </button>
+                )}
                 <button
                   onClick={handleCopy}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
