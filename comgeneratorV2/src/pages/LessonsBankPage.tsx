@@ -25,8 +25,11 @@ import {
   Archive,
   Sparkles,
   Settings,
-  CheckCircle
+  CheckCircle,
+  Maximize2
 } from 'lucide-react';
+import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
+import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
 
 type LessonBank = {
   id: string;
@@ -125,6 +128,7 @@ export function LessonsBankPage() {
   const [filterSubject, setFilterSubject] = React.useState<string>('all');
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set());
   const [expandedTopics, setExpandedTopics] = React.useState<Set<string>>(new Set());
+  const [fullScreenLesson, setFullScreenLesson] = React.useState<LessonBank | null>(null);
 
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [exportingId, setExportingId] = React.useState<string | null>(null);
@@ -1018,7 +1022,16 @@ export function LessonsBankPage() {
                     Séance complète
                   </div>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setFullScreenLesson(lesson)}
+                      className="inline-flex items-center px-3 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-200"
+                      title="Afficher la séance en plein écran (format classique)"
+                    >
+                      <Maximize2 className="w-4 h-4 mr-1" />
+                      Plein écran
+                    </button>
+
                     <button
                       onClick={() => handleCopy(lesson.content, lesson.topic)}
                       className="inline-flex items-center px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-all duration-200"
@@ -1063,6 +1076,22 @@ export function LessonsBankPage() {
         subject={selectedLessonForExercise?.subject ?? ''}
         level={selectedLessonForExercise?.level ?? ''}
       />
+
+      <FullScreenViewModal
+        isOpen={fullScreenLesson !== null}
+        onClose={() => setFullScreenLesson(null)}
+        title={fullScreenLesson?.topic ?? 'Séance'}
+        subtitle={
+          fullScreenLesson
+            ? `${fullScreenLesson.subject} · ${fullScreenLesson.level} · ${fullScreenLesson.duration} min`
+            : undefined
+        }
+      >
+        <EnhancedMarkdownRenderer
+          content={fullScreenLesson?.content ?? ''}
+          className="prose prose-base max-w-none dark:prose-invert"
+        />
+      </FullScreenViewModal>
     </div>
   );
 }

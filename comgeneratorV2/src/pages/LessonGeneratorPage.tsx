@@ -25,6 +25,8 @@ import useTokenBalance from '../hooks/useTokenBalance';
 import { getFolders } from '../lib/ragApi';
 import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
+import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
+import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
@@ -48,7 +50,9 @@ import {
   Video,
   Database,
   BookMarked,
-  Info
+  Info,
+  Maximize2,
+  GripHorizontal
 } from 'lucide-react';
 
 interface RagSource {
@@ -194,6 +198,19 @@ const convertMarkdownTablesToHtml = (markdown: string): string => {
   return result.join('\n');
 };
 
+// Poignée de redimensionnement visible et toujours accessible (barre basse).
+// Reste fixée au bas de la fenêtre (hors zone scrollable) pour ne jamais disparaître.
+const renderResizeHandle = (_axis: any, ref: any) => (
+  <div
+    ref={ref}
+    className="absolute left-0 right-0 bottom-0 h-8 flex items-center justify-center gap-2 cursor-ns-resize select-none bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold z-20 transition-colors"
+    title="Glisser pour agrandir ou réduire la fenêtre"
+  >
+    <GripHorizontal className="w-4 h-4" />
+    <span>Glisser pour redimensionner</span>
+  </div>
+);
+
 const MarkdownEditor: React.FC<{
   content: string;
   onChange: (content: string) => void;
@@ -204,6 +221,7 @@ const MarkdownEditor: React.FC<{
 }> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0, onOpenExerciseModal }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(content);
+  const [showFullScreen, setShowFullScreen] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
 
   // États pour vérifier l'accès banque
@@ -733,20 +751,24 @@ const MarkdownEditor: React.FC<{
         </div>
 
         <ResizableBox
-          className="relative"
-          height={384}
-          minConstraints={[300, 200]}
-          maxConstraints={[Infinity, 1200]}
+          className="relative rounded-2xl border-2 border-gray-200 dark:border-gray-600 overflow-hidden"
+          height={520}
+          minConstraints={[300, 240]}
+          maxConstraints={[Infinity, 1600]}
           axis="y"
-          resizeHandles={['se']}
+          resizeHandles={['s']}
+          handle={renderResizeHandle}
         >
-          <textarea
-            className="w-full h-full p-6 border-2 border-gray-200 dark:border-gray-600 rounded-2xl text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono resize-none"
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            placeholder="Éditez votre contenu markdown ici..."
-          />
-          <div className="absolute bottom-4 right-4 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg">
+          <div className="flex flex-col h-full">
+            <textarea
+              className="flex-1 w-full p-6 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-inset focus:ring-blue-500 font-mono resize-none outline-none"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Éditez votre contenu markdown ici..."
+            />
+            <div className="h-8 shrink-0" />
+          </div>
+          <div className="absolute bottom-10 right-4 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg pointer-events-none">
             <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">💡 Syntaxe Markdown supportée</p>
           </div>
         </ResizableBox>
@@ -763,7 +785,10 @@ const MarkdownEditor: React.FC<{
           </div>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">Aperçu de la séance</h3>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => setShowFullScreen(true)} className="inline-flex items-center px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium rounded-xl hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-all duration-200">
+            <Maximize2 className="w-4 h-4 mr-2" /> Plein écran
+          </button>
           <button onClick={() => navigator.clipboard.writeText(content)} className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200">
             <Copy className="w-4 h-4 mr-2" /> Copier
           </button>
@@ -795,14 +820,16 @@ const MarkdownEditor: React.FC<{
       )}
 
       <ResizableBox
-        className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-auto relative"
-        height={384}
-        minConstraints={[300, 200]}
-        maxConstraints={[Infinity, 1200]}
+        className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden relative"
+        height={560}
+        minConstraints={[300, 240]}
+        maxConstraints={[Infinity, 1600]}
         axis="y"
-        resizeHandles={['se']}
+        resizeHandles={['s']}
+        handle={renderResizeHandle}
       >
-        <div className="prose prose-sm max-w-none dark:prose-invert p-8 h-full">
+        <div className="h-full overflow-auto">
+        <div className="prose prose-sm max-w-none dark:prose-invert p-8 pb-12">
           <ReactMarkdown
             components={{
               h1: ({ children }) => <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-blue-200 dark:border-blue-800">{children}</h1>,
@@ -867,7 +894,20 @@ const MarkdownEditor: React.FC<{
           </ReactMarkdown>
 
         </div>
+        </div>
       </ResizableBox>
+
+      <FullScreenViewModal
+        isOpen={showFullScreen}
+        onClose={() => setShowFullScreen(false)}
+        title="Aperçu de la séance"
+        subtitle="Lecture plein écran"
+      >
+        <EnhancedMarkdownRenderer
+          content={content}
+          className="prose prose-base max-w-none dark:prose-invert"
+        />
+      </FullScreenViewModal>
     </div>
   );
 };
