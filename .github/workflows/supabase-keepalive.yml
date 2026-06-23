@@ -1,0 +1,57 @@
+name: Supabase Keep-Alive
+
+# =====================================================
+# Empêche la mise en pause automatique du projet Supabase
+# (plan gratuit : pause après ~7 jours d'inactivité).
+#
+# Ce workflow appelle l'Edge Function "ping" qui effectue
+# une requête minimale en lecture seule sur la base, ce qui
+# génère l'activité nécessaire pour garder le projet actif.
+#
+# Prérequis : définir 2 secrets de dépôt (Settings > Secrets
+# and variables > Actions) :
+#   - SUPABASE_URL       ex: https://xxxxxxxx.supabase.co
+#   - SUPABASE_ANON_KEY  la clé "anon" publique du projet
+# =====================================================
+
+on:
+  schedule:
+    # Tous les jours à 04:17 UTC (marge confortable < 7 jours).
+    # Minute non nulle pour éviter la congestion des runs à l'heure pile.
+    - cron: '17 4 * * *'
+  # Permet de lancer le ping manuellement depuis l'onglet Actions.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase Edge Function
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Les secrets SUPABASE_URL et SUPABASE_ANON_KEY doivent être définis."
+            exit 1
+          fi
+
+          echo "Appel de l'Edge Function ping..."
+          HTTP_CODE=$(curl -sS -o /tmp/ping_response.json -w "%{http_code}" \
+            --retry 3 --retry-delay 5 --max-time 30 \
+            -X POST "${SUPABASE_URL}/functions/v1/ping" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json")
+
+          echo "Code HTTP : $HTTP_CODE"
+          echo "Réponse :"
+          cat /tmp/ping_response.json || true
+          echo ""
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::Le ping a échoué (HTTP $HTTP_CODE)."
+            exit 1
+          fi
+
+          echo "✅ Keep-alive Supabase réussi."
