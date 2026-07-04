@@ -10,21 +10,21 @@ export async function submitFeedback(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // 1. Créer la session
-    const { data: sessionData, error: sessionError } = await supabase
+    // L'id est généré côté client : un INSERT ... RETURNING (.select() après
+    // .insert()) exigerait une policy RLS SELECT pour anon, qui exposerait
+    // les emails des testeurs. Sans RETURNING, la policy INSERT seule suffit.
+    const sessionId = crypto.randomUUID();
+    const { error: sessionError } = await supabase
       .from('feedback_sessions')
-      .insert({ ...session, completed: true })
-      .select('id')
-      .single();
+      .insert({ ...session, id: sessionId, completed: true });
 
-    if (sessionError || !sessionData) {
+    if (sessionError) {
       // Doublon email → l'utilisateur a déjà répondu
-      if (sessionError?.code === '23505') {
+      if (sessionError.code === '23505') {
         return { success: false, error: 'Vous avez déjà soumis un feedback avec cette adresse email.' };
       }
-      throw new Error(sessionError?.message || 'Erreur lors de la création de la session');
+      throw new Error(sessionError.message || 'Erreur lors de la création de la session');
     }
-
-    const sessionId = sessionData.id;
 
     // 2. Insérer les ratings (batch)
     if (ratings.length > 0) {
