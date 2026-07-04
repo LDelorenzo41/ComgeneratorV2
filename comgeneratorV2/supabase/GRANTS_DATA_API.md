@@ -1,5 +1,11 @@
 # Plan d'action — GRANTs explicites Data API (échéance Supabase du 30/10/2026)
 
+> **Statut : appliqué en production le 2026-07-04** via l'éditeur SQL du
+> dashboard (migrations `20260704_grant_data_api_explicit.sql` et
+> `20260704_revoke_anon_function_exec.sql`). Vérifications SQL effectuées à
+> chaque étape ; l'anomalie feedback décrite plus bas a été confirmée en prod
+> et corrigée dans `src/lib/feedbackApi.ts` (UUID côté client, sans RETURNING).
+
 ## Contexte
 
 À partir du **30 octobre 2026**, Supabase ne fournira plus de privilèges implicites
