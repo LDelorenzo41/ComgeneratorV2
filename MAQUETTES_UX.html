@@ -17,6 +17,7 @@
     --shadow: 0 1px 2px rgba(35, 42, 66, .05), 0 8px 24px -12px rgba(35, 42, 66, .18);
     --chip-warn-bg: #fdf3e3;
     --brand-contrast: #ffffff;
+    --pin-text: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -36,6 +37,7 @@
       --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -12px rgba(0, 0, 0, .55);
       --chip-warn-bg: #3a2f16;
       --brand-contrast: #10142a;
+      --pin-text: #1a1405;
     }
   }
   :root[data-theme="dark"] {
@@ -55,6 +57,7 @@
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -12px rgba(0, 0, 0, .55);
     --chip-warn-bg: #3a2f16;
     --brand-contrast: #10142a;
+    --pin-text: #1a1405;
   }
   :root[data-theme="light"] {
     --brand: #4f46e5;
@@ -73,6 +76,7 @@
     --shadow: 0 1px 2px rgba(35, 42, 66, .05), 0 8px 24px -12px rgba(35, 42, 66, .18);
     --chip-warn-bg: #fdf3e3;
     --brand-contrast: #ffffff;
+    --pin-text: #ffffff;
   }
 
   * { box-sizing: border-box; }
@@ -82,17 +86,12 @@
     color: var(--text);
     font: 16px/1.6 system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 48px 20px 80px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 14px 80px; }
+  @media (min-width: 760px) { .wrap { padding: 48px 20px 80px; } }
 
-  /* ---------- Page (le document de proposition) ---------- */
-  .eyebrow {
-    text-transform: uppercase; letter-spacing: .12em; font-size: .72rem;
-    font-weight: 700; color: var(--brand);
-  }
-  h1 {
-    font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 800;
-    letter-spacing: -.02em; line-height: 1.15; margin: .35rem 0 .6rem; text-wrap: balance;
-  }
+  /* ---------- Le document de proposition ---------- */
+  .eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; font-weight: 700; color: var(--brand); }
+  h1 { font-size: clamp(1.55rem, 4.5vw, 2.3rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin: .35rem 0 .6rem; text-wrap: balance; }
   .lede { color: var(--muted); max-width: 62ch; margin: 0; }
   .notice {
     display: flex; gap: 10px; align-items: flex-start;
@@ -101,234 +100,274 @@
   }
   .notice strong { color: var(--text); }
 
-  .section { margin-top: 64px; }
-  .section > h2 {
-    font-size: 1.35rem; font-weight: 800; letter-spacing: -.015em; margin: 0 0 4px;
-  }
-  .section > .sub { color: var(--muted); margin: 0 0 22px; max-width: 68ch; }
+  .section { margin-top: 58px; }
+  .section > h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.015em; margin: 0 0 4px; }
+  .section > .sub { color: var(--muted); margin: 0 0 20px; max-width: 68ch; }
 
   /* ---------- Cadre de maquette ---------- */
-  .frame {
-    border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
-    box-shadow: var(--shadow); background: var(--bg);
-  }
-  .frame-bar {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 16px;
-  }
+  .frame { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); background: var(--bg); }
+  .frame-bar { display: flex; align-items: center; gap: 10px; background: var(--card); border-bottom: 1px solid var(--border); padding: 9px 14px; }
   .frame-bar .dots { display: flex; gap: 6px; }
   .frame-bar .dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
   .frame-bar .url {
-    flex: 1; text-align: center; font-size: .78rem; color: var(--muted);
-    background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px 14px;
-    max-width: 340px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; text-align: center; font-size: .76rem; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px;
+    max-width: 320px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .mock { padding: 0 0 36px; }
+  .mock { padding-bottom: 30px; }
+  .mock.has-tabbar { padding-bottom: 0; }
 
-  /* Pastilles d'annotation */
   .pin {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--warn); color: #fff; font-size: .72rem; font-weight: 800;
-    box-shadow: 0 0 0 3px var(--chip-warn-bg);
-    vertical-align: middle; flex: none;
+    width: 21px; height: 21px; border-radius: 50%;
+    background: var(--warn); color: var(--pin-text); font-size: .7rem; font-weight: 800;
+    box-shadow: 0 0 0 3px var(--chip-warn-bg); vertical-align: middle; flex: none;
   }
-  :root[data-theme="dark"] .pin, :root:not([data-theme="light"]) .pin { color: #1a1405; }
-  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .pin { color: #fff; } }
-  :root[data-theme="light"] .pin { color: #fff; }
 
-  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 18px; }
-  .legend .item {
-    display: flex; gap: 10px; align-items: flex-start;
-    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
-    font-size: .9rem;
-  }
+  .legend { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 18px; }
+  @media (min-width: 640px) { .legend { grid-template-columns: 1fr 1fr; } }
+  .legend .item { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
   .legend .item p { margin: 0; color: var(--muted); }
   .legend .item strong { display: block; color: var(--text); margin-bottom: 2px; }
 
-  /* ---------- Éléments d'app simulée ---------- */
-  .appbar {
-    display: flex; align-items: center; gap: 18px;
-    background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 22px;
-    position: relative;
+  /* ---------- App simulée : barre du haut ---------- */
+  .appbar { display: flex; align-items: center; gap: 10px; background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 14px; }
+  .logo { font-weight: 800; font-size: 1.08rem; letter-spacing: -.02em; color: var(--brand); margin-right: 2px; }
+  .appnav { display: none; }
+  .burger {
+    display: inline-flex; flex-direction: column; gap: 4px; justify-content: center;
+    width: 38px; height: 38px; padding: 10px 9px; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--card); cursor: pointer; margin-left: auto;
   }
-  .logo { font-weight: 800; font-size: 1.12rem; letter-spacing: -.02em; color: var(--brand); }
-  .appnav { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
-  .appnav a {
-    text-decoration: none; color: var(--muted); font-size: .86rem; font-weight: 600;
-    padding: 6px 11px; border-radius: 8px;
+  .burger i { display: block; height: 2px; border-radius: 2px; background: var(--text); }
+  @media (min-width: 760px) {
+    .appbar { gap: 18px; padding: 12px 22px; }
+    .appnav { display: flex; gap: 4px; flex: 1; }
+    .burger { display: none; }
   }
+  .appnav a { text-decoration: none; color: var(--muted); font-size: .86rem; font-weight: 600; padding: 6px 11px; border-radius: 8px; }
   .appnav a.active { background: var(--brand-soft); color: var(--brand); }
   .appnav a:hover { color: var(--text); }
+
   .credit-chip {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--brand-soft); border-radius: 999px; padding: 6px 12px;
-    font-size: .8rem; font-weight: 700; color: var(--brand); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--brand-soft); border-radius: 999px; padding: 6px 11px;
+    font-size: .78rem; font-weight: 700; color: var(--brand); white-space: nowrap;
   }
-  .credit-chip .bar { width: 54px; height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .credit-chip .bar { width: 40px; height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
   .credit-chip .bar i { display: block; height: 100%; width: 62%; background: var(--brand); border-radius: 999px; }
+  .credit-chip .full { display: none; }
+  .credit-chip .short { display: inline; }
+  @media (min-width: 760px) {
+    .credit-chip .full { display: inline; }
+    .credit-chip .short { display: none; }
+    .credit-chip .bar { width: 54px; }
+  }
   .avatar {
     width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--brand-contrast);
-    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; flex: none;
+    display: none; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; flex: none;
   }
+  @media (min-width: 760px) { .avatar { display: flex; } }
 
-  .mock-body { padding: 26px 22px 0; max-width: 940px; margin: 0 auto; }
-  .hello { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .hello h3 { margin: 0; font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; }
-  .hello .date { color: var(--muted); font-size: .85rem; }
+  /* ---------- Barre d'onglets mobile ---------- */
+  .tabbar { display: flex; border-top: 1px solid var(--border); background: var(--card); margin-top: 26px; }
+  .tabbar a {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 2px 9px; text-decoration: none; color: var(--muted); font-size: .62rem; font-weight: 700;
+  }
+  .tabbar a svg { width: 20px; height: 20px; }
+  .tabbar a.active { color: var(--brand); }
+  @media (min-width: 760px) { .tabbar { display: none; } .mock.has-tabbar { padding-bottom: 30px; } }
+
+  .mock-body { padding: 20px 14px 0; max-width: 940px; margin: 0 auto; }
+  @media (min-width: 760px) { .mock-body { padding: 26px 22px 0; } }
+
+  .hello { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .hello h3 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+  .hello .date { color: var(--muted); font-size: .84rem; }
 
   .season {
-    position: relative;
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    margin-top: 16px; padding: 13px 16px;
-    background: linear-gradient(90deg, var(--brand-soft), transparent 80%);
-    border: 1px solid var(--border); border-radius: 12px; font-size: .92rem;
+    position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 14px; padding: 12px 14px;
+    background: linear-gradient(90deg, var(--brand-soft), transparent 85%);
+    border: 1px solid var(--border); border-radius: 12px; font-size: .9rem;
   }
   .season .cta {
-    margin-left: auto;
     background: var(--brand); color: var(--brand-contrast); border: none; border-radius: 9px;
     font-weight: 700; font-size: .84rem; padding: 8px 14px; cursor: pointer;
   }
+  @media (min-width: 640px) { .season .cta { margin-left: auto; } }
 
-  .home-grid { display: grid; grid-template-columns: 300px 1fr; gap: 16px; margin-top: 18px; align-items: start; }
-  @media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; } }
-
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 18px; box-shadow: var(--shadow); position: relative;
-  }
-  .card h4 { margin: 0 0 4px; font-size: .98rem; font-weight: 800; letter-spacing: -.01em; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); position: relative; }
+  .card h4 { margin: 0 0 4px; font-size: .96rem; font-weight: 800; letter-spacing: -.01em; }
   .card .hint { color: var(--muted); font-size: .82rem; margin: 0; }
 
-  .credits .big { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 8px; }
+  /* Accueil : structure */
+  .home-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; align-items: start; }
+  @media (min-width: 860px) { .home-grid { grid-template-columns: 300px 1fr; gap: 16px; } }
+  .stack { display: grid; gap: 14px; }
+
+  .credits .big { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 8px; }
   .credits .big small { font-size: .8rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
   .gauge { height: 9px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 12px 0 8px; }
   .gauge i { display: block; height: 100%; width: 62%; border-radius: 999px; background: linear-gradient(90deg, var(--pole-evaluer), var(--brand)); }
   .equiv { font-size: .82rem; color: var(--muted); margin: 0 0 14px; }
   .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .btn {
-    border-radius: 9px; padding: 8px 14px; font-weight: 700; font-size: .84rem; cursor: pointer;
-    border: 1px solid transparent;
-  }
+  .btn { border-radius: 9px; padding: 8px 14px; font-weight: 700; font-size: .84rem; cursor: pointer; border: 1px solid transparent; }
   .btn-primary { background: var(--brand); color: var(--brand-contrast); }
   .btn-ghost { background: transparent; color: var(--brand); border-color: var(--border); }
 
-  .poles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  @media (max-width: 560px) { .poles { grid-template-columns: 1fr; } }
-  .pole { border-top: 3px solid var(--pole); }
-  .pole .icon {
-    width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--pole) 14%, var(--card));
-    color: var(--pole); display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
-  }
-  .pole .icon svg { width: 17px; height: 17px; }
-  .pole ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-  .pole li a {
-    color: var(--text); text-decoration: none; font-size: .87rem; font-weight: 600;
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .pole li a::before { content: "→"; color: var(--pole); font-weight: 800; }
-  .pole li a:hover { color: var(--pole); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .stat { background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .stat span { font-size: .74rem; color: var(--muted); font-weight: 600; }
+  .stat.hours { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--pole-ressources) 40%, var(--border)); }
+  .stat.hours b { color: var(--pole-ressources); }
 
-  .recent { margin-top: 18px; }
-  .recent h4 { margin: 0 0 10px; font-size: .98rem; font-weight: 800; }
-  .recent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
-  .recent .card { padding: 14px 16px; }
+  /* Actions rapides : pastilles de lancement, pas un menu */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  @media (min-width: 640px) { .quick { grid-template-columns: 1fr 1fr 1fr; } }
+  .quick a {
+    display: flex; align-items: center; gap: 9px; text-decoration: none;
+    background: var(--card-2); border: 1px solid var(--border); border-radius: 11px;
+    padding: 11px 12px; color: var(--text); font-size: .82rem; font-weight: 700; line-height: 1.25;
+  }
+  .quick a:hover { border-color: var(--pole); }
+  .quick .dot {
+    width: 28px; height: 28px; border-radius: 8px; flex: none;
+    background: color-mix(in srgb, var(--pole) 14%, var(--card)); color: var(--pole);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .quick .dot svg { width: 15px; height: 15px; }
+
+  .recent-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+  @media (min-width: 640px) { .recent-grid { grid-template-columns: 1fr 1fr 1fr; } }
+  .recent-grid .card { padding: 13px 14px; }
   .tag {
-    display: inline-block; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
-    padding: 2px 8px; border-radius: 999px; margin-bottom: 8px;
+    display: inline-block; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    padding: 2px 8px; border-radius: 999px; margin-bottom: 7px;
     background: color-mix(in srgb, var(--pole) 14%, var(--card)); color: var(--pole);
   }
-  .recent .title { font-weight: 700; font-size: .92rem; margin: 0 0 2px; }
-  .recent .meta { color: var(--muted); font-size: .78rem; margin: 0; }
+  .recent-grid .title { font-weight: 700; font-size: .9rem; margin: 0 0 2px; }
+  .recent-grid .meta { color: var(--muted); font-size: .77rem; margin: 0; }
+
+  .news { display: grid; gap: 0; margin-top: 10px; }
+  .news a {
+    display: block; text-decoration: none; padding: 10px 2px; color: var(--text);
+    border-top: 1px solid var(--border); font-size: .88rem; font-weight: 600; line-height: 1.4;
+  }
+  .news a:first-child { border-top: none; padding-top: 4px; }
+  .news .src { display: block; font-size: .74rem; color: var(--pole-ressources); font-weight: 700; margin-bottom: 1px; }
+  .news a:hover { color: var(--brand); }
+  .card .more { font-size: .8rem; font-weight: 700; color: var(--brand); text-decoration: none; }
 
   /* ---------- Maquette 2 : formulaire ---------- */
-  .form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .form-head .crumb { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--pole-evaluer); }
-  .form-head h3 { margin: 2px 0 0; font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+  .form-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .form-head .crumb { font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--pole-evaluer); }
+  .form-head h3 { margin: 2px 0 0; font-size: 1.3rem; font-weight: 800; letter-spacing: -.02em; }
 
-  .form-card { margin-top: 18px; display: grid; gap: 22px; }
-  .field label { display: block; font-weight: 700; font-size: .88rem; margin-bottom: 6px; }
-  .field label .opt { color: var(--muted); font-weight: 500; }
+  .form-card { margin-top: 16px; display: grid; gap: 20px; }
+  .field label, .field .lbl { display: block; font-weight: 700; font-size: .88rem; margin-bottom: 6px; }
+  .field .opt { color: var(--muted); font-weight: 500; }
   .control, textarea.control {
     width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--card-2);
     color: var(--text); padding: 10px 12px; font: inherit; font-size: .92rem;
   }
-  .control:focus, textarea.control:focus, .seg button:focus-visible, .btn:focus-visible, .scale button:focus-visible {
+  .control:focus, textarea.control:focus, .seg button:focus-visible, .btn:focus-visible,
+  .scale button:focus-visible, .linkbtn:focus-visible, .generate:focus-visible {
     outline: 2px solid var(--brand); outline-offset: 2px;
   }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 560px) { .two-col { grid-template-columns: 1fr; } }
+  .two-col { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .two-col { grid-template-columns: 1fr 1fr; } }
 
-  .seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
-  .seg button {
-    border: none; background: transparent; color: var(--muted); font: inherit; font-size: .86rem; font-weight: 700;
-    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  .matiere-row { display: flex; gap: 8px; align-items: stretch; }
+  .matiere-row .control { flex: 1; min-width: 0; }
+  .linkbtn {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--brand);
+    border-radius: 10px; padding: 0 13px; font: inherit; font-size: .82rem; font-weight: 700;
   }
-  .seg button small { display: block; font-size: .68rem; font-weight: 600; color: var(--muted); }
+
+  .crit-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .crit-head .lbl { margin-bottom: 0; }
+  .crit-head .tools { display: flex; gap: 12px; font-size: .8rem; font-weight: 700; }
+  .crit-head .tools a { color: var(--brand); text-decoration: none; }
+
+  .seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; max-width: 100%; }
+  .seg button { border: none; background: transparent; color: var(--muted); font: inherit; font-size: .84rem; font-weight: 700; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
+  .seg button small { display: block; font-size: .67rem; font-weight: 600; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-contrast); }
   .seg button[aria-pressed="true"] small { color: color-mix(in srgb, var(--brand-contrast) 75%, var(--brand)); }
 
-  .crit { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--card-2); }
+  .crit { border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; background: var(--card-2); }
   .crit + .crit { margin-top: 10px; }
-  .crit .name { font-weight: 700; font-size: .92rem; margin: 0 0 10px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-  .crit .chosen { font-size: .8rem; font-weight: 800; color: var(--pole-evaluer); }
-  .scale { display: flex; gap: 6px; flex-wrap: wrap; }
+  .crit .name { font-weight: 700; font-size: .9rem; margin: 0 0 10px; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .crit .name .left { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge-imp {
+    font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+    background: color-mix(in srgb, var(--pole-evaluer) 13%, var(--card)); color: var(--pole-evaluer);
+    border-radius: 999px; padding: 2px 8px;
+  }
+  .crit .chosen { font-size: .78rem; font-weight: 800; color: var(--pole-evaluer); }
+  .scale { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  @media (min-width: 640px) { .scale { grid-template-columns: repeat(6, 1fr); } }
   .scale button {
-    flex: 1; min-width: 86px; min-height: 44px; cursor: pointer;
+    min-height: 44px; cursor: pointer;
     border: 1px solid var(--border); border-radius: 9px; background: var(--card);
-    color: var(--muted); font: inherit; font-size: .78rem; font-weight: 700; padding: 8px 6px;
+    color: var(--muted); font: inherit; font-size: .76rem; font-weight: 700; padding: 8px 4px;
   }
-  .scale button[aria-pressed="true"] {
-    background: var(--pole-evaluer); border-color: var(--pole-evaluer); color: #fff;
-  }
+  .scale button[aria-pressed="true"] { background: var(--pole-evaluer); border-color: var(--pole-evaluer); color: #fff; }
   :root[data-theme="dark"] .scale button[aria-pressed="true"] { color: #0d1326; }
+  .addcrit {
+    margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    background: transparent; border: 1px dashed var(--border); border-radius: 10px;
+    color: var(--muted); font: inherit; font-size: .82rem; font-weight: 700; padding: 9px 14px; width: 100%;
+    justify-content: center;
+  }
+  .addcrit:hover { color: var(--brand); border-color: var(--brand); }
 
   .cost {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     border: 1px solid var(--border); border-left: 3px solid var(--warn);
-    background: var(--chip-warn-bg); border-radius: 12px; padding: 13px 16px; font-size: .9rem;
-    position: relative;
+    background: var(--chip-warn-bg); border-radius: 12px; padding: 12px 14px; font-size: .88rem; position: relative;
   }
   .cost b { font-variant-numeric: tabular-nums; }
-  .cost .after { color: var(--muted); font-size: .82rem; }
+  .cost .after { color: var(--muted); font-size: .8rem; }
   .generate {
-    align-self: start;
     background: linear-gradient(90deg, var(--pole-evaluer), var(--brand)); color: #fff;
-    border: none; border-radius: 11px; padding: 13px 26px; font: inherit; font-weight: 800; font-size: .98rem;
-    cursor: pointer; box-shadow: var(--shadow);
+    border: none; border-radius: 11px; padding: 13px 26px; font: inherit; font-weight: 800; font-size: .96rem;
+    cursor: pointer; box-shadow: var(--shadow); width: 100%;
   }
+  @media (min-width: 640px) { .generate { width: auto; justify-self: start; } }
   :root[data-theme="dark"] .generate { color: #0d1326; }
 
-  .foot {
-    margin-top: 56px; border-top: 1px solid var(--border); padding-top: 18px;
-    color: var(--muted); font-size: .86rem; max-width: 70ch;
-  }
+  .foot { margin-top: 52px; border-top: 1px solid var(--border); padding-top: 18px; color: var(--muted); font-size: .86rem; max-width: 70ch; }
   @media (prefers-reduced-motion: no-preference) {
-    .btn, .seg button, .scale button, .generate { transition: background .15s ease, color .15s ease, transform .15s ease; }
+    .btn, .seg button, .scale button, .generate, .quick a { transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
     .generate:hover { transform: translateY(-1px); }
   }
 </style>
 
 <div class="wrap">
-  <p class="eyebrow">ProfAssist · Propositions de design</p>
+  <p class="eyebrow">ProfAssist · Propositions de design — v2</p>
   <h1>Deux maquettes issues de l'audit UX/UI</h1>
-  <p class="lede">Des maquettes statiques pour visualiser et décider — rien de tout ceci n'est implémenté dans l'application. Les zones repensées sont signalées par des pastilles numérotées <span class="pin" style="position:static">n</span>, expliquées sous chaque maquette. Certains contrôles sont cliquables pour « sentir » l'interaction.</p>
+  <p class="lede">Version revue après vos retours : responsive mobile retravaillé (regardez cette page sur votre téléphone — les maquettes s'adaptent réellement), page « Mon espace » enrichie au-delà du menu, et gestion des matières et critères d'évaluation réintégrée dans le générateur. Les pastilles <span class="pin" style="position:static">n</span> signalent les choix expliqués sous chaque maquette. Plusieurs contrôles sont cliquables.</p>
   <div class="notice">
     <span>ℹ️</span>
-    <span><strong>Aucun changement dans le code de l'app.</strong> Ce document et le rapport d'audit vivent uniquement sur la branche de revue. La charte actuelle (bleu → indigo, cartes arrondies, dark mode) est conservée et simplement systématisée.</span>
+    <span><strong>Aucun changement dans le code de l'app.</strong> Ces maquettes vivent uniquement sur la branche de revue. Toutes les fonctionnalités actuelles (création de matières, critères, importance, tons, banque…) sont conservées — rien n'est supprimé, seulement réorganisé.</span>
   </div>
 
   <!-- ============ MAQUETTE 1 ============ -->
   <div class="section">
     <h2>Maquette 1 — « Mon espace », l'accueil connecté</h2>
-    <p class="sub">Aujourd'hui, un enseignant connecté n'a pas de page d'accueil : la racine renvoie vers la landing marketing. Cette page devient son point de départ quotidien.</p>
+    <p class="sub">Sur mobile : barre du haut compacte (logo + crédits + menu) et barre d'onglets en bas de l'écran, comme une application. Sur ordinateur : navigation à plat. Le contenu ne se limite plus au menu : bilan de l'année, reprise d'activité, actualités.</p>
 
     <div class="frame">
       <div class="frame-bar">
         <div class="dots"><span></span><span></span><span></span></div>
         <div class="url">profassist.fr/mon-espace</div>
       </div>
-      <div class="mock">
+      <div class="mock has-tabbar">
         <div class="appbar">
           <span class="logo">ProfAssist</span>
           <nav class="appnav" aria-label="Navigation principale">
@@ -340,10 +379,12 @@
           </nav>
           <span class="pin" title="Annotation 1">1</span>
           <div class="credit-chip" title="247 500 crédits — environ 82 appréciations">
-            <span class="bar"><i></i></span> 247 500 crédits
+            <span class="bar"><i></i></span>
+            <span class="full">247 500 crédits</span><span class="short">247 k</span>
           </div>
           <span class="pin" title="Annotation 2">2</span>
           <div class="avatar">L</div>
+          <button class="burger" aria-label="Ouvrir le menu"><i></i><i></i><i></i></button>
         </div>
 
         <div class="mock-body">
@@ -359,96 +400,105 @@
           </div>
 
           <div class="home-grid">
-            <div class="card credits">
-              <h4>Mes crédits</h4>
-              <p class="hint">Sans abonnement · sans expiration</p>
-              <div class="big">247 500 <small>crédits</small></div>
-              <div class="gauge"><i></i></div>
-              <p class="equiv">≈ 82 appréciations détaillées <br>ou 24 séances complètes</p>
-              <div class="btn-row">
-                <button class="btn btn-primary">Recharger</button>
-                <button class="btn btn-ghost">J'ai un code</button>
+            <div class="stack">
+              <div class="card credits">
+                <h4>Mes crédits</h4>
+                <p class="hint">Sans abonnement · sans expiration</p>
+                <div class="big">247 500 <small>crédits</small></div>
+                <div class="gauge"><i></i></div>
+                <p class="equiv">≈ 82 appréciations détaillées <br>ou 24 séances complètes</p>
+                <div class="btn-row">
+                  <button class="btn btn-primary">Recharger</button>
+                  <button class="btn btn-ghost">J'ai un code</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <h4>Mon année avec ProfAssist <span class="pin" title="Annotation 6">6</span></h4>
+                <p class="hint">Depuis septembre 2025</p>
+                <div class="stats">
+                  <div class="stat"><b>124</b><span>appréciations</span></div>
+                  <div class="stat"><b>18</b><span>séances</span></div>
+                  <div class="stat"><b>9</b><span>scénarios</span></div>
+                  <div class="stat"><b>36</b><span>communications</span></div>
+                  <div class="stat hours"><b>≈ 26 h</b><span>de travail gagnées cette année</span></div>
+                </div>
               </div>
             </div>
 
-            <div>
-              <div class="poles">
-                <div class="card pole" style="--pole: var(--pole-concevoir)">
-                  <span class="pin" style="position:absolute; top:12px; right:12px" title="Annotation 4">4</span>
-                  <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg></div>
-                  <h4>Concevoir</h4>
-                  <ul>
-                    <li><a href="#" onclick="return false">Créer un scénario pédagogique</a></li>
-                    <li><a href="#" onclick="return false">Créer une séance</a></li>
-                    <li><a href="#" onclick="return false">Mes séances &amp; scénarios</a></li>
-                  </ul>
-                </div>
-                <div class="card pole" style="--pole: var(--pole-evaluer)">
-                  <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg></div>
-                  <h4>Évaluer</h4>
-                  <ul>
-                    <li><a href="#" onclick="return false">Générer une appréciation</a></li>
-                    <li><a href="#" onclick="return false">Synthèse de bulletin</a></li>
-                    <li><a href="#" onclick="return false">Ma banque d'appréciations</a></li>
-                  </ul>
-                </div>
-                <div class="card pole" style="--pole: var(--pole-communiquer)">
-                  <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11a8 8 0 0 1-8 8H4l1.5-3A8 8 0 1 1 21 11Z"/></svg></div>
-                  <h4>Communiquer</h4>
-                  <ul>
-                    <li><a href="#" onclick="return false">Écrire aux familles</a></li>
-                    <li><a href="#" onclick="return false">Répondre à un message</a></li>
-                  </ul>
-                </div>
-                <div class="card pole" style="--pole: var(--pole-ressources)">
-                  <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/></svg></div>
-                  <h4>Ressources</h4>
-                  <ul>
-                    <li><a href="#" onclick="return false">Interroger mon chatbot</a></li>
-                    <li><a href="#" onclick="return false">Actualités pédagogiques</a></li>
-                  </ul>
+            <div class="stack">
+              <div class="card">
+                <h4>Reprendre où j'en étais <span class="pin" title="Annotation 5">5</span></h4>
+                <div class="recent-grid">
+                  <div class="card" style="--pole: var(--pole-evaluer)">
+                    <span class="tag">Appréciation</span>
+                    <p class="title">Marie — Mathématiques</p>
+                    <p class="meta">Hier · notée « Très bien »</p>
+                  </div>
+                  <div class="card" style="--pole: var(--pole-concevoir)">
+                    <span class="tag">Séance</span>
+                    <p class="title">Les fractions — 6e</p>
+                    <p class="meta">Il y a 3 jours · 60 min</p>
+                  </div>
+                  <div class="card" style="--pole: var(--pole-concevoir)">
+                    <span class="tag">Scénario</span>
+                    <p class="title">Volley-ball — 5e</p>
+                    <p class="meta">Sem. dernière · 8 séances</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div class="recent">
-            <h4>Reprendre où j'en étais <span class="pin" title="Annotation 5">5</span></h4>
-            <div class="recent-grid">
-              <div class="card" style="--pole: var(--pole-evaluer)">
-                <span class="tag">Appréciation</span>
-                <p class="title">Marie — Mathématiques</p>
-                <p class="meta">Hier · notée « Très bien »</p>
+              <div class="card">
+                <h4>Actions rapides <span class="pin" title="Annotation 4">4</span></h4>
+                <div class="quick">
+                  <a href="#" onclick="return false" style="--pole: var(--pole-evaluer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span>Générer une appréciation</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-evaluer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 12h6M9 16h6"/></svg></span>Synthèse de bulletin</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-concevoir)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg></span>Créer une séance</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-concevoir)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3h8v4H8z"/><path d="M6 7h12v14H6z"/><path d="M9 12h6M9 16h4"/></svg></span>Créer un scénario</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-communiquer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11a8 8 0 0 1-8 8H4l1.5-3A8 8 0 1 1 21 11Z"/></svg></span>Écrire aux familles</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-ressources)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="6" width="16" height="12" rx="3"/><path d="M12 3v3M8.5 11.5h.01M15.5 11.5h.01"/></svg></span>Interroger mon chatbot</a>
+                </div>
               </div>
-              <div class="card" style="--pole: var(--pole-concevoir)">
-                <span class="tag">Séance</span>
-                <p class="title">Les fractions — 6e</p>
-                <p class="meta">Il y a 3 jours · 60 min · pédagogie explicite</p>
-              </div>
-              <div class="card" style="--pole: var(--pole-concevoir)">
-                <span class="tag">Scénario</span>
-                <p class="title">Volley-ball — 5e</p>
-                <p class="meta">La semaine dernière · 8 séances</p>
+
+              <div class="card">
+                <h4 style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+                  <span>Actualités pédagogiques <span class="pin" title="Annotation 7">7</span></span>
+                  <a class="more" href="#" onclick="return false">Tout voir →</a>
+                </h4>
+                <div class="news">
+                  <a href="#" onclick="return false"><span class="src">Éduscol</span>Évaluation par compétences : le nouveau cadre de référence publié pour la rentrée</a>
+                  <a href="#" onclick="return false"><span class="src">Café pédagogique</span>IA en classe : ce que disent les premiers retours d'expérimentation en collège</a>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <nav class="tabbar" aria-label="Navigation mobile">
+          <a class="active" href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Accueil</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg>Concevoir</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Évaluer</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11a8 8 0 0 1-8 8H4l1.5-3A8 8 0 1 1 21 11Z"/></svg>Communiquer</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/></svg>Ressources</a>
+        </nav>
       </div>
     </div>
 
     <div class="legend">
-      <div class="item"><span class="pin">1</span><p><strong>Navigation à plat, logo unique</strong>Les 4 pôles restent, mais visibles d'un coup d'œil (dropdowns au survol conservés). Un seul logo dans la barre ; le logo TeachTech descend au footer.</p></div>
-      <div class="item"><span class="pin">2</span><p><strong>Jauge de crédits parlante</strong>« Crédits » remplace « tokens ». La jauge donne le niveau en un regard, le survol traduit en actions (« ≈ 82 appréciations »).</p></div>
-      <div class="item"><span class="pin">3</span><p><strong>Bandeau contextuel</strong>Le message suit le calendrier scolaire : bulletins en fin de trimestre, préparation de séquences à la rentrée. Un seul CTA, jamais intrusif.</p></div>
-      <div class="item"><span class="pin">4</span><p><strong>Une couleur par pôle métier</strong>Concevoir = indigo, Évaluer = bleu, Communiquer = violet, Ressources = vert — reprises ensuite dans chaque page du pôle pour situer l'utilisateur.</p></div>
-      <div class="item"><span class="pin">5</span><p><strong>Reprise d'activité</strong>Les 3 derniers éléments des banques (les données existent déjà). L'utilisateur récurrent gagne un clic sur son geste le plus fréquent.</p></div>
+      <div class="item"><span class="pin">1</span><p><strong>Header réellement responsive</strong>Sur téléphone : logo + crédits compacts (« 247 k ») + bouton menu ; les 4 pôles passent dans une barre d'onglets en bas d'écran, à portée de pouce. Sur ordinateur : navigation à plat, logo unique (le logo TeachTech descend au footer). Réduisez/élargissez cette fenêtre pour voir la bascule.</p></div>
+      <div class="item"><span class="pin">2</span><p><strong>Jauge de crédits parlante</strong>« Crédits » remplace « tokens », la jauge donne le niveau d'un regard et le détail traduit en actions (« ≈ 82 appréciations »).</p></div>
+      <div class="item"><span class="pin">3</span><p><strong>Bandeau contextuel</strong>Le message suit le calendrier scolaire (bulletins, rentrée, conseils de classe). Un seul CTA, jamais intrusif.</p></div>
+      <div class="item"><span class="pin">4</span><p><strong>Actions rapides, pas un second menu</strong>Six lanceurs de tâches compacts, colorés par pôle. La navigation complète reste dans le header/la barre d'onglets — ici on lance un geste, on ne navigue pas.</p></div>
+      <div class="item"><span class="pin">5</span><p><strong>Reprise d'activité</strong>Les 3 derniers éléments des banques (les données existent déjà). Le geste le plus fréquent gagne un clic.</p></div>
+      <div class="item"><span class="pin">6</span><p><strong>Bilan de l'année</strong>Compteurs issus des banques + estimation du temps gagné : valorise l'usage, donne une raison de revenir, et fournit un argument de réabonnement naturel.</p></div>
+      <div class="item"><span class="pin">7</span><p><strong>Actualités pédagogiques</strong>Les 2 dernières entrées des flux RSS déjà agrégés par la page Ressources. La page vit même quand on n'a rien à générer.</p></div>
     </div>
   </div>
 
   <!-- ============ MAQUETTE 2 ============ -->
   <div class="section">
     <h2>Maquette 2 — Générateur d'appréciations repensé</h2>
-    <p class="sub">Mêmes champs, mêmes capacités qu'aujourd'hui — mais un seul compteur de crédits, une notation lisible sans survol, un seul clic pour générer, et le coût annoncé avant. Essayez les contrôles ci-dessous.</p>
+    <p class="sub">Toutes les capacités actuelles sont là : choix de la matière, <strong>gestion des matières et de leurs critères</strong>, importance des critères, ton, mode d'adresse, notes. Ce qui change : un seul compteur de crédits, une notation lisible sans survol, le coût annoncé avant, un seul clic pour générer.</p>
 
     <div class="frame">
       <div class="frame-bar">
@@ -463,22 +513,24 @@
               <h3>Générer une appréciation</h3>
             </div>
             <div style="display:flex; align-items:center; gap:8px">
-              <div class="credit-chip"><span class="bar"><i></i></span> 247 500 crédits</div>
-              <span class="pin" title="Annotation 9">9</span>
+              <div class="credit-chip"><span class="bar"><i></i></span><span class="full">247 500 crédits</span><span class="short">247 k</span></div>
+              <span class="pin" title="Annotation 13">13</span>
             </div>
           </div>
 
           <div class="card form-card">
             <div class="two-col">
               <div class="field">
-                <label for="m-matiere">Matière <span class="pin" title="Annotation 10">10</span></label>
-                <select id="m-matiere" class="control">
-                  <option>Mathématiques</option>
-                  <option>Français</option>
-                  <option>Histoire-Géographie</option>
-                  <option>EPS</option>
-                  <option>Autre…</option>
-                </select>
+                <label for="m-matiere">Matière <span class="pin" title="Annotation 8">8</span></label>
+                <div class="matiere-row">
+                  <select id="m-matiere" class="control">
+                    <option>Mathématiques — 4 critères</option>
+                    <option>Français — 5 critères</option>
+                    <option>EPS — 3 critères</option>
+                    <option>+ Créer une nouvelle matière…</option>
+                  </select>
+                  <button class="linkbtn" type="button" title="Créer, renommer ou supprimer vos matières">⚙ Gérer</button>
+                </div>
               </div>
               <div class="field">
                 <label for="m-prenom">Prénom de l'élève</label>
@@ -487,18 +539,16 @@
             </div>
 
             <div class="field">
-              <label id="lbl-longueur">Longueur de l'appréciation <span class="pin" title="Annotation 7">7</span></label>
-              <div class="seg" role="group" aria-labelledby="lbl-longueur" id="seg-longueur">
-                <button type="button" aria-pressed="false" data-cost="1800">Courte <small>≈ 150 caractères</small></button>
-                <button type="button" aria-pressed="true" data-cost="2900">Moyenne <small>≈ 300 caractères</small></button>
-                <button type="button" aria-pressed="false" data-cost="4200">Détaillée <small>≈ 500 caractères</small></button>
+              <div class="crit-head">
+                <span class="lbl">Critères de « Mathématiques » <span class="opt">— évaluez au moins un critère</span> <span class="pin" title="Annotation 10">10</span></span>
+                <span class="tools"><a href="#" onclick="return false">Modifier les critères</a></span>
               </div>
-            </div>
 
-            <div class="field">
-              <label>Critères d'évaluation <span class="opt">— évaluez au moins un critère</span> <span class="pin" title="Annotation 6">6</span></label>
               <div class="crit">
-                <p class="name">Participation orale <span class="chosen" data-chosen>Bien</span></p>
+                <p class="name">
+                  <span class="left">Participation orale <span class="badge-imp" title="Ce critère pèsera davantage dans l'appréciation">★ Crucial</span> <span class="pin" title="Annotation 9">9</span></span>
+                  <span class="chosen" data-chosen>Bien</span>
+                </p>
                 <div class="scale" role="radiogroup" aria-label="Participation orale">
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
@@ -508,8 +558,12 @@
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
+
               <div class="crit">
-                <p class="name">Maîtrise du cours <span class="chosen" data-chosen>Satisfaisant</span></p>
+                <p class="name">
+                  <span class="left">Maîtrise du cours</span>
+                  <span class="chosen" data-chosen>Satisfaisant</span>
+                </p>
                 <div class="scale" role="radiogroup" aria-label="Maîtrise du cours">
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
@@ -519,8 +573,12 @@
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
+
               <div class="crit">
-                <p class="name">Travail personnel <span class="chosen" data-chosen>Non évalué</span></p>
+                <p class="name">
+                  <span class="left">Travail personnel</span>
+                  <span class="chosen" data-chosen>Non évalué</span>
+                </p>
                 <div class="scale" role="radiogroup" aria-label="Travail personnel">
                   <button type="button" role="radio" aria-checked="true" aria-pressed="true">Non évalué</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
@@ -530,11 +588,37 @@
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
+
+              <div class="crit">
+                <p class="name">
+                  <span class="left">Autonomie</span>
+                  <span class="chosen" data-chosen>Excellent</span>
+                </p>
+                <div class="scale" role="radiogroup" aria-label="Autonomie">
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Fragile</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Satisfaisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Excellent</button>
+                </div>
+              </div>
+
+              <button class="addcrit" type="button">＋ Ajouter un critère à cette matière</button>
+            </div>
+
+            <div class="field">
+              <span class="lbl" id="lbl-longueur">Longueur de l'appréciation <span class="pin" title="Annotation 11">11</span></span>
+              <div class="seg" role="group" aria-labelledby="lbl-longueur" id="seg-longueur">
+                <button type="button" aria-pressed="false" data-cost="1800">Courte <small>≈ 150 caractères</small></button>
+                <button type="button" aria-pressed="true" data-cost="2900">Moyenne <small>≈ 300 caractères</small></button>
+                <button type="button" aria-pressed="false" data-cost="4200">Détaillée <small>≈ 500 caractères</small></button>
+              </div>
             </div>
 
             <div class="two-col">
               <div class="field">
-                <label id="lbl-ton">Ton</label>
+                <span class="lbl" id="lbl-ton">Ton</span>
                 <div class="seg" role="group" aria-labelledby="lbl-ton" id="seg-ton">
                   <button type="button" aria-pressed="false">Bienveillant</button>
                   <button type="button" aria-pressed="true">Neutre</button>
@@ -557,7 +641,7 @@
             </div>
 
             <div class="cost">
-              <span class="pin" title="Annotation 8">8</span>
+              <span class="pin" title="Annotation 12">12</span>
               <span>Cette génération consommera <b id="cost-val">≈ 2 900 crédits</b></span>
               <span class="after">Solde après : <b id="cost-after">244 600</b> crédits</span>
             </div>
@@ -569,15 +653,16 @@
     </div>
 
     <div class="legend">
-      <div class="item"><span class="pin">6</span><p><strong>Notation lisible et tactile</strong>Fini les sigles « TI / AB / TB » lisibles uniquement au survol : libellés complets, niveau choisi rappelé en couleur, cibles de 44 px minimum utilisables sur tablette, sémantique clavier/lecteur d'écran. Échelle resserrée à 6 niveaux (à valider avec vos utilisateurs — les 8 niveaux actuels restent possibles).</p></div>
-      <div class="item"><span class="pin">7</span><p><strong>Un seul contrôle de longueur</strong>« Courte / Moyenne / Détaillée » remplace les deux champs numériques min/max, avec l'équivalence en caractères affichée. Même pattern que le curseur de la Synthèse : un seul langage pour un même besoin.</p></div>
-      <div class="item"><span class="pin">8</span><p><strong>Coût annoncé, un seul clic</strong>L'encart de coût remplace le double-clic « Confirmer la génération » (perçu comme un bug). L'estimation se met à jour selon la longueur choisie — essayez ci-dessus.</p></div>
-      <div class="item"><span class="pin">9</span><p><strong>Un seul compteur de crédits</strong>Le compteur vit dans l'en-tête de page ; le formulaire n'affiche plus son propre compteur ni sa propre alerte « crédits épuisés » en doublon.</p></div>
-      <div class="item"><span class="pin">10</span><p><strong>Matières normalisées</strong>Liste des disciplines + « Autre… » (saisie libre conservée). Les filtres des banques cessent de séparer « Maths » et « Mathématiques ».</p></div>
+      <div class="item"><span class="pin">8</span><p><strong>Matières : rien ne disparaît</strong>Le sélecteur affiche vos matières avec leur nombre de critères ; « ⚙ Gérer » ouvre la gestion actuelle (créer, renommer, supprimer une matière et ses critères) sans quitter la page. L'option « + Créer une nouvelle matière » est aussi dans la liste pour le premier usage.</p></div>
+      <div class="item"><span class="pin">9</span><p><strong>Importance enfin visible… et réellement utilisée</strong>Le réglage Normal / Important / Crucial existe déjà à la création d'un critère, mais l'audit a montré qu'il est ignoré à la génération (valeur codée en dur). Ici il s'affiche sur le critère et pèse vraiment dans le texte produit.</p></div>
+      <div class="item"><span class="pin">10</span><p><strong>Notation lisible et tactile</strong>Les critères affichés sont ceux de la matière sélectionnée, comme aujourd'hui. Fini les sigles « TI / AB / TB » lisibles au survol uniquement : libellés complets, niveau choisi rappelé en couleur, cibles ≥ 44 px (sur mobile, la grille passe en 2 lignes de 3), sémantique clavier/lecteur d'écran. Échelle montrée à 6 niveaux — les 8 actuels restent possibles, à valider avec vos utilisateurs.</p></div>
+      <div class="item"><span class="pin">11</span><p><strong>Un seul contrôle de longueur</strong>« Courte / Moyenne / Détaillée » remplace les deux champs numériques min/max, équivalence en caractères affichée. Même langage que le curseur de la Synthèse.</p></div>
+      <div class="item"><span class="pin">12</span><p><strong>Coût annoncé, un seul clic</strong>L'encart de coût remplace le double-clic « Confirmer la génération » (souvent perçu comme un bug). L'estimation se met à jour selon la longueur — essayez.</p></div>
+      <div class="item"><span class="pin">13</span><p><strong>Un seul compteur de crédits</strong>Le compteur vit dans l'en-tête de page ; le formulaire n'affiche plus son propre compteur ni son alerte « crédits épuisés » en doublon.</p></div>
     </div>
   </div>
 
-  <p class="foot">Typographie : ces maquettes utilisent la police système ; la recommandation de l'audit est d'adopter une police de titrage chaleureuse (Nunito ou Plus Jakarta Sans) dans l'app. Toutes les propositions sont additives : aucun champ, aucune option, aucune fonctionnalité actuelle n'est supprimée.</p>
+  <p class="foot">Typographie : maquettes en police système ; la recommandation de l'audit est d'adopter une police de titrage chaleureuse (Nunito ou Plus Jakarta Sans) dans l'app. Toutes les propositions sont additives : aucun champ, aucune option, aucune fonctionnalité actuelle n'est supprimée.</p>
 </div>
 
 <script>
