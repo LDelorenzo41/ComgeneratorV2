@@ -341,6 +341,32 @@
   @media (min-width: 640px) { .generate { width: auto; justify-self: start; } }
   :root[data-theme="dark"] .generate { color: #0d1326; }
 
+  .tuto { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: .8rem; font-weight: 700; color: var(--brand); text-decoration: none; }
+  .tuto:hover { text-decoration: underline; }
+  .btn-row-gen { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .reset-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 11px; padding: 12px 20px; font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer;
+  }
+  .reset-btn:hover { color: var(--text); }
+  .disclaimer { font-size: .78rem; color: var(--muted); font-style: italic; margin: 0; }
+  .custom-length { display: none; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; font-size: .84rem; color: var(--muted); }
+  .custom-length.visible { display: flex; }
+  .custom-length input { width: 90px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-2); color: var(--text); padding: 7px 10px; font: inherit; font-size: .86rem; }
+
+  .parity-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: var(--shadow); }
+  table.parity { border-collapse: collapse; width: 100%; min-width: 620px; font-size: .85rem; }
+  .parity th {
+    text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+    padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card-2);
+  }
+  .parity td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+  .parity tr:last-child td { border-bottom: none; }
+  .parity td:first-child { font-weight: 600; width: 44%; }
+  .parity td .grp { display: block; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 1px; }
+  .parity .ok { color: var(--pole-ressources); font-weight: 800; margin-right: 6px; }
+  .parity .chg { color: var(--warn); font-weight: 800; margin-right: 6px; }
+
   .foot { margin-top: 52px; border-top: 1px solid var(--border); padding-top: 18px; color: var(--muted); font-size: .86rem; max-width: 70ch; }
   @media (prefers-reduced-motion: no-preference) {
     .btn, .seg button, .scale button, .generate, .quick a { transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
@@ -485,7 +511,7 @@
     </div>
 
     <div class="legend">
-      <div class="item"><span class="pin">1</span><p><strong>Header réellement responsive</strong>Sur téléphone : logo + crédits compacts (« 247 k ») + bouton menu ; les 4 pôles passent dans une barre d'onglets en bas d'écran, à portée de pouce. Sur ordinateur : navigation à plat, logo unique (le logo TeachTech descend au footer). Réduisez/élargissez cette fenêtre pour voir la bascule.</p></div>
+      <div class="item"><span class="pin">1</span><p><strong>Header réellement responsive</strong>Sur téléphone : logo + crédits compacts (« 247 k ») + bouton menu ; les 4 pôles passent dans une barre d'onglets en bas d'écran, à portée de pouce. Sur ordinateur : navigation à plat, logo unique (le logo TeachTech descend au footer). Chaque pôle garde son sous-menu déroulant actuel (banques, synthèse, répondre à une communication…). L'avatar « L » ouvre le menu compte inchangé : J'ai un code !, Donner votre avis, Paramètres du compte, mode sombre/clair, Déconnexion, et la section Administration pour les admins. Réduisez/élargissez cette fenêtre pour voir la bascule.</p></div>
       <div class="item"><span class="pin">2</span><p><strong>Jauge de crédits parlante</strong>« Crédits » remplace « tokens », la jauge donne le niveau d'un regard et le détail traduit en actions (« ≈ 82 appréciations »).</p></div>
       <div class="item"><span class="pin">3</span><p><strong>Bandeau contextuel</strong>Le message suit le calendrier scolaire (bulletins, rentrée, conseils de classe). Un seul CTA, jamais intrusif.</p></div>
       <div class="item"><span class="pin">4</span><p><strong>Actions rapides, pas un second menu</strong>Six lanceurs de tâches compacts, colorés par pôle. La navigation complète reste dans le header/la barre d'onglets — ici on lance un geste, on ne navigue pas.</p></div>
@@ -511,6 +537,7 @@
             <div>
               <span class="crumb">Évaluer</span>
               <h3>Générer une appréciation</h3>
+              <a class="tuto" href="#" onclick="return false">▶ Voir un court tuto vidéo</a>
             </div>
             <div style="display:flex; align-items:center; gap:8px">
               <div class="credit-chip"><span class="bar"><i></i></span><span class="full">247 500 crédits</span><span class="short">247 k</span></div>
@@ -621,6 +648,12 @@
                 <button type="button" aria-pressed="false" data-cost="1800">Courte <small>≈ 150 caractères</small></button>
                 <button type="button" aria-pressed="true" data-cost="2900">Moyenne <small>≈ 300 caractères</small></button>
                 <button type="button" aria-pressed="false" data-cost="4200">Détaillée <small>≈ 500 caractères</small></button>
+                <button type="button" aria-pressed="false" data-cost="2900" data-custom>Personnalisée <small>min / max exacts</small></button>
+              </div>
+              <div class="custom-length" id="custom-length">
+                <span>Longueur minimale</span> <input type="number" value="150" min="50" max="500" aria-label="Longueur minimale en caractères">
+                <span>maximale</span> <input type="number" value="300" min="100" max="1000" aria-label="Longueur maximale en caractères">
+                <span>caractères — le réglage fin actuel, conservé</span>
               </div>
             </div>
 
@@ -629,8 +662,8 @@
                 <span class="lbl" id="lbl-ton">Ton</span>
                 <div class="seg" role="group" aria-labelledby="lbl-ton" id="seg-ton">
                   <button type="button" aria-pressed="false">Bienveillant</button>
-                  <button type="button" aria-pressed="true">Neutre</button>
-                  <button type="button" aria-pressed="false">Exigeant</button>
+                  <button type="button" aria-pressed="true">Normal</button>
+                  <button type="button" aria-pressed="false">Sévère</button>
                 </div>
               </div>
               <div class="field">
@@ -654,7 +687,11 @@
               <span class="after">Solde après : <b id="cost-after">244 600</b> crédits</span>
             </div>
 
-            <button class="generate" type="button">✨ Générer l'appréciation</button>
+            <div class="btn-row-gen">
+              <button class="generate" type="button">✨ Générer l'appréciation</button>
+              <button class="reset-btn" type="button" title="Affiché après une génération, comme aujourd'hui">↺ Réinitialiser</button>
+            </div>
+            <p class="disclaimer">⚠️ Texte généré par IA : relisez et ajustez avant utilisation — l'outil ne remplace pas votre expertise. Après génération, la zone de résultats actuelle est inchangée : versions détaillée et synthétique éditables, boutons Copier, « Taguer et enregistrer » dans votre banque.</p>
           </div>
         </div>
       </div>
@@ -664,9 +701,55 @@
       <div class="item"><span class="pin">8</span><p><strong>Matières : rien ne disparaît</strong>Le sélecteur affiche vos matières avec leur nombre de critères ; « ⚙ Gérer » ouvre la gestion actuelle (créer, renommer, supprimer une matière et ses critères) sans quitter la page. L'option « + Créer une nouvelle matière » est aussi dans la liste pour le premier usage.</p></div>
       <div class="item"><span class="pin">9</span><p><strong>Importance visible… et réellement utilisée</strong>Le réglage Normal / Important / Crucial existe déjà à la création d'un critère, mais l'audit a montré qu'il est ignoré à la génération (valeur codée en dur). Ici il s'affiche sur le critère et pèsera vraiment dans le texte produit.</p></div>
       <div class="item"><span class="pin">10</span><p><strong>L'échelle complète à 8 niveaux, enfin lisible</strong>Les 8 niveaux actuels sont intégralement conservés (Non évalué, Très insuffisant, Insuffisant, Moyen, Assez bien, Bien, Très bien, Excellent) : c'est cette finesse qui diversifie et personnalise les appréciations. L'interaction ne change pas — un appui sélectionne le niveau — mais les libellés sont écrits en toutes lettres au lieu des sigles « TI / AB / TB » lisibles uniquement au survol, le niveau choisi est rappelé en couleur à côté du critère, les cibles font ≥ 44 px (sur mobile la grille passe en 2 lignes de 4), et l'ensemble est utilisable au clavier et au lecteur d'écran.</p></div>
-      <div class="item"><span class="pin">11</span><p><strong>Un seul contrôle de longueur</strong>« Courte / Moyenne / Détaillée » remplace les deux champs numériques min/max, équivalence en caractères affichée. Même langage que le curseur de la Synthèse.</p></div>
+      <div class="item"><span class="pin">11</span><p><strong>Longueur simple par défaut, réglage fin conservé</strong>« Courte / Moyenne / Détaillée » couvre l'usage courant, et l'option « Personnalisée » rouvre les deux champs min/max exacts d'aujourd'hui (50–500 / 100–1000 caractères) — cliquez dessus pour voir. Zéro capacité perdue.</p></div>
       <div class="item"><span class="pin">12</span><p><strong>Coût annoncé, un seul clic</strong>L'encart de coût remplace le double-clic « Confirmer la génération » (souvent perçu comme un bug). L'estimation se met à jour selon la longueur — essayez.</p></div>
       <div class="item"><span class="pin">13</span><p><strong>Un seul compteur de crédits</strong>Le compteur vit dans l'en-tête de page ; le formulaire n'affiche plus son propre compteur ni son alerte « crédits épuisés » en doublon.</p></div>
+    </div>
+  </div>
+
+  <!-- ============ TABLE DE CORRESPONDANCE ============ -->
+  <div class="section">
+    <h2>Vérification anti-régression — correspondance accès par accès</h2>
+    <p class="sub">Chaque bouton, lien et réglage des écrans actuels (header, page Dashboard, formulaire d'appréciation) et son pendant dans la proposition. <span class="ok" style="margin:0">✓</span> = identique ou déplacé sans perte · <span class="chg" style="margin:0">△</span> = remplacé par un équivalent, à valider.</p>
+
+    <div class="parity-wrap">
+      <table class="parity">
+        <thead><tr><th>Accès dans la version actuelle</th><th>Où il vit dans la proposition</th></tr></thead>
+        <tbody>
+          <tr><td><span class="grp">Header</span>Logo « ProfAssist » (→ landing)</td><td><span class="ok">✓</span>Logo conservé ; connecté, il mène à « Mon espace »</td></tr>
+          <tr><td>Logo TeachTech (image, non cliquable)</td><td><span class="chg">△</span>Déplacé au footer pour alléger la barre</td></tr>
+          <tr><td>Menu Concevoir ▾ : Scénarios pédagogiques · Séances pédagogiques · Ma banque de scénarios · Ma banque de séances</td><td><span class="ok">✓</span>Onglet « Concevoir », sous-menu déroulant identique ; en plus : actions rapides (Créer une séance / un scénario) et « Reprendre où j'en étais »</td></tr>
+          <tr><td>Menu Évaluer ▾ : Générer une appréciation · Ma banque d'appréciations · Synthèse</td><td><span class="ok">✓</span>Onglet « Évaluer », sous-menu identique ; actions rapides « Générer une appréciation » et « Synthèse de bulletin »</td></tr>
+          <tr><td>Menu Communiquer ▾ : Créer · Répondre à une communication</td><td><span class="ok">✓</span>Onglet « Communiquer », sous-menu identique ; action rapide « Écrire aux familles »</td></tr>
+          <tr><td>Menu Ressources ▾ : Flux RSS · Mon chatbot · Ma banque de réponses</td><td><span class="ok">✓</span>Onglet « Ressources », sous-menu identique ; carte « Actualités pédagogiques » et action rapide chatbot en bonus</td></tr>
+          <tr><td>Compteur « X tokens »</td><td><span class="ok">✓</span>Jauge de crédits (cliquable → page d'achat), équivalence en actions au survol</td></tr>
+          <tr><td>Bouton « Acheter des tokens »</td><td><span class="ok">✓</span>« Recharger » (carte crédits + jauge cliquable)</td></tr>
+          <tr><td>⚙ Paramètres ▾ : J'ai un code ! · Donner votre avis / Avis envoyé · Paramètres du compte · Mode sombre/clair · Déconnexion · section Administration (Dashboard, Newsletter, Campagnes, Feedback)</td><td><span class="ok">✓</span>Menu avatar « L », contenu identique ; « J'ai un code » aussi en raccourci dans la carte crédits</td></tr>
+          <tr><td>Menu mobile (burger déroulant tout le site)</td><td><span class="ok">✓</span>Barre d'onglets en bas (navigation) + burger (compte, paramètres, code, avis, thème, déconnexion)</td></tr>
+
+          <tr><td><span class="grp">Page Dashboard</span>« Bonjour {prénom} ! » + sous-titre</td><td><span class="ok">✓</span>En-tête de « Mon espace »</td></tr>
+          <tr><td>Lien « Voir un court tuto vidéo » (YouTube)</td><td><span class="ok">✓</span>Conservé dans l'en-tête du générateur</td></tr>
+          <tr><td>Compteur de crédits + « Un token ≈ 4 caractères »</td><td><span class="ok">✓</span>Carte « Mes crédits » avec jauge + équivalences en actions concrètes</td></tr>
+          <tr><td>Alerte « Crédits épuisés » + badge « Indisponible » + bouton « Recharger mes crédits »</td><td><span class="ok">✓</span>États conservés : jauge rouge, encart au-dessus du formulaire, même bouton — un seul exemplaire au lieu de deux doublons</td></tr>
+          <tr><td>« Ajouter une matière »</td><td><span class="ok">✓</span>« + Créer une nouvelle matière… » dans la liste + bouton « ⚙ Gérer »</td></tr>
+          <tr><td>Cartes matières : « X critères définis » · « Modifier les critères » · 🗑 Supprimer (Confirmer / Annuler)</td><td><span class="ok">✓</span>Nombre de critères affiché dans la liste ; « Modifier les critères » en lien direct ; suppression via « ⚙ Gérer » (gestion actuelle inchangée)</td></tr>
+          <tr><td>Modale matière : nom · « Voir des exemples de critères » (12 catégories) · « + Ajouter un critère » · importance Normal/Important/Crucial · supprimer un critère · Annuler / Enregistrer</td><td><span class="ok">✓</span>Modale inchangée, ouverte par « ⚙ Gérer » ; « + Ajouter un critère » aussi en accès direct sous la liste ; l'importance devient réellement utilisée à la génération</td></tr>
+          <tr><td>Disclaimer IA avant le formulaire</td><td><span class="ok">✓</span>Conservé, sous le bouton de génération</td></tr>
+          <tr><td>Liens bas de page : « Ma banque d'appréciations » · « Outils communication »</td><td><span class="ok">✓</span>Navigation (sous-menus) + actions rapides de « Mon espace »</td></tr>
+          <tr><td>3 cartes « IA avancée / Personnalisable / Gain de temps »</td><td><span class="chg">△</span>Seul contenu remplacé : au profit du bilan « Mon année avec ProfAssist » (plus utile que de l'auto-promotion interne) — à valider</td></tr>
+
+          <tr><td><span class="grp">Formulaire</span>Sélecteur de matière (+ message « Aucune matière disponible »)</td><td><span class="ok">✓</span>Identique, états vides conservés</td></tr>
+          <tr><td>Prénom de l'élève</td><td><span class="ok">✓</span>Identique</td></tr>
+          <tr><td>Longueur min / max en caractères (50–500 / 100–1000)</td><td><span class="ok">✓</span>« Courte / Moyenne / Détaillée » + option « Personnalisée » qui rouvre les champs min/max exacts</td></tr>
+          <tr><td>Barre de notation par critère, 8 niveaux NE → E (tooltips au survol)</td><td><span class="ok">✓</span>Les 8 niveaux, libellés en toutes lettres, niveau choisi rappelé, utilisable au tactile et au clavier</td></tr>
+          <tr><td>Ton : Bienveillant / Normal / Sévère</td><td><span class="ok">✓</span>Mêmes trois tons, en boutons</td></tr>
+          <tr><td>Mode d'adresse : Tutoiement / Vouvoiement / Impersonnel</td><td><span class="ok">✓</span>Identique, avec exemples ajoutés</td></tr>
+          <tr><td>Notes personnelles (optionnel)</td><td><span class="ok">✓</span>Identique</td></tr>
+          <tr><td>« Générer les appréciations » (états : Génération en cours… / Crédits épuisés / « Confirmer la génération » au 2e clic)</td><td><span class="ok">✓</span>États chargement et épuisé conservés ; le 2e clic de confirmation est remplacé par l'encart de coût permanent — même garde-fou, plus lisible</td></tr>
+          <tr><td>« Réinitialiser » (affiché après une génération)</td><td><span class="ok">✓</span>Conservé ; proposition d'ajouter « Régénérer une variante » (paramètres conservés)</td></tr>
+          <tr><td>Résultats : versions détaillée et synthétique éditables · boutons Copier · « Taguer et enregistrer » (4 tags, modale de confirmation, verrou accès banque)</td><td><span class="ok">✓</span>Zone de résultats inchangée — hors périmètre de cette refonte</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -690,6 +773,7 @@
     var c = parseInt(b.getAttribute('data-cost'), 10);
     document.getElementById('cost-val').textContent = '≈ ' + fmt(c) + ' crédits';
     document.getElementById('cost-after').textContent = fmt(BALANCE - c);
+    document.getElementById('custom-length').classList.toggle('visible', b.hasAttribute('data-custom'));
   });
   wireSeg(document.getElementById('seg-ton'));
   document.querySelectorAll('.scale').forEach(function (scale) {
