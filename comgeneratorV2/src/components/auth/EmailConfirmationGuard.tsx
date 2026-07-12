@@ -53,26 +53,26 @@ export function EmailConfirmationGuard({ children }: EmailConfirmationGuardProps
   // Si l'email n'est pas confirmé, bloquer l'accès
   if (!isEmailConfirmed) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-gray-900 dark:via-amber-900/20 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center mb-6">
             <Mail className="mx-auto h-16 w-16 text-amber-500 mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Confirmez votre email
             </h1>
-            <p className="text-gray-600">
-              Votre adresse email <span className="font-semibold text-blue-600">{user?.email}</span> doit être confirmée avant d'accéder à ProfAssist.
+            <p className="text-gray-600 dark:text-gray-300">
+              Votre adresse email <span className="font-semibold text-blue-600 dark:text-blue-400">{user?.email}</span> doit être confirmée avant d'accéder à ProfAssist.
             </p>
           </div>
 
-          <div className="bg-amber-50 rounded-lg p-4 mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 mb-6">
             <div className="flex items-start">
               <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-amber-800">
+                <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
                   Accès temporairement bloqué
                 </h3>
-                <p className="mt-1 text-sm text-amber-700">
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-200">
                   Toutes les fonctionnalités sont inaccessibles jusqu'à la confirmation de votre email.
                 </p>
               </div>
@@ -80,8 +80,8 @@ export function EmailConfirmationGuard({ children }: EmailConfirmationGuardProps
           </div>
 
           {resendSuccess && (
-            <div className="bg-green-50 rounded-lg p-4 mb-4">
-              <p className="text-sm text-green-700 text-center">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-700 dark:text-green-300 text-center">
                 ✅ Email de confirmation renvoyé ! Vérifiez votre boîte de réception.
               </p>
             </div>
@@ -108,14 +108,14 @@ export function EmailConfirmationGuard({ children }: EmailConfirmationGuardProps
 
             <button
               onClick={() => supabase.auth.signOut()}
-              className="w-full py-2 px-4 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              className="w-full py-2 px-4 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 font-medium transition-colors"
             >
               Se déconnecter
             </button>
           </div>
 
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Email non reçu ? Vérifiez vos spams ou contactez le support.
             </p>
           </div>

@@ -20,6 +20,7 @@ import {
   Loader2,
   FolderOpen,
   ArrowLeft,
+  Plus,
   Copy,
   Check,
   Sparkles,
@@ -604,7 +605,7 @@ export function ScenariosBankPage() {
             to="/scenario-pedagogique"
             className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition-all"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-2" />
             Nouveau scénario
           </Link>
         </div>

@@ -16,7 +16,9 @@ import {
   Eye,
   Copy,
   RotateCcw,
-  Archive
+  Archive,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 
 interface Appreciation {
@@ -170,7 +172,7 @@ export function AppreciationBankPage() {
       filtered = filtered.filter(app => 
         app.detailed.toLowerCase().includes(search) ||
         (app.summary && app.summary.toLowerCase().includes(search)) ||
-        tagToTitle[app.tag].toLowerCase().includes(search)
+        (tagToTitle[app.tag] ?? app.tag ?? '').toLowerCase().includes(search)
       );
     }
 
@@ -303,8 +305,10 @@ export function AppreciationBankPage() {
                     ? 'bg-white dark:bg-gray-800 text-purple-600 shadow-sm' 
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
+                title="Vue en grille"
+                aria-label="Vue en grille"
               >
-                <Target className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -313,8 +317,10 @@ export function AppreciationBankPage() {
                     ? 'bg-white dark:bg-gray-800 text-purple-600 shadow-sm' 
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
+                title="Vue en liste"
+                aria-label="Vue en liste"
               >
-                <Filter className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
             </div>
           </div>

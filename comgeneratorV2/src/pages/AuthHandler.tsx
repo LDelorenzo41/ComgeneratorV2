@@ -12,13 +12,8 @@ export function AuthHandler() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔐 Traitement du callback d\'authentification...');
-        console.log('URL actuelle:', window.location.href);
-        console.log('📍 Pathname:', location.pathname);
-
         // Vérifier si on est sur la route /auth/callback
         if (location.pathname !== '/auth/callback') {
-          console.log('❌ Pas sur la route callback, redirection vers landing');
           navigate('/landing');
           return;
         }
@@ -30,14 +25,6 @@ export function AuthHandler() {
         const type = hashParams.get('type');
         const error = hashParams.get('error');
         const errorDescription = hashParams.get('error_description');
-
-        console.log('📋 Paramètres trouvés:', { 
-          accessToken: !!accessToken, 
-          refreshToken: !!refreshToken, 
-          type, 
-          error,
-          errorDescription 
-        });
 
         // Gérer les erreurs dans l'URL
         if (error) {
@@ -62,7 +49,6 @@ export function AuthHandler() {
 
         // Vérifier la présence des tokens
         if (!accessToken || !refreshToken) {
-          console.log('❌ Tokens manquants, redirection vers landing');
           navigate('/landing');
           return;
         }
@@ -95,9 +81,6 @@ export function AuthHandler() {
           return;
         }
 
-        console.log('✅ Session définie avec succès:', data.user?.email);
-        console.log('✅ Email confirmé le:', data.user?.email_confirmed_at);
-        
         setStatus('success');
         setMessage(`Email confirmé avec succès pour ${data.user?.email} !`);
 
@@ -107,10 +90,8 @@ export function AuthHandler() {
         // Redirection robuste avec fallback
         setTimeout(() => {
           try {
-            console.log('🔄 Tentative de redirection...');
             navigate('/dashboard');
           } catch (navError) {
-            console.log('❌ Navigate échoué, utilisation de window.location');
             window.location.href = '/dashboard';
           }
         }, 3000);
@@ -127,7 +108,6 @@ export function AuthHandler() {
       handleAuthCallback();
     } else {
       // Pas de tokens, rediriger vers landing
-      console.log('❌ Pas de tokens, redirection vers landing');
       navigate('/landing');
     }
   }, [navigate, location.pathname]);
@@ -135,13 +115,13 @@ export function AuthHandler() {
   // États d'affichage
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900 flex items-center justify-center px-4">
         <div className="text-center">
           <Loader className="mx-auto h-12 w-12 text-blue-600 animate-spin mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Confirmation de votre email...
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Veuillez patienter pendant que nous confirmons votre adresse email.
           </p>
         </div>
@@ -151,17 +131,17 @@ export function AuthHandler() {
 
   if (status === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-green-900/10 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
           <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-6" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Email confirmé !
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
             {message}
           </p>
-          <div className="bg-green-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-700">
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-6">
+            <p className="text-sm text-green-700 dark:text-green-300">
               🎉 Votre compte est maintenant actif !<br/>
               Redirection automatique vers votre tableau de bord...
             </p>
@@ -185,17 +165,17 @@ export function AuthHandler() {
 
   if (status === 'expired') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 dark:from-gray-900 dark:via-orange-900/10 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
           <RefreshCw className="mx-auto h-16 w-16 text-orange-500 mb-6" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             Lien expiré
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
             {message}
           </p>
-          <div className="bg-orange-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-orange-700">
+          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 mb-6">
+            <p className="text-sm text-orange-700 dark:text-orange-300">
               Les liens de confirmation expirent après 24 heures pour votre sécurité.
             </p>
           </div>
@@ -208,7 +188,7 @@ export function AuthHandler() {
             </button>
             <button
               onClick={() => navigate('/login')}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors"
+              className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-3 px-6 rounded-lg transition-colors"
             >
               J'ai déjà un compte
             </button>
@@ -220,13 +200,13 @@ export function AuthHandler() {
 
   // Erreur
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-purple-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-purple-50 dark:from-gray-900 dark:via-red-900/10 dark:to-gray-900 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
         <AlertCircle className="mx-auto h-16 w-16 text-red-500 mb-6" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
           Erreur de confirmation
         </h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 dark:text-gray-300 mb-6">
           {message}
         </p>
         <div className="space-y-3">
@@ -238,7 +218,7 @@ export function AuthHandler() {
           </button>
           <button
             onClick={() => navigate('/login')}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors"
+            className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-3 px-6 rounded-lg transition-colors"
           >
             Retour à la connexion
           </button>

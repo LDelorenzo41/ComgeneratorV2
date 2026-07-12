@@ -12,7 +12,9 @@ import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorMo
 import { 
   BookOpen, 
   Search, 
-  Filter, 
+  Filter,
+  LayoutGrid,
+  List,
   Calendar,
   Clock,
   Users,
@@ -768,8 +770,10 @@ export function LessonsBankPage() {
                     ? 'bg-white dark:bg-gray-800 text-green-600 shadow-sm' 
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
+                title="Vue en grille"
+                aria-label="Vue en grille"
               >
-                <Target className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -778,8 +782,10 @@ export function LessonsBankPage() {
                     ? 'bg-white dark:bg-gray-800 text-green-600 shadow-sm' 
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
+                title="Vue en liste"
+                aria-label="Vue en liste"
               >
-                <Filter className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
             </div>
           </div>

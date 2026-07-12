@@ -5,8 +5,6 @@ import { rssService, type RSSArticle } from '../lib/rssService';
 import { ExternalLink, RefreshCw, AlertCircle, Newspaper, Check, ChevronDown, X, Sparkles, Rss, Filter, Calendar, Globe, TrendingUp } from 'lucide-react';
 import type { RssFeed, UserRssPreference } from '../lib/types';
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
 export function ResourcesPage() {
   const { user } = useAuthStore();
   const [articles, setArticles] = React.useState<RSSArticle[]>([]);
@@ -87,8 +85,6 @@ export function ResourcesPage() {
         setRefreshStatus(`${rssArticles.length} articles récupérés`);
       }
 
-      await delay(2000);
-      
     } catch (err: any) {
       console.error('Erreur RSS:', err);
       setError(err.message || 'Erreur lors de la récupération des articles');
