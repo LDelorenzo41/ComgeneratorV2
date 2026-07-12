@@ -6,6 +6,7 @@ import {
   Moon,
   Sun,
   Menu,
+  Home,
   MessageSquare,
   PenTool,
   BookOpen,
@@ -126,7 +127,7 @@ export function Header() {
           
           {/* ===== SECTION GAUCHE : Logo ===== */}
           <div className="flex items-center space-x-6 flex-shrink-0">
-            <Link to="/landing" className="flex-shrink-0 flex items-center">
+            <Link to={user ? '/mon-espace' : '/landing'} className="flex-shrink-0 flex items-center">
               <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                 ProfAssist
               </span>
@@ -142,6 +143,15 @@ export function Header() {
           {user && !isLandingPage && (
             <nav className="hidden lg:flex items-center justify-center flex-1 px-4">
               <div className="flex items-center space-x-2">
+
+                {/* ========== 🏠 MON ESPACE ========== */}
+                <Link
+                  to="/mon-espace"
+                  className={menuButtonClass(location.pathname === '/mon-espace')}
+                >
+                  <Home className="w-5 h-5" />
+                  <span className="ml-2">Mon espace</span>
+                </Link>
 
                 {/* ========== 🟦 CONCEVOIR ========== */}
                 <div className="relative dropdown-concevoir">
@@ -575,6 +585,16 @@ Scénarios pédagogiques
                 </span>
               </div>
             )}
+
+            {/* ========== 🏠 MON ESPACE - Mobile ========== */}
+            <Link
+              to="/mon-espace"
+              className="flex items-center px-3 py-2 text-base font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Mon espace
+            </Link>
 
             {/* ========== 🟦 CONCEVOIR - Mobile ========== */}
             <div className="block px-3 py-2">

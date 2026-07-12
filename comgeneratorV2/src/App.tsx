@@ -68,6 +68,16 @@ import { FEATURES } from './lib/features';
 import { useAuthStore, useThemeStore } from './lib/store';
 import { supabase } from './lib/supabase';
 
+// Import de la page Mon espace (accueil connecté)
+import { MonEspacePage } from './pages/MonEspacePage';
+
+// Racine : les utilisateurs connectés arrivent sur leur espace, les visiteurs sur la landing
+function RootRedirect() {
+  const { user, loading } = useAuthStore();
+  if (loading) return null;
+  return <Navigate to={user ? '/mon-espace' : '/landing'} replace />;
+}
+
 function App() {
   const { setUser, setLoading, user, signOut } = useAuthStore();
   const { isDark } = useThemeStore();
@@ -139,8 +149,8 @@ function App() {
           <Header />
           <main className="flex-1">
             <Routes>
-              {/* Route racine redirige vers landing */}
-              <Route path="/" element={<Navigate to="/landing" replace />} />
+              {/* Route racine : espace connecté ou landing selon la session */}
+              <Route path="/" element={<RootRedirect />} />
               
               {/* Route pour traiter l'authentification et confirmation d'email */}
               <Route path="/auth/callback" element={<AuthHandler />} />
@@ -164,6 +174,11 @@ function App() {
               
               {/* Routes protégées avec garde de confirmation d'email OBLIGATOIRE */}
               <Route element={<AuthLayout />}>
+                <Route path="/mon-espace" element={
+                  <EmailConfirmationGuard>
+                    <MonEspacePage />
+                  </EmailConfirmationGuard>
+                } />
                 <Route path="/dashboard" element={
                   <EmailConfirmationGuard>
                     <DashboardPage />
