@@ -309,12 +309,12 @@
     border-radius: 999px; padding: 2px 8px;
   }
   .crit .chosen { font-size: .78rem; font-weight: 800; color: var(--pole-evaluer); }
-  .scale { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  @media (min-width: 640px) { .scale { grid-template-columns: repeat(6, 1fr); } }
+  .scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  @media (min-width: 760px) { .scale { grid-template-columns: repeat(8, 1fr); } }
   .scale button {
-    min-height: 44px; cursor: pointer;
+    min-height: 44px; cursor: pointer; line-height: 1.2;
     border: 1px solid var(--border); border-radius: 9px; background: var(--card);
-    color: var(--muted); font: inherit; font-size: .76rem; font-weight: 700; padding: 8px 4px;
+    color: var(--muted); font: inherit; font-size: .7rem; font-weight: 700; padding: 7px 3px;
   }
   .scale button[aria-pressed="true"] { background: var(--pole-evaluer); border-color: var(--pole-evaluer); color: #fff; }
   :root[data-theme="dark"] .scale button[aria-pressed="true"] { color: #0d1326; }
@@ -498,7 +498,7 @@
   <!-- ============ MAQUETTE 2 ============ -->
   <div class="section">
     <h2>Maquette 2 — Générateur d'appréciations repensé</h2>
-    <p class="sub">Toutes les capacités actuelles sont là : choix de la matière, <strong>gestion des matières et de leurs critères</strong>, importance des critères, ton, mode d'adresse, notes. Ce qui change : un seul compteur de crédits, une notation lisible sans survol, le coût annoncé avant, un seul clic pour générer.</p>
+    <p class="sub">Toutes les capacités actuelles sont là : choix de la matière, <strong>gestion des matières et de leurs critères</strong>, importance des critères, <strong>l'échelle complète à 8 niveaux</strong>, ton, mode d'adresse, notes. Ce qui change : un seul compteur de crédits, une notation lisible sans survol, le coût annoncé avant, un seul clic pour générer.</p>
 
     <div class="frame">
       <div class="frame-bar">
@@ -551,10 +551,12 @@
                 </p>
                 <div class="scale" role="radiogroup" aria-label="Participation orale">
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Fragile</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Satisfaisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
                   <button type="button" role="radio" aria-checked="true" aria-pressed="true">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
@@ -562,14 +564,16 @@
               <div class="crit">
                 <p class="name">
                   <span class="left">Maîtrise du cours</span>
-                  <span class="chosen" data-chosen>Satisfaisant</span>
+                  <span class="chosen" data-chosen>Assez bien</span>
                 </p>
                 <div class="scale" role="radiogroup" aria-label="Maîtrise du cours">
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Fragile</button>
-                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Satisfaisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Assez bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
@@ -581,10 +585,12 @@
                 </p>
                 <div class="scale" role="radiogroup" aria-label="Travail personnel">
                   <button type="button" role="radio" aria-checked="true" aria-pressed="true">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Fragile</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Satisfaisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
@@ -592,15 +598,17 @@
               <div class="crit">
                 <p class="name">
                   <span class="left">Autonomie</span>
-                  <span class="chosen" data-chosen>Excellent</span>
+                  <span class="chosen" data-chosen>Très bien</span>
                 </p>
                 <div class="scale" role="radiogroup" aria-label="Autonomie">
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Fragile</button>
-                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Satisfaisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
                   <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
-                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Excellent</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Très bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
                 </div>
               </div>
 
@@ -654,8 +662,8 @@
 
     <div class="legend">
       <div class="item"><span class="pin">8</span><p><strong>Matières : rien ne disparaît</strong>Le sélecteur affiche vos matières avec leur nombre de critères ; « ⚙ Gérer » ouvre la gestion actuelle (créer, renommer, supprimer une matière et ses critères) sans quitter la page. L'option « + Créer une nouvelle matière » est aussi dans la liste pour le premier usage.</p></div>
-      <div class="item"><span class="pin">9</span><p><strong>Importance enfin visible… et réellement utilisée</strong>Le réglage Normal / Important / Crucial existe déjà à la création d'un critère, mais l'audit a montré qu'il est ignoré à la génération (valeur codée en dur). Ici il s'affiche sur le critère et pèse vraiment dans le texte produit.</p></div>
-      <div class="item"><span class="pin">10</span><p><strong>Notation lisible et tactile</strong>Les critères affichés sont ceux de la matière sélectionnée, comme aujourd'hui. Fini les sigles « TI / AB / TB » lisibles au survol uniquement : libellés complets, niveau choisi rappelé en couleur, cibles ≥ 44 px (sur mobile, la grille passe en 2 lignes de 3), sémantique clavier/lecteur d'écran. Échelle montrée à 6 niveaux — les 8 actuels restent possibles, à valider avec vos utilisateurs.</p></div>
+      <div class="item"><span class="pin">9</span><p><strong>Importance visible… et réellement utilisée</strong>Le réglage Normal / Important / Crucial existe déjà à la création d'un critère, mais l'audit a montré qu'il est ignoré à la génération (valeur codée en dur). Ici il s'affiche sur le critère et pèsera vraiment dans le texte produit.</p></div>
+      <div class="item"><span class="pin">10</span><p><strong>L'échelle complète à 8 niveaux, enfin lisible</strong>Les 8 niveaux actuels sont intégralement conservés (Non évalué, Très insuffisant, Insuffisant, Moyen, Assez bien, Bien, Très bien, Excellent) : c'est cette finesse qui diversifie et personnalise les appréciations. L'interaction ne change pas — un appui sélectionne le niveau — mais les libellés sont écrits en toutes lettres au lieu des sigles « TI / AB / TB » lisibles uniquement au survol, le niveau choisi est rappelé en couleur à côté du critère, les cibles font ≥ 44 px (sur mobile la grille passe en 2 lignes de 4), et l'ensemble est utilisable au clavier et au lecteur d'écran.</p></div>
       <div class="item"><span class="pin">11</span><p><strong>Un seul contrôle de longueur</strong>« Courte / Moyenne / Détaillée » remplace les deux champs numériques min/max, équivalence en caractères affichée. Même langage que le curseur de la Synthèse.</p></div>
       <div class="item"><span class="pin">12</span><p><strong>Coût annoncé, un seul clic</strong>L'encart de coût remplace le double-clic « Confirmer la génération » (souvent perçu comme un bug). L'estimation se met à jour selon la longueur — essayez.</p></div>
       <div class="item"><span class="pin">13</span><p><strong>Un seul compteur de crédits</strong>Le compteur vit dans l'en-tête de page ; le formulaire n'affiche plus son propre compteur ni son alerte « crédits épuisés » en doublon.</p></div>
