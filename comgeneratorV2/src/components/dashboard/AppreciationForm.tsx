@@ -71,6 +71,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [editableDetailed, setEditableDetailed] = React.useState('');
   const [editableSummary, setEditableSummary] = React.useState('');
+  const [lastUsedTokens, setLastUsedTokens] = React.useState<number | null>(null);
   const [subjectsRefreshKey, setSubjectsRefreshKey] = React.useState(0);
   
   // ✅ MODIFICATION : Remplacement de la logique locale par useTokenBalance
@@ -115,9 +116,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
     }
   };
 
-  // Estimation de la consommation, mise à jour selon la longueur demandée
-  const watchedMaxLength = watch('maxLength');
-  const estimatedCost = Math.round((1500 + (watchedMaxLength || 300) * 5) / 100) * 100;
 
   const saveAppreciation = React.useCallback(
     async (tagValue: string, _generated?: AppreciationResultType) => {
@@ -264,6 +262,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
       onTokensUpdated?.();
       setResult(generatedResult);
+      setLastUsedTokens(usedTokens);
       setEditableDetailed(generatedResult.detailed);
       setEditableSummary(generatedResult.summary);
 
@@ -282,6 +281,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
     reset();
     setLengthPreset('moyenne');
     setResult(null);
+    setLastUsedTokens(null);
     setError(null);
     setTag('');
     setSaveError(null);
@@ -562,18 +562,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </div>
             )}
 
-            {/* Estimation du coût : garde-fou permanent, remplace le double-clic de confirmation */}
-            {tokenCount > 0 && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 border-l-4 border-l-amber-500 rounded-xl px-4 py-3">
-                <p className="text-sm text-amber-900 dark:text-amber-200">
-                  Cette génération consommera <strong>≈ {estimatedCost.toLocaleString('fr-FR')} crédits</strong>
-                </p>
-                <p className="text-xs text-amber-700/80 dark:text-amber-300/70">
-                  Solde après : ≈ {Math.max(0, tokenCount - estimatedCost).toLocaleString('fr-FR')} crédits
-                </p>
-              </div>
-            )}
-
             {/* Boutons d'action */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
@@ -630,6 +618,11 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </div>
               <p className="text-gray-600 dark:text-gray-400">
                 Vos appréciations sont prêtes ! Vous pouvez les éditer si nécessaire
+                {lastUsedTokens !== null && (
+                  <span className="block mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Consommation réelle : <strong className="text-gray-700 dark:text-gray-300">{lastUsedTokens.toLocaleString('fr-FR')} crédits</strong>
+                  </span>
+                )}
               </p>
             </div>
 
