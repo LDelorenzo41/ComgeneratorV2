@@ -19,18 +19,25 @@ const ratingLabels = [
 export function RatingBar({ value, onChange }: RatingBarProps) {
   const [hoveredValue, setHoveredValue] = useState<number | null>(null);
 
+  const selectedLabel = ratingLabels.find(r => r.value === value)?.label ?? 'Non évalué';
+
   return (
     <div className="relative">
-      <div className="flex w-full h-10 rounded-md overflow-hidden">
+      <div className="flex w-full h-11 rounded-md overflow-hidden" role="radiogroup" aria-label="Niveau d'évaluation">
         {ratingLabels.map((rating) => (
           <button
             key={rating.value}
+            type="button"
+            role="radio"
+            aria-checked={value === rating.value}
+            aria-label={rating.label}
+            title={rating.label}
             onClick={() => onChange(rating.value)}
             onMouseEnter={() => setHoveredValue(rating.value)}
             onMouseLeave={() => setHoveredValue(null)}
             className={`
               flex-1 transition-colors duration-200 relative flex items-center justify-center
-              ${rating.value === 0 
+              ${rating.value === 0
                 ? `border-2 ${value === 0 ? 'border-blue-500' : 'border-gray-400 hover:border-blue-500'}`
                 : 'border-r border-gray-300 last:border-r-0'
               }
@@ -49,10 +56,18 @@ export function RatingBar({ value, onChange }: RatingBarProps) {
           </button>
         ))}
       </div>
-      
+
+      {/* Libellé du niveau sélectionné, toujours visible (indispensable sur tablette/mobile) */}
+      <p className="mt-2 text-sm" aria-live="polite">
+        <span className="text-gray-500 dark:text-gray-400">Niveau : </span>
+        <span className={`font-semibold ${value === 0 ? 'text-gray-500 dark:text-gray-400' : 'text-blue-600 dark:text-blue-400'}`}>
+          {selectedLabel}
+        </span>
+      </p>
+
       {/* Tooltip externe au conteneur */}
       {hoveredValue !== null && (
-        <div 
+        <div
           className="absolute pointer-events-none bg-gray-900 dark:bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap transform -translate-x-1/2"
           style={{
             left: `${((hoveredValue + 0.5) / ratingLabels.length) * 100}%`,
