@@ -160,25 +160,56 @@ export function MonEspacePage() {
     fetchData();
   }, [user]);
 
-  // Actualités : deux flux généralistes seulement, en échec silencieux
+  // Actualités : le dernier article de chacun des flux choisis par l'utilisateur
+  // (page Ressources). Sans flux configurés : les deux flux généralistes.
+  // Échec silencieux : la section est simplement masquée.
   React.useEffect(() => {
+    if (!user) return;
+
     const fetchNews = async () => {
       try {
-        const feeds = rssService.getAllFeeds().filter(f =>
-          f.name.includes('Café pédagogique') || f.name.includes('Éduscol')
-        ).slice(0, 2);
-        const results = await Promise.allSettled(feeds.map(f => rssService.fetchFeed(f)));
-        const all = results
-          .filter((r): r is PromiseFulfilledResult<RSSArticle[]> => r.status === 'fulfilled')
-          .flatMap(r => r.value);
-        all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-        setArticles(all.slice(0, 3));
+        const catalog = rssService.getAllFeeds();
+
+        const { data: prefs } = await supabase
+          .from('user_rss_preferences')
+          .select('feed_id, position')
+          .eq('user_id', user.id)
+          .order('position', { ascending: true });
+
+        const chosenFeeds = (prefs || [])
+          .map((p: { feed_id: string }) => catalog.find(f => f.id === p.feed_id))
+          .filter((f): f is NonNullable<typeof f> => Boolean(f));
+
+        if (chosenFeeds.length > 0) {
+          // Un article par flux choisi, dans l'ordre des positions
+          const results = await Promise.allSettled(chosenFeeds.map(f => rssService.fetchFeed(f)));
+          const latestPerFeed = results
+            .map(r => {
+              if (r.status !== 'fulfilled' || r.value.length === 0) return null;
+              return [...r.value].sort(
+                (a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
+              )[0];
+            })
+            .filter((a): a is RSSArticle => a !== null);
+          setArticles(latestPerFeed);
+        } else {
+          // Repli : les 3 derniers articles des flux généralistes
+          const fallbackFeeds = catalog.filter(f =>
+            f.name.includes('Café pédagogique') || f.name.includes('Éduscol')
+          ).slice(0, 2);
+          const results = await Promise.allSettled(fallbackFeeds.map(f => rssService.fetchFeed(f)));
+          const all = results
+            .filter((r): r is PromiseFulfilledResult<RSSArticle[]> => r.status === 'fulfilled')
+            .flatMap(r => r.value);
+          all.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+          setArticles(all.slice(0, 3));
+        }
       } catch {
         // Pas d'actualités : la section est simplement masquée
       }
     };
     fetchNews();
-  }, []);
+  }, [user]);
 
   const kindStyles: Record<RecentItem['kind'], { label: string; classes: string }> = {
     appreciation: { label: 'Appréciation', classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
