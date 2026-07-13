@@ -4,6 +4,8 @@ import { useAuthStore } from '../lib/store';
 import {
   Search,
   Filter,
+  LayoutGrid,
+  List,
   Calendar,
   Copy,
   Trash2,
@@ -358,7 +360,7 @@ export function ChatbotAnswerBankPage() {
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
-                <Target className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -368,7 +370,7 @@ export function ChatbotAnswerBankPage() {
                     : 'text-gray-600 dark:text-gray-400'
                 }`}
               >
-                <Filter className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </button>
             </div>
           </div>

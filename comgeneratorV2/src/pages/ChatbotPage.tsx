@@ -1,6 +1,6 @@
 // src/pages/ChatbotPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Bot, FileText, MessageSquare, BarChart3, Loader2, Sparkles, Info, X,
   BookOpen, Database, Shield, Gift, Globe, User, HardDrive, Upload, ToggleLeft, Filter,
@@ -575,7 +575,7 @@ export const ChatbotPage: React.FC = () => {
           </div>
         </div>
         
-        <p className="text-sm text-gray-500 dark:text-gray-400 ml-13">
+        <p className="text-sm text-gray-500 dark:text-gray-400 ml-14">
           Interrogez vos documents avec l'IA
         </p>
 
@@ -684,6 +684,12 @@ export const ChatbotPage: React.FC = () => {
                 }
               </p>
             </div>
+            <Link
+              to="/buy-tokens"
+              className="ml-auto flex-shrink-0 inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Recharger
+            </Link>
           </div>
         </div>
       )}

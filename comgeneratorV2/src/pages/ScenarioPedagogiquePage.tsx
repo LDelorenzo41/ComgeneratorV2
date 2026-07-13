@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 
+import { logGeneration } from '../lib/usageStats';
 // ============================================================================
 // OPTIONS DE FORMULAIRE
 // ============================================================================
@@ -650,11 +651,8 @@ export function ScenarioPedagogiquePage() {
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setGeneratedContent(content);
+      logGeneration('scenario');
 
-      console.log('=== RAW CONTENT FROM API ===');
-      console.log(content);
-      console.log('=== END RAW CONTENT ===');
-      
       const rows = parseMarkdownTable(content);
       setParsedRows(rows);
       setEditableRows(rows);
@@ -1143,7 +1141,7 @@ export function ScenarioPedagogiquePage() {
                   🎁 Offre de lancement !
                 </h3>
                 <p className="text-emerald-700 dark:text-emerald-300 mb-3">
-                  Pour vous permettre de tester sans sereinement la fonctionnalité de création de scénario pédagogique, 
+                  Pour vous permettre de tester sereinement la fonctionnalité de création de scénario pédagogique,
                   allez dans les <strong>paramètres</strong> (icône en forme de roue crantée) et choisissez "<strong>J'ai un code !</strong>"
                 </p>
                 <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border-2 border-dashed border-emerald-400 dark:border-emerald-600 rounded-xl">

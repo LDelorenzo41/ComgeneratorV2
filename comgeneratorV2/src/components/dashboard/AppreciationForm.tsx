@@ -11,6 +11,7 @@ import type { AppreciationResult as AppreciationResultType } from '../../lib/typ
 import { RatingBar } from './RatingBar';
 import { subjectUpdateEvent, SUBJECT_UPDATED } from './SubjectList';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../layout/Header';
+import { logGeneration } from '../../lib/usageStats';
 import useTokenBalance from '../../hooks/useTokenBalance'; // ✅ AJOUT
 import { 
   PenTool, 
@@ -19,15 +20,12 @@ import {
   MessageCircle, 
   Volume2, 
   FileText, 
-  Sparkles,
   RotateCcw,
   CheckCircle,
   Target,
   Settings,
-  AlertCircle, // ✅ AJOUT
-  CreditCard // ✅ AJOUT
+  CreditCard
 } from 'lucide-react';
-import { Link } from 'react-router-dom'; // ✅ AJOUT
 
 const appreciationSchema = z.object({
   subject: z.string().min(1, 'Veuillez sélectionner une matière'),
@@ -69,12 +67,12 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
   const [loading, setLoading] = React.useState(false);
   const [result, setResult] = React.useState<AppreciationResultType | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [isGenerateClicked, setIsGenerateClicked] = React.useState(false);
   const [tag, setTag] = React.useState('');
   const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [editableDetailed, setEditableDetailed] = React.useState('');
   const [editableSummary, setEditableSummary] = React.useState('');
+  const [lastUsedTokens, setLastUsedTokens] = React.useState<number | null>(null);
   const [subjectsRefreshKey, setSubjectsRefreshKey] = React.useState(0);
   
   // ✅ MODIFICATION : Remplacement de la logique locale par useTokenBalance
@@ -102,6 +100,23 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
   const { register, control, handleSubmit, watch, setValue, reset } = form;
   const selectedSubject = watch('subject');
+
+  // Presets de longueur ("Personnalisée" rouvre les champs min/max exacts)
+  type LengthPreset = 'courte' | 'moyenne' | 'detaillee' | 'custom';
+  const LENGTH_PRESETS: Record<Exclude<LengthPreset, 'custom'>, { min: number; max: number; label: string; hint: string }> = {
+    courte: { min: 100, max: 150, label: 'Courte', hint: '≈ 150 caractères' },
+    moyenne: { min: 150, max: 300, label: 'Moyenne', hint: '≈ 300 caractères' },
+    detaillee: { min: 300, max: 500, label: 'Détaillée', hint: '≈ 500 caractères' }
+  };
+  const [lengthPreset, setLengthPreset] = React.useState<LengthPreset>('moyenne');
+  const applyLengthPreset = (preset: LengthPreset) => {
+    setLengthPreset(preset);
+    if (preset !== 'custom') {
+      setValue('minLength', LENGTH_PRESETS[preset].min);
+      setValue('maxLength', LENGTH_PRESETS[preset].max);
+    }
+  };
+
 
   const saveAppreciation = React.useCallback(
     async (tagValue: string, _generated?: AppreciationResultType) => {
@@ -185,7 +200,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
           ...c,
           value: 0
         })));
-        setIsGenerateClicked(false);
       }
     }
   }, [selectedSubject, subjects, setValue]);
@@ -194,11 +208,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
     // ✅ MODIFICATION : Nouvelle logique de vérification des tokens
     if (tokenCount === 0) {
       setError('Crédits insuffisants pour générer une appréciation.');
-      return;
-    }
-
-    if (!isGenerateClicked) {
-      setIsGenerateClicked(true);
       return;
     }
 
@@ -219,7 +228,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
         criteria: data.criteria.map((c, i) => ({
           ...c,
           id: subject.criteria[i].id,
-          importance: 2
+          importance: subject.criteria[i].importance ?? 2
         })),
         personalNotes: data.personalNotes || '',
         minLength: data.minLength,
@@ -254,6 +263,8 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
       onTokensUpdated?.();
       setResult(generatedResult);
+      setLastUsedTokens(usedTokens);
+      logGeneration('appreciation');
       setEditableDetailed(generatedResult.detailed);
       setEditableSummary(generatedResult.summary);
 
@@ -270,93 +281,17 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
   const handleReset = () => {
     reset();
+    setLengthPreset('moyenne');
     setResult(null);
+    setLastUsedTokens(null);
     setError(null);
-    setIsGenerateClicked(false);
     setTag('');
     setSaveError(null);
     setSaveSuccess(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Header avec compteur de tokens */}
-        <div className="text-center mb-12">
-          <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <PenTool className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            Générateur d'appréciations
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-6">
-            Créez des appréciations personnalisées et pertinentes basées sur vos critères d'évaluation
-          </p>
-          
-          {/* Compteur de tokens modernisé avec alerte si 0 tokens */}
-          {tokenBalance !== null && (
-            <div className={`inline-flex items-center px-6 py-3 rounded-xl shadow-lg border ${
-              tokenCount === 0 
-                ? 'bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200 dark:border-red-800'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-            }`}>
-              {tokenCount === 0 ? (
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
-              ) : (
-                <Sparkles className="w-5 h-5 text-blue-500 mr-3" />
-              )}
-              <span className={`text-sm font-medium ${
-                tokenCount === 0 
-                  ? 'text-red-700 dark:text-red-300'
-                  : 'text-gray-700 dark:text-gray-300'
-              }`}>
-                {tokenCount === 0 ? (
-                  <>
-                    <span className="font-bold">Crédits épuisés !</span>
-                    <Link 
-                      to="/buy-tokens" 
-                      className="ml-2 underline hover:no-underline"
-                    >
-                      Recharger →
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    Crédits restants : <span className="font-bold text-blue-600 dark:text-blue-400">{tokenCount.toLocaleString()}</span> tokens
-                  </>
-                )}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* ✅ AJOUT : Alerte tokens épuisés */}
-        {tokenCount === 0 && (
-          <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8 mb-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <CreditCard className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-red-700 dark:text-red-300 mb-4">
-                Génération indisponible
-              </h2>
-              <p className="text-red-600 dark:text-red-400 mb-6 max-w-2xl mx-auto">
-                Vous avez utilisé tous vos tokens. Pour continuer à générer des appréciations, veuillez recharger votre compte.
-              </p>
-              <Link
-                to="/buy-tokens"
-                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
-              >
-                <CreditCard className="w-5 h-5 mr-3" />
-                Recharger mes crédits
-              </Link>
-            </div>
-          </div>
-        )}
-
+    <div>
         {/* Formulaire principal modernisé */}
         <div className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 mb-8 ${
           tokenCount === 0 ? 'opacity-50' : ''
@@ -364,12 +299,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Paramètres de l'appréciation
-              {/* ✅ AJOUT : Badge "Indisponible" si 0 tokens */}
-              {tokenCount === 0 && (
-                <span className="ml-3 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                  Indisponible
-                </span>
-              )}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
               {tokenCount === 0 
@@ -436,10 +365,55 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </div>
             </div>
 
-            {/* Longueurs */}
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* Longueur : presets + réglage fin conservé */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <BarChart3 className="w-4 h-4 inline mr-2" />
+                Longueur de l'appréciation
+              </label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Longueur de l'appréciation">
+                {(Object.keys(LENGTH_PRESETS) as Array<Exclude<LengthPreset, 'custom'>>).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={tokenCount === 0}
+                    aria-pressed={lengthPreset === key}
+                    onClick={() => applyLengthPreset(key)}
+                    className={`px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      lengthPreset === key
+                        ? 'bg-blue-600 border-blue-600 text-white shadow'
+                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-blue-400'
+                    }`}
+                  >
+                    {LENGTH_PRESETS[key].label}
+                    <span className={`block text-xs font-normal ${lengthPreset === key ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {LENGTH_PRESETS[key].hint}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={tokenCount === 0}
+                  aria-pressed={lengthPreset === 'custom'}
+                  onClick={() => applyLengthPreset('custom')}
+                  className={`px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    lengthPreset === 'custom'
+                      ? 'bg-blue-600 border-blue-600 text-white shadow'
+                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-blue-400'
+                  }`}
+                >
+                  Personnalisée
+                  <span className={`block text-xs font-normal ${lengthPreset === 'custom' ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                    min / max exacts
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Réglage fin min/max : affiché avec le preset "Personnalisée" */}
+            <div className={`grid md:grid-cols-2 gap-6 ${lengthPreset === 'custom' ? '' : 'hidden'}`}>
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <label htmlFor="minLength" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <BarChart3 className="w-4 h-4 inline mr-2" />
                   Longueur minimale (caractères)
                 </label>
@@ -449,12 +423,10 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                   render={({ field }) => (
                     <input
                       type="number"
+                      id="minLength"
                       {...field}
                       disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
-                      onChange={(e) => {
-                        field.onChange(Number(e.target.value));
-                        setIsGenerateClicked(false);
-                      }}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                       min="50"
                       max="500"
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -464,7 +436,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </div>
               
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                <label htmlFor="maxLength" className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                   <BarChart3 className="w-4 h-4 inline mr-2" />
                   Longueur maximale (caractères)
                 </label>
@@ -474,12 +446,10 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                   render={({ field }) => (
                     <input
                       type="number"
+                      id="maxLength"
                       {...field}
                       disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
-                      onChange={(e) => {
-                        field.onChange(Number(e.target.value));
-                        setIsGenerateClicked(false);
-                      }}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
                       min="100"
                       max="1000"
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -508,8 +478,14 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                     <div className="grid gap-6">
                       {field.value.map((criterion, index) => (
                         <div key={index} className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 p-6 rounded-2xl border border-gray-200 dark:border-gray-600">
-                          <label className="block text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4">
                             {criterion.name}
+                            {(() => {
+                              const importance = subjects.find(s => s.id === selectedSubject)?.criteria[index]?.importance;
+                              if (importance === 3) return <span className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" title="Ce critère pèse davantage dans l'appréciation">★ Crucial</span>;
+                              if (importance === 2) return <span className="px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="Ce critère pèse davantage dans l'appréciation">Important</span>;
+                              return null;
+                            })()}
                           </label>
                           <RatingBar
                             value={criterion.value}
@@ -517,7 +493,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                               const newCriteria = [...field.value];
                               newCriteria[index] = { ...criterion, value };
                               field.onChange(newCriteria);
-                              setIsGenerateClicked(false);
                             }}
                           />
                         </div>
@@ -543,11 +518,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </label>
               <select
                 {...register('tone')}
-                disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
-                onChange={(e) => {
-                  register('tone').onChange(e);
-                  setIsGenerateClicked(false);
-                }}
+                disabled={tokenCount === 0}
                 className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="bienveillant">Bienveillant</option>
@@ -564,10 +535,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               <select
                 {...register('addressMode')}
                 disabled={tokenCount === 0}
-                onChange={(e) => {
-                  register('addressMode').onChange(e);
-                  setIsGenerateClicked(false);
-                }}
                 className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="tutoiement">Tutoiement</option>
@@ -583,11 +550,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </label>
               <textarea
                 {...register('personalNotes')}
-                disabled={tokenCount === 0} // ✅ AJOUT : Désactivation si 0 tokens
-                onChange={(e) => {
-                  register('personalNotes').onChange(e);
-                  setIsGenerateClicked(false);
-                }}
+                disabled={tokenCount === 0}
                 rows={4}
                 placeholder="Ajoutez des observations particulières, des points à mentionner..."
                 className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -623,7 +586,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                   ) : (
                     <>
                       <Send className="w-5 h-5 mr-3" />
-                      {isGenerateClicked ? "Confirmer la génération" : "Générer les appréciations"}
+                      Générer les appréciations
                     </>
                   )}
                 </span>
@@ -657,6 +620,11 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
               </div>
               <p className="text-gray-600 dark:text-gray-400">
                 Vos appréciations sont prêtes ! Vous pouvez les éditer si nécessaire
+                {lastUsedTokens !== null && (
+                  <span className="block mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Consommation réelle : <strong className="text-gray-700 dark:text-gray-300">{lastUsedTokens.toLocaleString('fr-FR')} crédits</strong>
+                  </span>
+                )}
               </p>
             </div>
 
@@ -682,8 +650,6 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
             </div>
           </div>
         )}
-        
-      </div>
     </div>
   );
 }

@@ -29,6 +29,7 @@ import copyToClipboard from '../../lib/copyToClipboard';
 
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../layout/Header';
 
+import { logGeneration } from '../../lib/usageStats';
 class MarkdownErrorBoundary extends React.Component<
   { children: React.ReactNode; fallbackContent: string },
   { hasError: boolean }
@@ -270,6 +271,7 @@ export function ExerciseGeneratorModal({
       });
 
       setGeneratedContent(result.content);
+      logGeneration('exercise');
       setGeneratedHeading(`${phaseHeading} — ${cleanSupportLabel(supportType)}`);
 
       // Rafraîchir le solde de tokens

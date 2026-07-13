@@ -1,0 +1,791 @@
+<title>Propositions de design — ProfAssist</title>
+<style>
+  :root {
+    --brand: #4f46e5;
+    --brand-soft: #eef0fd;
+    --pole-concevoir: #6366f1;
+    --pole-evaluer: #2563eb;
+    --pole-communiquer: #8b5cf6;
+    --pole-ressources: #059669;
+    --warn: #d97706;
+    --bg: #f5f7fd;
+    --card: #ffffff;
+    --card-2: #f8f9fe;
+    --text: #232a42;
+    --muted: #5d6685;
+    --border: #e3e8f4;
+    --shadow: 0 1px 2px rgba(35, 42, 66, .05), 0 8px 24px -12px rgba(35, 42, 66, .18);
+    --chip-warn-bg: #fdf3e3;
+    --brand-contrast: #ffffff;
+    --pin-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --brand: #818cf8;
+      --brand-soft: #262c4d;
+      --pole-concevoir: #818cf8;
+      --pole-evaluer: #60a5fa;
+      --pole-communiquer: #a78bfa;
+      --pole-ressources: #34d399;
+      --warn: #fbbf24;
+      --bg: #0e1220;
+      --card: #171d31;
+      --card-2: #1c2340;
+      --text: #e9ecf8;
+      --muted: #99a2c0;
+      --border: #2a3350;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -12px rgba(0, 0, 0, .55);
+      --chip-warn-bg: #3a2f16;
+      --brand-contrast: #10142a;
+      --pin-text: #1a1405;
+    }
+  }
+  :root[data-theme="dark"] {
+    --brand: #818cf8;
+    --brand-soft: #262c4d;
+    --pole-concevoir: #818cf8;
+    --pole-evaluer: #60a5fa;
+    --pole-communiquer: #a78bfa;
+    --pole-ressources: #34d399;
+    --warn: #fbbf24;
+    --bg: #0e1220;
+    --card: #171d31;
+    --card-2: #1c2340;
+    --text: #e9ecf8;
+    --muted: #99a2c0;
+    --border: #2a3350;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -12px rgba(0, 0, 0, .55);
+    --chip-warn-bg: #3a2f16;
+    --brand-contrast: #10142a;
+    --pin-text: #1a1405;
+  }
+  :root[data-theme="light"] {
+    --brand: #4f46e5;
+    --brand-soft: #eef0fd;
+    --pole-concevoir: #6366f1;
+    --pole-evaluer: #2563eb;
+    --pole-communiquer: #8b5cf6;
+    --pole-ressources: #059669;
+    --warn: #d97706;
+    --bg: #f5f7fd;
+    --card: #ffffff;
+    --card-2: #f8f9fe;
+    --text: #232a42;
+    --muted: #5d6685;
+    --border: #e3e8f4;
+    --shadow: 0 1px 2px rgba(35, 42, 66, .05), 0 8px 24px -12px rgba(35, 42, 66, .18);
+    --chip-warn-bg: #fdf3e3;
+    --brand-contrast: #ffffff;
+    --pin-text: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 14px 80px; }
+  @media (min-width: 760px) { .wrap { padding: 48px 20px 80px; } }
+
+  /* ---------- Le document de proposition ---------- */
+  .eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; font-weight: 700; color: var(--brand); }
+  h1 { font-size: clamp(1.55rem, 4.5vw, 2.3rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin: .35rem 0 .6rem; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0; }
+  .notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--brand);
+    border-radius: 10px; padding: 12px 16px; margin-top: 22px; font-size: .92rem; color: var(--muted);
+  }
+  .notice strong { color: var(--text); }
+
+  .section { margin-top: 58px; }
+  .section > h2 { font-size: 1.3rem; font-weight: 800; letter-spacing: -.015em; margin: 0 0 4px; }
+  .section > .sub { color: var(--muted); margin: 0 0 20px; max-width: 68ch; }
+
+  /* ---------- Cadre de maquette ---------- */
+  .frame { border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); background: var(--bg); }
+  .frame-bar { display: flex; align-items: center; gap: 10px; background: var(--card); border-bottom: 1px solid var(--border); padding: 9px 14px; }
+  .frame-bar .dots { display: flex; gap: 6px; }
+  .frame-bar .dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+  .frame-bar .url {
+    flex: 1; text-align: center; font-size: .76rem; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px;
+    max-width: 320px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mock { padding-bottom: 30px; }
+  .mock.has-tabbar { padding-bottom: 0; }
+
+  .pin {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 21px; height: 21px; border-radius: 50%;
+    background: var(--warn); color: var(--pin-text); font-size: .7rem; font-weight: 800;
+    box-shadow: 0 0 0 3px var(--chip-warn-bg); vertical-align: middle; flex: none;
+  }
+
+  .legend { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 18px; }
+  @media (min-width: 640px) { .legend { grid-template-columns: 1fr 1fr; } }
+  .legend .item { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
+  .legend .item p { margin: 0; color: var(--muted); }
+  .legend .item strong { display: block; color: var(--text); margin-bottom: 2px; }
+
+  /* ---------- App simulée : barre du haut ---------- */
+  .appbar { display: flex; align-items: center; gap: 10px; background: var(--card); border-bottom: 1px solid var(--border); padding: 10px 14px; }
+  .logo { font-weight: 800; font-size: 1.08rem; letter-spacing: -.02em; color: var(--brand); margin-right: 2px; }
+  .appnav { display: none; }
+  .burger {
+    display: inline-flex; flex-direction: column; gap: 4px; justify-content: center;
+    width: 38px; height: 38px; padding: 10px 9px; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--card); cursor: pointer; margin-left: auto;
+  }
+  .burger i { display: block; height: 2px; border-radius: 2px; background: var(--text); }
+  @media (min-width: 760px) {
+    .appbar { gap: 18px; padding: 12px 22px; }
+    .appnav { display: flex; gap: 4px; flex: 1; }
+    .burger { display: none; }
+  }
+  .appnav a { text-decoration: none; color: var(--muted); font-size: .86rem; font-weight: 600; padding: 6px 11px; border-radius: 8px; }
+  .appnav a.active { background: var(--brand-soft); color: var(--brand); }
+  .appnav a:hover { color: var(--text); }
+
+  .credit-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--brand-soft); border-radius: 999px; padding: 6px 11px;
+    font-size: .78rem; font-weight: 700; color: var(--brand); white-space: nowrap;
+  }
+  .credit-chip .bar { width: 40px; height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .credit-chip .bar i { display: block; height: 100%; width: 62%; background: var(--brand); border-radius: 999px; }
+  .credit-chip .full { display: none; }
+  .credit-chip .short { display: inline; }
+  @media (min-width: 760px) {
+    .credit-chip .full { display: inline; }
+    .credit-chip .short { display: none; }
+    .credit-chip .bar { width: 54px; }
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--brand-contrast);
+    display: none; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem; flex: none;
+  }
+  @media (min-width: 760px) { .avatar { display: flex; } }
+
+  /* ---------- Barre d'onglets mobile ---------- */
+  .tabbar { display: flex; border-top: 1px solid var(--border); background: var(--card); margin-top: 26px; }
+  .tabbar a {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 2px 9px; text-decoration: none; color: var(--muted); font-size: .62rem; font-weight: 700;
+  }
+  .tabbar a svg { width: 20px; height: 20px; }
+  .tabbar a.active { color: var(--brand); }
+  @media (min-width: 760px) { .tabbar { display: none; } .mock.has-tabbar { padding-bottom: 30px; } }
+
+  .mock-body { padding: 20px 14px 0; max-width: 940px; margin: 0 auto; }
+  @media (min-width: 760px) { .mock-body { padding: 26px 22px 0; } }
+
+  .hello { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .hello h3 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+  .hello .date { color: var(--muted); font-size: .84rem; }
+
+  .season {
+    position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 14px; padding: 12px 14px;
+    background: linear-gradient(90deg, var(--brand-soft), transparent 85%);
+    border: 1px solid var(--border); border-radius: 12px; font-size: .9rem;
+  }
+  .season .cta {
+    background: var(--brand); color: var(--brand-contrast); border: none; border-radius: 9px;
+    font-weight: 700; font-size: .84rem; padding: 8px 14px; cursor: pointer;
+  }
+  @media (min-width: 640px) { .season .cta { margin-left: auto; } }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); position: relative; }
+  .card h4 { margin: 0 0 4px; font-size: .96rem; font-weight: 800; letter-spacing: -.01em; }
+  .card .hint { color: var(--muted); font-size: .82rem; margin: 0; }
+
+  /* Accueil : structure */
+  .home-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; align-items: start; }
+  @media (min-width: 860px) { .home-grid { grid-template-columns: 300px 1fr; gap: 16px; } }
+  .stack { display: grid; gap: 14px; }
+
+  .credits .big { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 8px; }
+  .credits .big small { font-size: .8rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .gauge { height: 9px; border-radius: 999px; background: var(--border); overflow: hidden; margin: 12px 0 8px; }
+  .gauge i { display: block; height: 100%; width: 62%; border-radius: 999px; background: linear-gradient(90deg, var(--pole-evaluer), var(--brand)); }
+  .equiv { font-size: .82rem; color: var(--muted); margin: 0 0 14px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { border-radius: 9px; padding: 8px 14px; font-weight: 700; font-size: .84rem; cursor: pointer; border: 1px solid transparent; }
+  .btn-primary { background: var(--brand); color: var(--brand-contrast); }
+  .btn-ghost { background: transparent; color: var(--brand); border-color: var(--border); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .stat { background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .stat span { font-size: .74rem; color: var(--muted); font-weight: 600; }
+  .stat.hours { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--pole-ressources) 40%, var(--border)); }
+  .stat.hours b { color: var(--pole-ressources); }
+
+  /* Actions rapides : pastilles de lancement, pas un menu */
+  .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  @media (min-width: 640px) { .quick { grid-template-columns: 1fr 1fr 1fr; } }
+  .quick a {
+    display: flex; align-items: center; gap: 9px; text-decoration: none;
+    background: var(--card-2); border: 1px solid var(--border); border-radius: 11px;
+    padding: 11px 12px; color: var(--text); font-size: .82rem; font-weight: 700; line-height: 1.25;
+  }
+  .quick a:hover { border-color: var(--pole); }
+  .quick .dot {
+    width: 28px; height: 28px; border-radius: 8px; flex: none;
+    background: color-mix(in srgb, var(--pole) 14%, var(--card)); color: var(--pole);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .quick .dot svg { width: 15px; height: 15px; }
+
+  .recent-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+  @media (min-width: 640px) { .recent-grid { grid-template-columns: 1fr 1fr 1fr; } }
+  .recent-grid .card { padding: 13px 14px; }
+  .tag {
+    display: inline-block; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    padding: 2px 8px; border-radius: 999px; margin-bottom: 7px;
+    background: color-mix(in srgb, var(--pole) 14%, var(--card)); color: var(--pole);
+  }
+  .recent-grid .title { font-weight: 700; font-size: .9rem; margin: 0 0 2px; }
+  .recent-grid .meta { color: var(--muted); font-size: .77rem; margin: 0; }
+
+  .news { display: grid; gap: 0; margin-top: 10px; }
+  .news a {
+    display: block; text-decoration: none; padding: 10px 2px; color: var(--text);
+    border-top: 1px solid var(--border); font-size: .88rem; font-weight: 600; line-height: 1.4;
+  }
+  .news a:first-child { border-top: none; padding-top: 4px; }
+  .news .src { display: block; font-size: .74rem; color: var(--pole-ressources); font-weight: 700; margin-bottom: 1px; }
+  .news a:hover { color: var(--brand); }
+  .card .more { font-size: .8rem; font-weight: 700; color: var(--brand); text-decoration: none; }
+
+  /* ---------- Maquette 2 : formulaire ---------- */
+  .form-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .form-head .crumb { font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--pole-evaluer); }
+  .form-head h3 { margin: 2px 0 0; font-size: 1.3rem; font-weight: 800; letter-spacing: -.02em; }
+
+  .form-card { margin-top: 16px; display: grid; gap: 20px; }
+  .field label, .field .lbl { display: block; font-weight: 700; font-size: .88rem; margin-bottom: 6px; }
+  .field .opt { color: var(--muted); font-weight: 500; }
+  .control, textarea.control {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--card-2);
+    color: var(--text); padding: 10px 12px; font: inherit; font-size: .92rem;
+  }
+  .control:focus, textarea.control:focus, .seg button:focus-visible, .btn:focus-visible,
+  .scale button:focus-visible, .linkbtn:focus-visible, .generate:focus-visible {
+    outline: 2px solid var(--brand); outline-offset: 2px;
+  }
+  .two-col { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 640px) { .two-col { grid-template-columns: 1fr 1fr; } }
+
+  .matiere-row { display: flex; gap: 8px; align-items: stretch; }
+  .matiere-row .control { flex: 1; min-width: 0; }
+  .linkbtn {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--brand);
+    border-radius: 10px; padding: 0 13px; font: inherit; font-size: .82rem; font-weight: 700;
+  }
+
+  .crit-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .crit-head .lbl { margin-bottom: 0; }
+  .crit-head .tools { display: flex; gap: 12px; font-size: .8rem; font-weight: 700; }
+  .crit-head .tools a { color: var(--brand); text-decoration: none; }
+
+  .seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; max-width: 100%; }
+  .seg button { border: none; background: transparent; color: var(--muted); font: inherit; font-size: .84rem; font-weight: 700; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
+  .seg button small { display: block; font-size: .67rem; font-weight: 600; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-contrast); }
+  .seg button[aria-pressed="true"] small { color: color-mix(in srgb, var(--brand-contrast) 75%, var(--brand)); }
+
+  .crit { border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px; background: var(--card-2); }
+  .crit + .crit { margin-top: 10px; }
+  .crit .name { font-weight: 700; font-size: .9rem; margin: 0 0 10px; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .crit .name .left { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge-imp {
+    font-size: .64rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+    background: color-mix(in srgb, var(--pole-evaluer) 13%, var(--card)); color: var(--pole-evaluer);
+    border-radius: 999px; padding: 2px 8px;
+  }
+  .crit .chosen { font-size: .78rem; font-weight: 800; color: var(--pole-evaluer); }
+  .scale { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  @media (min-width: 760px) { .scale { grid-template-columns: repeat(8, 1fr); } }
+  .scale button {
+    min-height: 44px; cursor: pointer; line-height: 1.2;
+    border: 1px solid var(--border); border-radius: 9px; background: var(--card);
+    color: var(--muted); font: inherit; font-size: .7rem; font-weight: 700; padding: 7px 3px;
+  }
+  .scale button[aria-pressed="true"] { background: var(--pole-evaluer); border-color: var(--pole-evaluer); color: #fff; }
+  :root[data-theme="dark"] .scale button[aria-pressed="true"] { color: #0d1326; }
+  .addcrit {
+    margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    background: transparent; border: 1px dashed var(--border); border-radius: 10px;
+    color: var(--muted); font: inherit; font-size: .82rem; font-weight: 700; padding: 9px 14px; width: 100%;
+    justify-content: center;
+  }
+  .addcrit:hover { color: var(--brand); border-color: var(--brand); }
+
+  .cost {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    border: 1px solid var(--border); border-left: 3px solid var(--warn);
+    background: var(--chip-warn-bg); border-radius: 12px; padding: 12px 14px; font-size: .88rem; position: relative;
+  }
+  .cost b { font-variant-numeric: tabular-nums; }
+  .cost .after { color: var(--muted); font-size: .8rem; }
+  .generate {
+    background: linear-gradient(90deg, var(--pole-evaluer), var(--brand)); color: #fff;
+    border: none; border-radius: 11px; padding: 13px 26px; font: inherit; font-weight: 800; font-size: .96rem;
+    cursor: pointer; box-shadow: var(--shadow); width: 100%;
+  }
+  @media (min-width: 640px) { .generate { width: auto; justify-self: start; } }
+  :root[data-theme="dark"] .generate { color: #0d1326; }
+
+  .tuto { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: .8rem; font-weight: 700; color: var(--brand); text-decoration: none; }
+  .tuto:hover { text-decoration: underline; }
+  .btn-row-gen { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .reset-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 11px; padding: 12px 20px; font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer;
+  }
+  .reset-btn:hover { color: var(--text); }
+  .disclaimer { font-size: .78rem; color: var(--muted); font-style: italic; margin: 0; }
+  .custom-length { display: none; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; font-size: .84rem; color: var(--muted); }
+  .custom-length.visible { display: flex; }
+  .custom-length input { width: 90px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-2); color: var(--text); padding: 7px 10px; font: inherit; font-size: .86rem; }
+
+  .parity-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: var(--shadow); }
+  table.parity { border-collapse: collapse; width: 100%; min-width: 620px; font-size: .85rem; }
+  .parity th {
+    text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+    padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card-2);
+  }
+  .parity td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
+  .parity tr:last-child td { border-bottom: none; }
+  .parity td:first-child { font-weight: 600; width: 44%; }
+  .parity td .grp { display: block; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 1px; }
+  .parity .ok { color: var(--pole-ressources); font-weight: 800; margin-right: 6px; }
+  .parity .chg { color: var(--warn); font-weight: 800; margin-right: 6px; }
+
+  .foot { margin-top: 52px; border-top: 1px solid var(--border); padding-top: 18px; color: var(--muted); font-size: .86rem; max-width: 70ch; }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn, .seg button, .scale button, .generate, .quick a { transition: background .15s ease, color .15s ease, border-color .15s ease, transform .15s ease; }
+    .generate:hover { transform: translateY(-1px); }
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">ProfAssist · Propositions de design — v2</p>
+  <h1>Deux maquettes issues de l'audit UX/UI</h1>
+  <p class="lede">Version revue après vos retours : responsive mobile retravaillé (regardez cette page sur votre téléphone — les maquettes s'adaptent réellement), page « Mon espace » enrichie au-delà du menu, et gestion des matières et critères d'évaluation réintégrée dans le générateur. Les pastilles <span class="pin" style="position:static">n</span> signalent les choix expliqués sous chaque maquette. Plusieurs contrôles sont cliquables.</p>
+  <div class="notice">
+    <span>ℹ️</span>
+    <span><strong>Aucun changement dans le code de l'app.</strong> Ces maquettes vivent uniquement sur la branche de revue. Toutes les fonctionnalités actuelles (création de matières, critères, importance, tons, banque…) sont conservées — rien n'est supprimé, seulement réorganisé.</span>
+  </div>
+
+  <!-- ============ MAQUETTE 1 ============ -->
+  <div class="section">
+    <h2>Maquette 1 — « Mon espace », l'accueil connecté</h2>
+    <p class="sub">Sur mobile : barre du haut compacte (logo + crédits + menu) et barre d'onglets en bas de l'écran, comme une application. Sur ordinateur : navigation à plat. Le contenu ne se limite plus au menu : bilan de l'année, reprise d'activité, actualités.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">profassist.fr/mon-espace</div>
+      </div>
+      <div class="mock has-tabbar">
+        <div class="appbar">
+          <span class="logo">ProfAssist</span>
+          <nav class="appnav" aria-label="Navigation principale">
+            <a class="active" href="#" onclick="return false">Mon espace</a>
+            <a href="#" onclick="return false">Concevoir</a>
+            <a href="#" onclick="return false">Évaluer</a>
+            <a href="#" onclick="return false">Communiquer</a>
+            <a href="#" onclick="return false">Ressources</a>
+          </nav>
+          <span class="pin" title="Annotation 1">1</span>
+          <div class="credit-chip" title="247 500 crédits — environ 82 appréciations">
+            <span class="bar"><i></i></span>
+            <span class="full">247 500 crédits</span><span class="short">247 k</span>
+          </div>
+          <span class="pin" title="Annotation 2">2</span>
+          <div class="avatar">L</div>
+          <button class="burger" aria-label="Ouvrir le menu"><i></i><i></i><i></i></button>
+        </div>
+
+        <div class="mock-body">
+          <div class="hello">
+            <h3>Bonjour Lionel 👋</h3>
+            <span class="date">Samedi 12 juillet</span>
+          </div>
+
+          <div class="season">
+            <span class="pin" title="Annotation 3">3</span>
+            <span>📝 <strong>Période de bulletins.</strong> Gagnez du temps sur vos appréciations de fin d'année.</span>
+            <button class="cta">Générer une appréciation</button>
+          </div>
+
+          <div class="home-grid">
+            <div class="stack">
+              <div class="card credits">
+                <h4>Mes crédits</h4>
+                <p class="hint">Sans abonnement · sans expiration</p>
+                <div class="big">247 500 <small>crédits</small></div>
+                <div class="gauge"><i></i></div>
+                <p class="equiv">≈ 82 appréciations détaillées <br>ou 24 séances complètes</p>
+                <div class="btn-row">
+                  <button class="btn btn-primary">Recharger</button>
+                  <button class="btn btn-ghost">J'ai un code</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <h4>Mon année avec ProfAssist <span class="pin" title="Annotation 6">6</span></h4>
+                <p class="hint">Depuis septembre 2025</p>
+                <div class="stats">
+                  <div class="stat"><b>124</b><span>appréciations</span></div>
+                  <div class="stat"><b>18</b><span>séances</span></div>
+                  <div class="stat"><b>9</b><span>scénarios</span></div>
+                  <div class="stat"><b>36</b><span>communications</span></div>
+                  <div class="stat hours"><b>≈ 26 h</b><span>de travail gagnées cette année</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="card">
+                <h4>Reprendre où j'en étais <span class="pin" title="Annotation 5">5</span></h4>
+                <div class="recent-grid">
+                  <div class="card" style="--pole: var(--pole-evaluer)">
+                    <span class="tag">Appréciation</span>
+                    <p class="title">Marie — Mathématiques</p>
+                    <p class="meta">Hier · notée « Très bien »</p>
+                  </div>
+                  <div class="card" style="--pole: var(--pole-concevoir)">
+                    <span class="tag">Séance</span>
+                    <p class="title">Les fractions — 6e</p>
+                    <p class="meta">Il y a 3 jours · 60 min</p>
+                  </div>
+                  <div class="card" style="--pole: var(--pole-concevoir)">
+                    <span class="tag">Scénario</span>
+                    <p class="title">Volley-ball — 5e</p>
+                    <p class="meta">Sem. dernière · 8 séances</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <h4>Actions rapides <span class="pin" title="Annotation 4">4</span></h4>
+                <div class="quick">
+                  <a href="#" onclick="return false" style="--pole: var(--pole-evaluer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg></span>Générer une appréciation</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-evaluer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 12h6M9 16h6"/></svg></span>Synthèse de bulletin</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-concevoir)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg></span>Créer une séance</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-concevoir)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3h8v4H8z"/><path d="M6 7h12v14H6z"/><path d="M9 12h6M9 16h4"/></svg></span>Créer un scénario</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-communiquer)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11a8 8 0 0 1-8 8H4l1.5-3A8 8 0 1 1 21 11Z"/></svg></span>Écrire aux familles</a>
+                  <a href="#" onclick="return false" style="--pole: var(--pole-ressources)"><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="4" y="6" width="16" height="12" rx="3"/><path d="M12 3v3M8.5 11.5h.01M15.5 11.5h.01"/></svg></span>Interroger mon chatbot</a>
+                </div>
+              </div>
+
+              <div class="card">
+                <h4 style="display:flex; justify-content:space-between; align-items:center; gap:8px">
+                  <span>Actualités pédagogiques <span class="pin" title="Annotation 7">7</span></span>
+                  <a class="more" href="#" onclick="return false">Tout voir →</a>
+                </h4>
+                <div class="news">
+                  <a href="#" onclick="return false"><span class="src">Éduscol</span>Évaluation par compétences : le nouveau cadre de référence publié pour la rentrée</a>
+                  <a href="#" onclick="return false"><span class="src">Café pédagogique</span>IA en classe : ce que disent les premiers retours d'expérimentation en collège</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar" aria-label="Navigation mobile">
+          <a class="active" href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Accueil</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 13l10 5 10-5"/></svg>Concevoir</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Évaluer</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11a8 8 0 0 1-8 8H4l1.5-3A8 8 0 1 1 21 11Z"/></svg>Communiquer</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z"/><path d="M4 19a2 2 0 0 0 2 2h13"/></svg>Ressources</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="item"><span class="pin">1</span><p><strong>Header réellement responsive</strong>Sur téléphone : logo + crédits compacts (« 247 k ») + bouton menu ; les 4 pôles passent dans une barre d'onglets en bas d'écran, à portée de pouce. Sur ordinateur : navigation à plat, logo unique (le logo TeachTech descend au footer). Chaque pôle garde son sous-menu déroulant actuel (banques, synthèse, répondre à une communication…). L'avatar « L » ouvre le menu compte inchangé : J'ai un code !, Donner votre avis, Paramètres du compte, mode sombre/clair, Déconnexion, et la section Administration pour les admins. Réduisez/élargissez cette fenêtre pour voir la bascule.</p></div>
+      <div class="item"><span class="pin">2</span><p><strong>Jauge de crédits parlante</strong>« Crédits » remplace « tokens », la jauge donne le niveau d'un regard et le détail traduit en actions (« ≈ 82 appréciations »).</p></div>
+      <div class="item"><span class="pin">3</span><p><strong>Bandeau contextuel</strong>Le message suit le calendrier scolaire (bulletins, rentrée, conseils de classe). Un seul CTA, jamais intrusif.</p></div>
+      <div class="item"><span class="pin">4</span><p><strong>Actions rapides, pas un second menu</strong>Six lanceurs de tâches compacts, colorés par pôle. La navigation complète reste dans le header/la barre d'onglets — ici on lance un geste, on ne navigue pas.</p></div>
+      <div class="item"><span class="pin">5</span><p><strong>Reprise d'activité</strong>Les 3 derniers éléments des banques (les données existent déjà). Le geste le plus fréquent gagne un clic.</p></div>
+      <div class="item"><span class="pin">6</span><p><strong>Bilan de l'année</strong>Compteurs issus des banques + estimation du temps gagné : valorise l'usage, donne une raison de revenir, et fournit un argument de réabonnement naturel.</p></div>
+      <div class="item"><span class="pin">7</span><p><strong>Actualités pédagogiques</strong>Les 2 dernières entrées des flux RSS déjà agrégés par la page Ressources. La page vit même quand on n'a rien à générer.</p></div>
+    </div>
+  </div>
+
+  <!-- ============ MAQUETTE 2 ============ -->
+  <div class="section">
+    <h2>Maquette 2 — Générateur d'appréciations repensé</h2>
+    <p class="sub">Toutes les capacités actuelles sont là : choix de la matière, <strong>gestion des matières et de leurs critères</strong>, importance des critères, <strong>l'échelle complète à 8 niveaux</strong>, ton, mode d'adresse, notes. Ce qui change : un seul compteur de crédits, une notation lisible sans survol, le coût annoncé avant, un seul clic pour générer.</p>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">profassist.fr/appreciations/generer</div>
+      </div>
+      <div class="mock">
+        <div class="mock-body">
+          <div class="form-head">
+            <div>
+              <span class="crumb">Évaluer</span>
+              <h3>Générer une appréciation</h3>
+              <a class="tuto" href="#" onclick="return false">▶ Voir un court tuto vidéo</a>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px">
+              <div class="credit-chip"><span class="bar"><i></i></span><span class="full">247 500 crédits</span><span class="short">247 k</span></div>
+              <span class="pin" title="Annotation 13">13</span>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="two-col">
+              <div class="field">
+                <label for="m-matiere">Matière <span class="pin" title="Annotation 8">8</span></label>
+                <div class="matiere-row">
+                  <select id="m-matiere" class="control">
+                    <option>Mathématiques — 4 critères</option>
+                    <option>Français — 5 critères</option>
+                    <option>EPS — 3 critères</option>
+                    <option>+ Créer une nouvelle matière…</option>
+                  </select>
+                  <button class="linkbtn" type="button" title="Créer, renommer ou supprimer vos matières">⚙ Gérer</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="m-prenom">Prénom de l'élève</label>
+                <input id="m-prenom" class="control" value="Marie">
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="crit-head">
+                <span class="lbl">Critères de « Mathématiques » <span class="opt">— évaluez au moins un critère</span> <span class="pin" title="Annotation 10">10</span></span>
+                <span class="tools"><a href="#" onclick="return false">Modifier les critères</a></span>
+              </div>
+
+              <div class="crit">
+                <p class="name">
+                  <span class="left">Participation orale <span class="badge-imp" title="Ce critère pèsera davantage dans l'appréciation">★ Crucial</span> <span class="pin" title="Annotation 9">9</span></span>
+                  <span class="chosen" data-chosen>Bien</span>
+                </p>
+                <div class="scale" role="radiogroup" aria-label="Participation orale">
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
+                </div>
+              </div>
+
+              <div class="crit">
+                <p class="name">
+                  <span class="left">Maîtrise du cours</span>
+                  <span class="chosen" data-chosen>Assez bien</span>
+                </p>
+                <div class="scale" role="radiogroup" aria-label="Maîtrise du cours">
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Assez bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
+                </div>
+              </div>
+
+              <div class="crit">
+                <p class="name">
+                  <span class="left">Travail personnel</span>
+                  <span class="chosen" data-chosen>Non évalué</span>
+                </p>
+                <div class="scale" role="radiogroup" aria-label="Travail personnel">
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
+                </div>
+              </div>
+
+              <div class="crit">
+                <p class="name">
+                  <span class="left">Autonomie</span>
+                  <span class="chosen" data-chosen>Très bien</span>
+                </p>
+                <div class="scale" role="radiogroup" aria-label="Autonomie">
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Non évalué</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Très insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Insuffisant</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Moyen</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Assez bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Bien</button>
+                  <button type="button" role="radio" aria-checked="true" aria-pressed="true">Très bien</button>
+                  <button type="button" role="radio" aria-checked="false" aria-pressed="false">Excellent</button>
+                </div>
+              </div>
+
+              <button class="addcrit" type="button">＋ Ajouter un critère à cette matière</button>
+            </div>
+
+            <div class="field">
+              <span class="lbl" id="lbl-longueur">Longueur de l'appréciation <span class="pin" title="Annotation 11">11</span></span>
+              <div class="seg" role="group" aria-labelledby="lbl-longueur" id="seg-longueur">
+                <button type="button" aria-pressed="false" data-cost="1800">Courte <small>≈ 150 caractères</small></button>
+                <button type="button" aria-pressed="true" data-cost="2900">Moyenne <small>≈ 300 caractères</small></button>
+                <button type="button" aria-pressed="false" data-cost="4200">Détaillée <small>≈ 500 caractères</small></button>
+                <button type="button" aria-pressed="false" data-cost="2900" data-custom>Personnalisée <small>min / max exacts</small></button>
+              </div>
+              <div class="custom-length" id="custom-length">
+                <span>Longueur minimale</span> <input type="number" value="150" min="50" max="500" aria-label="Longueur minimale en caractères">
+                <span>maximale</span> <input type="number" value="300" min="100" max="1000" aria-label="Longueur maximale en caractères">
+                <span>caractères — le réglage fin actuel, conservé</span>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <span class="lbl" id="lbl-ton">Ton</span>
+                <div class="seg" role="group" aria-labelledby="lbl-ton" id="seg-ton">
+                  <button type="button" aria-pressed="false">Bienveillant</button>
+                  <button type="button" aria-pressed="true">Normal</button>
+                  <button type="button" aria-pressed="false">Sévère</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="m-adresse">Mode d'adresse</label>
+                <select id="m-adresse" class="control">
+                  <option>Tutoiement (« Tu participes… »)</option>
+                  <option>Vouvoiement (« Vous participez… »)</option>
+                  <option>Impersonnel (« Marie participe… »)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="m-notes">Notes personnelles <span class="opt">(optionnel)</span></label>
+              <textarea id="m-notes" class="control" rows="2" placeholder="Ex. : gros progrès depuis le contrôle de mai, encourager la prise de parole…"></textarea>
+            </div>
+
+            <div class="cost">
+              <span class="pin" title="Annotation 12">12</span>
+              <span>Cette génération consommera <b id="cost-val">≈ 2 900 crédits</b></span>
+              <span class="after">Solde après : <b id="cost-after">244 600</b> crédits</span>
+            </div>
+
+            <div class="btn-row-gen">
+              <button class="generate" type="button">✨ Générer l'appréciation</button>
+              <button class="reset-btn" type="button" title="Affiché après une génération, comme aujourd'hui">↺ Réinitialiser</button>
+            </div>
+            <p class="disclaimer">⚠️ Texte généré par IA : relisez et ajustez avant utilisation — l'outil ne remplace pas votre expertise. Après génération, la zone de résultats actuelle est inchangée : versions détaillée et synthétique éditables, boutons Copier, « Taguer et enregistrer » dans votre banque.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="item"><span class="pin">8</span><p><strong>Matières : rien ne disparaît</strong>Le sélecteur affiche vos matières avec leur nombre de critères ; « ⚙ Gérer » ouvre la gestion actuelle (créer, renommer, supprimer une matière et ses critères) sans quitter la page. L'option « + Créer une nouvelle matière » est aussi dans la liste pour le premier usage.</p></div>
+      <div class="item"><span class="pin">9</span><p><strong>Importance visible… et réellement utilisée</strong>Le réglage Normal / Important / Crucial existe déjà à la création d'un critère, mais l'audit a montré qu'il est ignoré à la génération (valeur codée en dur). Ici il s'affiche sur le critère et pèsera vraiment dans le texte produit.</p></div>
+      <div class="item"><span class="pin">10</span><p><strong>L'échelle complète à 8 niveaux, enfin lisible</strong>Les 8 niveaux actuels sont intégralement conservés (Non évalué, Très insuffisant, Insuffisant, Moyen, Assez bien, Bien, Très bien, Excellent) : c'est cette finesse qui diversifie et personnalise les appréciations. L'interaction ne change pas — un appui sélectionne le niveau — mais les libellés sont écrits en toutes lettres au lieu des sigles « TI / AB / TB » lisibles uniquement au survol, le niveau choisi est rappelé en couleur à côté du critère, les cibles font ≥ 44 px (sur mobile la grille passe en 2 lignes de 4), et l'ensemble est utilisable au clavier et au lecteur d'écran.</p></div>
+      <div class="item"><span class="pin">11</span><p><strong>Longueur simple par défaut, réglage fin conservé</strong>« Courte / Moyenne / Détaillée » couvre l'usage courant, et l'option « Personnalisée » rouvre les deux champs min/max exacts d'aujourd'hui (50–500 / 100–1000 caractères) — cliquez dessus pour voir. Zéro capacité perdue.</p></div>
+      <div class="item"><span class="pin">12</span><p><strong>Coût annoncé, un seul clic</strong>L'encart de coût remplace le double-clic « Confirmer la génération » (souvent perçu comme un bug). L'estimation se met à jour selon la longueur — essayez.</p></div>
+      <div class="item"><span class="pin">13</span><p><strong>Un seul compteur de crédits</strong>Le compteur vit dans l'en-tête de page ; le formulaire n'affiche plus son propre compteur ni son alerte « crédits épuisés » en doublon.</p></div>
+    </div>
+  </div>
+
+  <!-- ============ TABLE DE CORRESPONDANCE ============ -->
+  <div class="section">
+    <h2>Vérification anti-régression — correspondance accès par accès</h2>
+    <p class="sub">Chaque bouton, lien et réglage des écrans actuels (header, page Dashboard, formulaire d'appréciation) et son pendant dans la proposition. <span class="ok" style="margin:0">✓</span> = identique ou déplacé sans perte · <span class="chg" style="margin:0">△</span> = remplacé par un équivalent, à valider.</p>
+
+    <div class="parity-wrap">
+      <table class="parity">
+        <thead><tr><th>Accès dans la version actuelle</th><th>Où il vit dans la proposition</th></tr></thead>
+        <tbody>
+          <tr><td><span class="grp">Header</span>Logo « ProfAssist » (→ landing)</td><td><span class="ok">✓</span>Logo conservé ; connecté, il mène à « Mon espace »</td></tr>
+          <tr><td>Logo TeachTech (image, non cliquable)</td><td><span class="chg">△</span>Déplacé au footer pour alléger la barre</td></tr>
+          <tr><td>Menu Concevoir ▾ : Scénarios pédagogiques · Séances pédagogiques · Ma banque de scénarios · Ma banque de séances</td><td><span class="ok">✓</span>Onglet « Concevoir », sous-menu déroulant identique ; en plus : actions rapides (Créer une séance / un scénario) et « Reprendre où j'en étais »</td></tr>
+          <tr><td>Menu Évaluer ▾ : Générer une appréciation · Ma banque d'appréciations · Synthèse</td><td><span class="ok">✓</span>Onglet « Évaluer », sous-menu identique ; actions rapides « Générer une appréciation » et « Synthèse de bulletin »</td></tr>
+          <tr><td>Menu Communiquer ▾ : Créer · Répondre à une communication</td><td><span class="ok">✓</span>Onglet « Communiquer », sous-menu identique ; action rapide « Écrire aux familles »</td></tr>
+          <tr><td>Menu Ressources ▾ : Flux RSS · Mon chatbot · Ma banque de réponses</td><td><span class="ok">✓</span>Onglet « Ressources », sous-menu identique ; carte « Actualités pédagogiques » et action rapide chatbot en bonus</td></tr>
+          <tr><td>Compteur « X tokens »</td><td><span class="ok">✓</span>Jauge de crédits (cliquable → page d'achat), équivalence en actions au survol</td></tr>
+          <tr><td>Bouton « Acheter des tokens »</td><td><span class="ok">✓</span>« Recharger » (carte crédits + jauge cliquable)</td></tr>
+          <tr><td>⚙ Paramètres ▾ : J'ai un code ! · Donner votre avis / Avis envoyé · Paramètres du compte · Mode sombre/clair · Déconnexion · section Administration (Dashboard, Newsletter, Campagnes, Feedback)</td><td><span class="ok">✓</span>Menu avatar « L », contenu identique ; « J'ai un code » aussi en raccourci dans la carte crédits</td></tr>
+          <tr><td>Menu mobile (burger déroulant tout le site)</td><td><span class="ok">✓</span>Barre d'onglets en bas (navigation) + burger (compte, paramètres, code, avis, thème, déconnexion)</td></tr>
+
+          <tr><td><span class="grp">Page Dashboard</span>« Bonjour {prénom} ! » + sous-titre</td><td><span class="ok">✓</span>En-tête de « Mon espace »</td></tr>
+          <tr><td>Lien « Voir un court tuto vidéo » (YouTube)</td><td><span class="ok">✓</span>Conservé dans l'en-tête du générateur</td></tr>
+          <tr><td>Compteur de crédits + « Un token ≈ 4 caractères »</td><td><span class="ok">✓</span>Carte « Mes crédits » avec jauge + équivalences en actions concrètes</td></tr>
+          <tr><td>Alerte « Crédits épuisés » + badge « Indisponible » + bouton « Recharger mes crédits »</td><td><span class="ok">✓</span>États conservés : jauge rouge, encart au-dessus du formulaire, même bouton — un seul exemplaire au lieu de deux doublons</td></tr>
+          <tr><td>« Ajouter une matière »</td><td><span class="ok">✓</span>« + Créer une nouvelle matière… » dans la liste + bouton « ⚙ Gérer »</td></tr>
+          <tr><td>Cartes matières : « X critères définis » · « Modifier les critères » · 🗑 Supprimer (Confirmer / Annuler)</td><td><span class="ok">✓</span>Nombre de critères affiché dans la liste ; « Modifier les critères » en lien direct ; suppression via « ⚙ Gérer » (gestion actuelle inchangée)</td></tr>
+          <tr><td>Modale matière : nom · « Voir des exemples de critères » (12 catégories) · « + Ajouter un critère » · importance Normal/Important/Crucial · supprimer un critère · Annuler / Enregistrer</td><td><span class="ok">✓</span>Modale inchangée, ouverte par « ⚙ Gérer » ; « + Ajouter un critère » aussi en accès direct sous la liste ; l'importance devient réellement utilisée à la génération</td></tr>
+          <tr><td>Disclaimer IA avant le formulaire</td><td><span class="ok">✓</span>Conservé, sous le bouton de génération</td></tr>
+          <tr><td>Liens bas de page : « Ma banque d'appréciations » · « Outils communication »</td><td><span class="ok">✓</span>Navigation (sous-menus) + actions rapides de « Mon espace »</td></tr>
+          <tr><td>3 cartes « IA avancée / Personnalisable / Gain de temps »</td><td><span class="chg">△</span>Seul contenu remplacé : au profit du bilan « Mon année avec ProfAssist » (plus utile que de l'auto-promotion interne) — à valider</td></tr>
+
+          <tr><td><span class="grp">Formulaire</span>Sélecteur de matière (+ message « Aucune matière disponible »)</td><td><span class="ok">✓</span>Identique, états vides conservés</td></tr>
+          <tr><td>Prénom de l'élève</td><td><span class="ok">✓</span>Identique</td></tr>
+          <tr><td>Longueur min / max en caractères (50–500 / 100–1000)</td><td><span class="ok">✓</span>« Courte / Moyenne / Détaillée » + option « Personnalisée » qui rouvre les champs min/max exacts</td></tr>
+          <tr><td>Barre de notation par critère, 8 niveaux NE → E (tooltips au survol)</td><td><span class="ok">✓</span>Les 8 niveaux, libellés en toutes lettres, niveau choisi rappelé, utilisable au tactile et au clavier</td></tr>
+          <tr><td>Ton : Bienveillant / Normal / Sévère</td><td><span class="ok">✓</span>Mêmes trois tons, en boutons</td></tr>
+          <tr><td>Mode d'adresse : Tutoiement / Vouvoiement / Impersonnel</td><td><span class="ok">✓</span>Identique, avec exemples ajoutés</td></tr>
+          <tr><td>Notes personnelles (optionnel)</td><td><span class="ok">✓</span>Identique</td></tr>
+          <tr><td>« Générer les appréciations » (états : Génération en cours… / Crédits épuisés / « Confirmer la génération » au 2e clic)</td><td><span class="ok">✓</span>États chargement et épuisé conservés ; le 2e clic de confirmation est remplacé par l'encart de coût permanent — même garde-fou, plus lisible</td></tr>
+          <tr><td>« Réinitialiser » (affiché après une génération)</td><td><span class="ok">✓</span>Conservé ; proposition d'ajouter « Régénérer une variante » (paramètres conservés)</td></tr>
+          <tr><td>Résultats : versions détaillée et synthétique éditables · boutons Copier · « Taguer et enregistrer » (4 tags, modale de confirmation, verrou accès banque)</td><td><span class="ok">✓</span>Zone de résultats inchangée — hors périmètre de cette refonte</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="foot">Typographie : maquettes en police système ; la recommandation de l'audit est d'adopter une police de titrage chaleureuse (Nunito ou Plus Jakarta Sans) dans l'app. Toutes les propositions sont additives : aucun champ, aucune option, aucune fonctionnalité actuelle n'est supprimée.</p>
+</div>
+
+<script>
+  function wireSeg(seg, onChange) {
+    var btns = seg.querySelectorAll('button');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+        if (onChange) onChange(b);
+      });
+    });
+  }
+  var BALANCE = 247500;
+  var fmt = function (n) { return n.toLocaleString('fr-FR'); };
+  wireSeg(document.getElementById('seg-longueur'), function (b) {
+    var c = parseInt(b.getAttribute('data-cost'), 10);
+    document.getElementById('cost-val').textContent = '≈ ' + fmt(c) + ' crédits';
+    document.getElementById('cost-after').textContent = fmt(BALANCE - c);
+    document.getElementById('custom-length').classList.toggle('visible', b.hasAttribute('data-custom'));
+  });
+  wireSeg(document.getElementById('seg-ton'));
+  document.querySelectorAll('.scale').forEach(function (scale) {
+    var chosen = scale.closest('.crit').querySelector('[data-chosen]');
+    var btns = scale.querySelectorAll('button');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); x.setAttribute('aria-checked', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+        b.setAttribute('aria-checked', 'true');
+        chosen.textContent = b.textContent;
+      });
+    });
+  });
+</script>

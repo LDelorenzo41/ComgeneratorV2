@@ -128,17 +128,6 @@ export function BuyTokensPage() {
 
     const priceId = priceIdMapping[`${planId}_${withBank}` as keyof typeof priceIdMapping];
 
-    // ✅ DÉBOGAGE : Affichage de toutes les variables d'environnement
-    console.log('🔍 DÉBOGAGE VARIABLES ENV:');
-    console.log('PROFESSOR_200K:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K);
-    console.log('PROFESSOR_200K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PROFESSOR_200K_BANK);
-    console.log('PRINCIPAL_400K:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K);
-    console.log('PRINCIPAL_400K_BANK:', import.meta.env.VITE_STRIPE_PRICE_PRINCIPAL_400K_BANK);
-    console.log('🎯 MAPPING COMPLET:', priceIdMapping);
-    console.log('🎯 CLÉ RECHERCHÉE:', `${planId}_${withBank}`);
-    console.log('🎯 PRICE ID TROUVÉ:', priceId);
-    console.log('🔍 REAL USER ID:', user.id);
-
     if (!priceId) {
       console.error('❌ Price ID not found for:', planId, withBank);
       console.error('❌ Mapping disponible:', Object.keys(priceIdMapping));
@@ -489,9 +478,12 @@ export function BuyTokensPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-4">
             Des questions sur nos packs de tokens ?
           </p>
-          <button className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+          <a
+            href="mailto:contact-profassist@teachtech.fr"
+            className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+          >
             Contactez-nous
-          </button>
+          </a>
         </div>
       </div>
     </div>

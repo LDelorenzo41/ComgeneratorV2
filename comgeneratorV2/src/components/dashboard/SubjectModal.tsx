@@ -56,11 +56,12 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
         <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
 
-          <div className="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle">
+          <div className="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle max-h-[85vh] overflow-y-auto">
             <div className="absolute top-0 right-0 pt-4 pr-4">
               <button
                 type="button"
                 onClick={onClose}
+                aria-label="Fermer"
                 className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none"
               >
                 <X className="h-6 w-6" />
@@ -74,8 +75,9 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                 </label>
                 <input
                   type="text"
+                  id="name"
                   {...register('name')}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -114,7 +116,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                       <input
                         {...register(`criteria.${index}.name`)}
                         placeholder="Nom du critère"
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       />
                       {errors.criteria?.[index]?.name && (
                         <p className="mt-1 text-sm text-red-600">{errors.criteria[index]?.name?.message}</p>
@@ -123,7 +125,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                     <div className="w-32">
                       <select
                         {...register(`criteria.${index}.importance`, { valueAsNumber: true })}
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       >
                         <option value={1}>Normal</option>
                         <option value={2}>Important</option>
@@ -134,6 +136,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                       <button
                         type="button"
                         onClick={() => remove(index)}
+                        aria-label="Supprimer ce critère"
                         className="inline-flex items-center text-red-600 hover:text-red-500"
                       >
                         <Minus className="h-5 w-5" />

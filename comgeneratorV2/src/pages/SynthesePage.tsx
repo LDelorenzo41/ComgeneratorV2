@@ -12,6 +12,7 @@ import { secureApi, type SynthesisParams } from '../lib/secureApi';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import { Link } from 'react-router-dom';
+import { logGeneration } from '../lib/usageStats';
 import { 
   FileText, 
   Upload, 
@@ -165,6 +166,7 @@ export function SynthesePage() {
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setSummary(content);
+      logGeneration('synthese');
 
       const usedTokens: number = result.usage?.total_tokens ?? 0;
 

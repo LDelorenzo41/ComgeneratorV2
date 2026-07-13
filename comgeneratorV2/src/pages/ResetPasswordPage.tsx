@@ -60,23 +60,7 @@ export function ResetPasswordPage() {
         refreshToken = searchParams.get('refresh_token');
       }
 
-      console.log('🔍 Recherche de tokens...', {
-        fromHash: { 
-          accessToken: !!hashParams.get('access_token'), 
-          refreshToken: !!hashParams.get('refresh_token') 
-        },
-        fromQuery: { 
-          accessToken: !!searchParams.get('access_token'), 
-          refreshToken: !!searchParams.get('refresh_token') 
-        },
-        finalResult: { accessToken: !!accessToken, refreshToken: !!refreshToken }
-      });
-
       if (!accessToken || !refreshToken) {
-        console.log('❌ Tokens manquants dans l\'URL');
-        console.log('URL complète:', window.location.href);
-        console.log('Hash:', window.location.hash);
-        console.log('Search:', window.location.search);
         setIsValidToken(false);
         setError('Lien invalide ou expiré. Veuillez demander un nouveau lien de réinitialisation.');
         return;
@@ -84,7 +68,6 @@ export function ResetPasswordPage() {
 
       // 🔒 SÉCURITÉ: Stocker les tokens SANS créer de session
       // L'utilisateur ne sera authentifié qu'APRÈS avoir changé son mot de passe
-      console.log('🔑 Tokens valides trouvés, stockage sécurisé sans authentification');
       setStoredTokens({ accessToken, refreshToken });
       setIsValidToken(true);
     };
@@ -108,8 +91,6 @@ export function ResetPasswordPage() {
         throw new Error('Tokens manquants. Veuillez utiliser un nouveau lien.');
       }
 
-      console.log('🔄 Tentative de changement de mot de passe...');
-
       // 🔐 OPTION 1: Utiliser directement updateUser sans setSession
       // Car les tokens sont peut-être déjà actifs dans la session courante
       let updateError = null;
@@ -125,8 +106,6 @@ export function ResetPasswordPage() {
 
       // Si ça ne marche pas, essayer avec setSession d'abord
       if (updateError) {
-        console.log('🔄 Première tentative échouée, essai avec setSession...');
-        
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: storedTokens.accessToken,
           refresh_token: storedTokens.refreshToken
@@ -148,11 +127,8 @@ export function ResetPasswordPage() {
         }
       }
 
-      console.log('✅ Mot de passe mis à jour avec succès');
-
       // 🔒 SÉCURITÉ: Déconnecter après le changement réussi
       await supabase.auth.signOut();
-      console.log('✅ Déconnexion sécurisée après changement de mot de passe');
 
       setSuccess(true);
 
@@ -177,16 +153,16 @@ export function ResetPasswordPage() {
   // Lien invalide
   if (isValidToken === false) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-8 h-8 text-red-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Lien invalide
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               {error || 'Ce lien de réinitialisation est invalide ou a expiré.'}
             </p>
             <button
@@ -204,20 +180,20 @@ export function ResetPasswordPage() {
   // Succès
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Mot de passe mis à jour !
             </h1>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               Votre mot de passe a été modifié avec succès. Vous allez être redirigé vers la page de connexion.
             </p>
-            <div className="bg-green-50 rounded-lg p-4 mb-4">
-              <p className="text-sm text-green-700">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-700 dark:text-green-300">
                 Redirection automatique dans quelques secondes...
               </p>
             </div>
@@ -236,11 +212,11 @@ export function ResetPasswordPage() {
   // Chargement
   if (isValidToken === null) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Vérification du lien...</p>
+            <p className="text-gray-600 dark:text-gray-300">Vérification du lien...</p>
           </div>
         </div>
       </div>
@@ -249,16 +225,16 @@ export function ResetPasswordPage() {
 
   // Formulaire de réinitialisation
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <Key className="w-8 h-8 text-blue-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Nouveau mot de passe
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Définissez un nouveau mot de passe pour votre compte ProfAssist
           </p>
         </div>
@@ -266,19 +242,21 @@ export function ResetPasswordPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Nouveau mot de passe */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
               Nouveau mot de passe
             </label>
             <div className="relative">
               <input
                 {...register('password')}
+                id="password"
                 type={showPassword ? 'text' : 'password'}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Minimum 6 caractères"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -291,19 +269,21 @@ export function ResetPasswordPage() {
 
           {/* Confirmer mot de passe */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
               Confirmer le nouveau mot de passe
             </label>
             <div className="relative">
               <input
                 {...register('confirmPassword')}
+                id="confirmPassword"
                 type={showConfirmPassword ? 'text' : 'password'}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Répétez le mot de passe"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -316,10 +296,10 @@ export function ResetPasswordPage() {
 
           {/* Erreur */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex items-center">
                 <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
               </div>
             </div>
           )}
@@ -345,7 +325,7 @@ export function ResetPasswordPage() {
         <div className="text-center mt-6">
           <button
             onClick={() => navigate('/login')}
-            className="text-sm text-gray-600 hover:text-gray-800"
+            className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
           >
             ← Retour à la connexion
           </button>
