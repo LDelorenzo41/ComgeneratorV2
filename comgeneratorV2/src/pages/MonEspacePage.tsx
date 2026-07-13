@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { rssService, RSSArticle } from '../lib/rssService';
+import { fetchGenerationCounts, GenerationCounts } from '../lib/usageStats';
 import { FEATURES } from '../lib/features';
 import {
   Sparkles,
@@ -31,14 +32,23 @@ interface RecentItem {
 }
 
 interface YearStats {
-  appreciations: number;
-  lessons: number;
-  scenarios: number;
+  counts: GenerationCounts;
+  // 'events' : journal réel des générations ; 'banks' : repli sur les
+  // enregistrements en banque tant que la table generation_events est vide/absente
+  source: 'events' | 'banks';
 }
 
 // Coûts moyens observés (voir guide de consommation de la page d'achat)
 const TOKENS_PER_APPRECIATION = 3000;
 const TOKENS_PER_LESSON = 10000;
+
+// Temps gagné estimé par génération, en minutes
+const MINUTES_SAVED: Partial<Record<keyof GenerationCounts, number>> = {
+  appreciation: 3,
+  synthese: 10,
+  lesson: 40,
+  scenario: 90
+};
 
 function getSeasonalBanner(): { emoji: string; title: string; text: string; ctaLabel: string; ctaLink: string } {
   const month = new Date().getMonth(); // 0 = janvier
@@ -109,13 +119,11 @@ export function MonEspacePage() {
       const yearStartIso = yearStart.toISOString();
 
       try {
-        const [appRes, lessonRes, scenarioRes, appCount, lessonCount, scenarioCount] = await Promise.all([
+        const [appRes, lessonRes, scenarioRes, eventCounts] = await Promise.all([
           supabase.from('appreciations').select('id, tag, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
           supabase.from('lessons_bank').select('id, subject, topic, level, duration, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
           (supabase as any).from('scenarios_bank').select('id, matiere, niveau, theme, nombre_seances, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
-          supabase.from('appreciations').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso),
-          supabase.from('lessons_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso),
-          (supabase as any).from('scenarios_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso)
+          fetchGenerationCounts(user.id, yearStartIso)
         ]);
 
         const items: RecentItem[] = [];
@@ -147,11 +155,28 @@ export function MonEspacePage() {
         items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setRecentItems(items.slice(0, 3));
 
-        setStats({
-          appreciations: appCount.count ?? 0,
-          lessons: lessonCount.count ?? 0,
-          scenarios: scenarioCount.count ?? 0
-        });
+        if (eventCounts && Object.values(eventCounts).some(n => n > 0)) {
+          // Journal réel des générations
+          setStats({ counts: eventCounts, source: 'events' });
+        } else {
+          // Repli : enregistrements en banque sur la même période
+          const [appCount, lessonCount, scenarioCount] = await Promise.all([
+            supabase.from('appreciations').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso),
+            supabase.from('lessons_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso),
+            (supabase as any).from('scenarios_bank').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', yearStartIso)
+          ]);
+          setStats({
+            source: 'banks',
+            counts: {
+              appreciation: appCount.count ?? 0,
+              synthese: 0,
+              lesson: lessonCount.count ?? 0,
+              exercise: 0,
+              scenario: scenarioCount.count ?? 0,
+              communication: 0
+            }
+          });
+        }
       } catch (error) {
         console.error('Erreur lors du chargement de Mon espace:', error);
       }
@@ -227,8 +252,13 @@ export function MonEspacePage() {
   ];
 
   const estimatedHoursSaved = stats
-    ? Math.round((stats.appreciations * 10 + stats.lessons * 45 + stats.scenarios * 60) / 60)
+    ? Math.round(
+        (Object.entries(MINUTES_SAVED) as Array<[keyof GenerationCounts, number]>)
+          .reduce((total, [kind, minutes]) => total + stats.counts[kind] * minutes, 0) / 60
+      )
     : null;
+
+  const statsTotal = stats ? Object.values(stats.counts).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
@@ -309,33 +339,41 @@ export function MonEspacePage() {
               </div>
             </div>
 
-            {stats && (stats.appreciations > 0 || stats.lessons > 0 || stats.scenarios > 0) && (
+            {stats && statsTotal > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Mon année avec ProfAssist</h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Depuis le 1er septembre</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 dark:bg-gray-700/60 rounded-xl px-3 py-2">
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.appreciations}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">appréciations</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/60 rounded-xl px-3 py-2">
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.lessons}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">séances</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700/60 rounded-xl px-3 py-2">
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.scenarios}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">scénarios</p>
-                  </div>
+                  {([
+                    ['appreciation', 'appréciations'],
+                    ['synthese', 'synthèses'],
+                    ['lesson', 'séances'],
+                    ['exercise', 'exercices'],
+                    ['scenario', 'scénarios'],
+                    ['communication', 'communications']
+                  ] as Array<[keyof GenerationCounts, string]>)
+                    .filter(([kind]) => stats.source === 'events' || stats.counts[kind] > 0)
+                    .map(([kind, label]) => (
+                      <div key={kind} className="bg-gray-50 dark:bg-gray-700/60 rounded-xl px-3 py-2">
+                        <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.counts[kind]}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+                      </div>
+                    ))}
                   {estimatedHoursSaved !== null && estimatedHoursSaved > 0 && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-3 py-2">
+                    <div className="col-span-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-3 py-2">
                       <p className="text-xl font-bold text-green-700 dark:text-green-400">≈ {estimatedHoursSaved} h</p>
                       <p className="text-xs text-green-700/80 dark:text-green-400/80">de travail gagnées*</p>
                     </div>
                   )}
                 </div>
-                {estimatedHoursSaved !== null && estimatedHoursSaved > 0 && (
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 italic">* Estimation indicative</p>
-                )}
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3 italic leading-relaxed">
+                  {stats.source === 'events'
+                    ? 'Compteurs de vos générations réussies.'
+                    : 'Estimation à partir de vos enregistrements en banque (les générations non sauvegardées ne sont pas comptées).'}
+                  {estimatedHoursSaved !== null && estimatedHoursSaved > 0 && (
+                    <> * Temps gagné estimé : 3 min par appréciation, 10 min par synthèse, 40 min par séance, 1 h 30 par scénario.</>
+                  )}
+                </p>
               </div>
             )}
           </div>

@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 
+import { logGeneration } from '../lib/usageStats';
 // ============================================================================
 // OPTIONS DE FORMULAIRE
 // ============================================================================
@@ -650,6 +651,7 @@ export function ScenarioPedagogiquePage() {
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setGeneratedContent(content);
+      logGeneration('scenario');
 
       const rows = parseMarkdownTable(content);
       setParsedRows(rows);

@@ -13,6 +13,7 @@ import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 
+import { logGeneration } from '../lib/usageStats';
 import { 
   MessageSquare, 
   Send, 
@@ -162,6 +163,7 @@ export function CommunicationPage() {
         signature: selectedSignature ? selectedSignature.content : null
       });
       setGeneratedContent(text);
+      logGeneration('communication');
       
       // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
       if (user) {
@@ -220,6 +222,7 @@ export function CommunicationPage() {
       });
 
       setGeneratedReply(reply);
+      logGeneration('communication');
       
       // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
       if (user) {

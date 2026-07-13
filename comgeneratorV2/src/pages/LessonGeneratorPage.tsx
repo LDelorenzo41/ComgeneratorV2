@@ -31,6 +31,7 @@ import { mergeSupportsIntoLesson } from '../lib/lessonSupports';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
+import { logGeneration } from '../lib/usageStats';
 import {
   BookOpen,
   Copy,
@@ -1106,6 +1107,7 @@ export function LessonGeneratorPage() {
       if (!content) throw new Error('Réponse invalide de l\'API');
 
       setGeneratedContent(content);
+      logGeneration('lesson');
 
       // Capturer les sources RAG si disponibles
       if (result.sources && result.sources.length > 0) {

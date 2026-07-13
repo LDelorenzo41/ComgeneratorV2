@@ -11,6 +11,7 @@ import type { AppreciationResult as AppreciationResultType } from '../../lib/typ
 import { RatingBar } from './RatingBar';
 import { subjectUpdateEvent, SUBJECT_UPDATED } from './SubjectList';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../layout/Header';
+import { logGeneration } from '../../lib/usageStats';
 import useTokenBalance from '../../hooks/useTokenBalance'; // ✅ AJOUT
 import { 
   PenTool, 
@@ -263,6 +264,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
       onTokensUpdated?.();
       setResult(generatedResult);
       setLastUsedTokens(usedTokens);
+      logGeneration('appreciation');
       setEditableDetailed(generatedResult.detailed);
       setEditableSummary(generatedResult.summary);
 
