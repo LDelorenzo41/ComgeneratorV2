@@ -47,7 +47,9 @@ const MINUTES_SAVED: Partial<Record<keyof GenerationCounts, number>> = {
   appreciation: 3,
   synthese: 10,
   lesson: 40,
-  scenario: 90
+  exercise: 10,
+  scenario: 90,
+  communication: 5
 };
 
 function getSeasonalBanner(): { emoji: string; title: string; text: string; ctaLabel: string; ctaLink: string } {
@@ -371,7 +373,7 @@ export function MonEspacePage() {
                     ? 'Compteurs de vos générations réussies.'
                     : 'Estimation à partir de vos enregistrements en banque (les générations non sauvegardées ne sont pas comptées).'}
                   {estimatedHoursSaved !== null && estimatedHoursSaved > 0 && (
-                    <> * Temps gagné estimé : 3 min par appréciation, 10 min par synthèse, 40 min par séance, 1 h 30 par scénario.</>
+                    <> * Temps gagné estimé : 3 min par appréciation, 10 min par synthèse, 40 min par séance, 10 min par exercice, 1 h 30 par scénario, 5 min par communication.</>
                   )}
                 </p>
               </div>
