@@ -85,14 +85,14 @@ export function AuthHandler() {
         setMessage(`Email confirmé avec succès pour ${data.user?.email} !`);
 
         // Nettoyer l'URL
-        window.history.replaceState({}, document.title, '/dashboard');
+        window.history.replaceState({}, document.title, '/mon-espace');
 
         // Redirection robuste avec fallback
         setTimeout(() => {
           try {
-            navigate('/dashboard');
+            navigate('/mon-espace');
           } catch (navError) {
-            window.location.href = '/dashboard';
+            window.location.href = '/mon-espace';
           }
         }, 3000);
 
@@ -143,20 +143,20 @@ export function AuthHandler() {
           <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 mb-6">
             <p className="text-sm text-green-700 dark:text-green-300">
               🎉 Votre compte est maintenant actif !<br/>
-              Redirection automatique vers votre tableau de bord...
+              Redirection automatique vers votre espace...
             </p>
           </div>
           <button
             onClick={() => {
               try {
-                navigate('/dashboard');
+                navigate('/mon-espace');
               } catch (error) {
-                window.location.href = '/dashboard';
+                window.location.href = '/mon-espace';
               }
             }}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
           >
-            Accéder maintenant au tableau de bord
+            Accéder à mon espace
           </button>
         </div>
       </div>

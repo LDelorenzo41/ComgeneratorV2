@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { rssService, RSSArticle } from '../lib/rssService';
-import { fetchGenerationCounts, GenerationCounts } from '../lib/usageStats';
+import { fetchGenerationCounts, GenerationCounts, GenerationKind } from '../lib/usageStats';
 import { FEATURES } from '../lib/features';
 import {
   Sparkles,
@@ -42,6 +42,16 @@ interface YearStats {
 const TOKENS_PER_APPRECIATION = 3000;
 const TOKENS_PER_LESSON = 10000;
 
+// Libellé et destination de chaque outil (bandeau « reprendre » + compteurs)
+const TOOL_ACTIONS: Record<GenerationKind, { label: string; link: string }> = {
+  appreciation: { label: 'Générer une appréciation', link: '/dashboard' },
+  synthese: { label: 'Créer une synthèse', link: '/synthese' },
+  lesson: { label: 'Créer une séance', link: '/generate-lesson' },
+  exercise: { label: 'Générer un exercice', link: '/lessons-bank' },
+  scenario: { label: 'Créer un scénario', link: '/scenario-pedagogique' },
+  communication: { label: 'Écrire aux familles', link: '/communication?mode=create' }
+};
+
 // Temps gagné estimé par génération, en minutes
 const MINUTES_SAVED: Partial<Record<keyof GenerationCounts, number>> = {
   appreciation: 3,
@@ -52,7 +62,7 @@ const MINUTES_SAVED: Partial<Record<keyof GenerationCounts, number>> = {
   communication: 5
 };
 
-function getSeasonalBanner(): { emoji: string; title: string; text: string; ctaLabel: string; ctaLink: string } {
+function getSeasonalBanner(lastTool: GenerationKind | null): { emoji: string; title: string; text: string; ctaLabel: string; ctaLink: string } {
   const month = new Date().getMonth(); // 0 = janvier
   if (month === 8 || month === 9) {
     return {
@@ -70,6 +80,15 @@ function getSeasonalBanner(): { emoji: string; title: string; text: string; ctaL
       text: 'Gagnez du temps sur vos appréciations de fin de trimestre.',
       ctaLabel: 'Générer une appréciation',
       ctaLink: '/dashboard'
+    };
+  }
+  if (lastTool) {
+    return {
+      emoji: '✨',
+      title: 'Bon retour !',
+      text: 'Reprenez là où vous vous étiez arrêté.',
+      ctaLabel: TOOL_ACTIONS[lastTool].label,
+      ctaLink: TOOL_ACTIONS[lastTool].link
     };
   }
   return {
@@ -102,8 +121,9 @@ export function MonEspacePage() {
   const [stats, setStats] = React.useState<YearStats | null>(null);
   const [articles, setArticles] = React.useState<RSSArticle[]>([]);
   const [isRedeemModalOpen, setIsRedeemModalOpen] = React.useState(false);
+  const [lastTool, setLastTool] = React.useState<GenerationKind | null>(null);
 
-  const banner = React.useMemo(() => getSeasonalBanner(), []);
+  const banner = React.useMemo(() => getSeasonalBanner(lastTool), [lastTool]);
   const isOutOfTokens = (tokenCount ?? 0) === 0;
 
   // Éléments récents + compteurs de l'année (les erreurs sont silencieuses : la page reste utilisable)
@@ -121,12 +141,18 @@ export function MonEspacePage() {
       const yearStartIso = yearStart.toISOString();
 
       try {
-        const [appRes, lessonRes, scenarioRes, eventCounts] = await Promise.all([
+        const [appRes, lessonRes, scenarioRes, eventCounts, lastEventRes] = await Promise.all([
           supabase.from('appreciations').select('id, tag, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
           supabase.from('lessons_bank').select('id, subject, topic, level, duration, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
           (supabase as any).from('scenarios_bank').select('id, matiere, niveau, theme, nombre_seances, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
-          fetchGenerationCounts(user.id, yearStartIso)
+          fetchGenerationCounts(user.id, yearStartIso),
+          supabase.from('generation_events').select('kind').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1)
         ]);
+
+        const lastKind = lastEventRes.data?.[0]?.kind as GenerationKind | undefined;
+        if (lastKind && lastKind in TOOL_ACTIONS) {
+          setLastTool(lastKind);
+        }
 
         const items: RecentItem[] = [];
         (appRes.data || []).forEach((a: any) => items.push({

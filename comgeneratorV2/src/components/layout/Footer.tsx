@@ -139,11 +139,11 @@ export function Footer() {
               </li>
               <li>
                 <Link 
-                  to="/dashboard" 
+                  to="/mon-espace" 
                   className="group flex items-center text-blue-100 hover:text-white transition-all duration-200"
                 >
                   <ArrowRight className="w-4 h-4 mr-2 group-hover:translate-x-1 transition-transform" />
-                  Dashboard
+                  Mon espace
                 </Link>
               </li>
               <li>
