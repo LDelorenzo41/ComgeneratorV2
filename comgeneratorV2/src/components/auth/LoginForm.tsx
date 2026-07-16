@@ -118,7 +118,7 @@ export function LoginForm() {
         throw signInError;
       }
 
-      navigate('/dashboard');
+      navigate('/mon-espace');
     } catch (error: any) {
       const errorMessage = getDetailedErrorMessage(error);
       setError(errorMessage);

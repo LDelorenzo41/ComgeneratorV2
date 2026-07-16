@@ -176,7 +176,7 @@ export function FeedbackSynthesisPage() {
   useEffect(() => {
     checkIsAdmin().then((isAdmin) => {
       if (!isAdmin) {
-        navigate('/dashboard');
+        navigate('/mon-espace');
         return;
       }
       loadData();

@@ -26,7 +26,11 @@ import {
   ShoppingCart,
   Zap,
   Bot,
-  FileSearch
+  FileSearch,
+  PenTool,
+  ClipboardList,
+  Send,
+  Layers
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { checkIsAdmin } from '../lib/ragApi';
@@ -120,6 +124,21 @@ interface DashboardData {
       this_month: number;
     };
   };
+}
+
+// Statistiques du journal des générations (get_admin_generation_stats)
+interface GenerationKindStats {
+  total: number;
+  today: number;
+  this_week: number;
+  this_month: number;
+  unique_users: number;
+}
+
+interface GenerationStats {
+  by_kind: Partial<Record<'appreciation' | 'synthese' | 'lesson' | 'exercise' | 'scenario' | 'communication', GenerationKindStats>>;
+  total_events: number;
+  active_users_this_month: number;
 }
 
 // ============================================================================
@@ -354,6 +373,7 @@ export function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [generationStats, setGenerationStats] = useState<GenerationStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -383,6 +403,13 @@ export function AdminDashboardPage() {
         setLastUpdated(new Date());
       } else {
         throw new Error('Format de données invalide');
+      }
+
+      // Journal des générations : section masquée si la fonction n'est pas
+      // encore migrée ou si le journal est vide
+      const { data: genResult, error: genError } = await supabase.rpc('get_admin_generation_stats');
+      if (!genError && genResult && typeof genResult === 'object') {
+        setGenerationStats(genResult as unknown as GenerationStats);
       }
     } catch (err: any) {
       console.error('Erreur lors du chargement du dashboard:', err);
@@ -546,37 +573,80 @@ export function AdminDashboardPage() {
               />
             </Section>
 
-            {/* ========== USAGE EDGE FUNCTIONS ========== */}
-            {data.edge_functions && (
-              <Section 
-                title="Usage des fonctionnalites IA" 
-                icon={<Zap className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />}
-                color="bg-cyan-100 dark:bg-cyan-900/30"
+            {/* ========== UTILISATION DES OUTILS ========== */}
+            {/* Appréciations, séances, exercices, scénarios et communications
+                viennent du journal generation_events (démarre à l'application
+                de la migration). Synthèses et Chatbot viennent des logs edge
+                functions, qui portent l'historique complet. */}
+            {(generationStats || data.edge_functions) && (
+              <Section
+                title="Utilisation des outils"
+                icon={<Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                color="bg-blue-100 dark:bg-blue-900/30"
               >
-                <StatCard
-                  title="RAG Chat"
-                  value={data.edge_functions.rag_chat.total}
-                  icon={<Bot className="w-6 h-6" />}
-                  color="cyan"
-                  subtitle="Interrogations du chatbot"
-                  trend={{
-                    today: data.edge_functions.rag_chat.today,
-                    week: data.edge_functions.rag_chat.this_week,
-                    month: data.edge_functions.rag_chat.this_month,
-                  }}
-                />
-                <StatCard
-                  title="Syntheses bulletin"
-                  value={data.edge_functions.synthesis.total}
-                  icon={<FileSearch className="w-6 h-6" />}
-                  color="cyan"
-                  subtitle="Creations de syntheses"
-                  trend={{
-                    today: data.edge_functions.synthesis.today,
-                    week: data.edge_functions.synthesis.this_week,
-                    month: data.edge_functions.synthesis.this_month,
-                  }}
-                />
+                {generationStats && ([
+                  ['appreciation', 'Appréciations', <PenTool key="i" className="w-6 h-6" />, 'blue'],
+                  ['lesson', 'Séances', <BookOpen key="i" className="w-6 h-6" />, 'indigo'],
+                  ['exercise', 'Exercices', <ClipboardList key="i" className="w-6 h-6" />, 'indigo'],
+                  ['scenario', 'Scénarios', <Layers key="i" className="w-6 h-6" />, 'indigo'],
+                  ['communication', 'Communications', <Send key="i" className="w-6 h-6" />, 'purple']
+                ] as Array<[keyof GenerationStats['by_kind'], string, React.ReactNode, StatCardProps['color']]>).map(([kind, label, icon, color]) => {
+                  const stats = generationStats.by_kind[kind];
+                  return (
+                    <StatCard
+                      key={kind}
+                      title={label}
+                      value={stats?.total ?? 0}
+                      icon={icon}
+                      color={color}
+                      subtitle={stats && stats.unique_users > 0
+                        ? `${stats.unique_users.toLocaleString('fr-FR')} utilisateur${stats.unique_users > 1 ? 's' : ''}`
+                        : 'Journal actif — en attente de générations'}
+                      trend={{
+                        today: stats?.today ?? 0,
+                        week: stats?.this_week ?? 0,
+                        month: stats?.this_month ?? 0
+                      }}
+                    />
+                  );
+                })}
+                {data.edge_functions && (
+                  <StatCard
+                    title="Synthèses"
+                    value={data.edge_functions.synthesis.total}
+                    icon={<FileSearch className="w-6 h-6" />}
+                    color="blue"
+                    subtitle="Historique complet (logs serveur)"
+                    trend={{
+                      today: data.edge_functions.synthesis.today,
+                      week: data.edge_functions.synthesis.this_week,
+                      month: data.edge_functions.synthesis.this_month,
+                    }}
+                  />
+                )}
+                {data.edge_functions && (
+                  <StatCard
+                    title="Chatbot"
+                    value={data.edge_functions.rag_chat.total}
+                    icon={<Bot className="w-6 h-6" />}
+                    color="cyan"
+                    subtitle="Interrogations (logs serveur)"
+                    trend={{
+                      today: data.edge_functions.rag_chat.today,
+                      week: data.edge_functions.rag_chat.this_week,
+                      month: data.edge_functions.rag_chat.this_month,
+                    }}
+                  />
+                )}
+                {generationStats && (
+                  <StatCard
+                    title="Utilisateurs actifs (30 j)"
+                    value={generationStats.active_users_this_month}
+                    icon={<UserCheck className="w-6 h-6" />}
+                    color="green"
+                    subtitle={`${generationStats.total_events.toLocaleString('fr-FR')} générations journalisées`}
+                  />
+                )}
               </Section>
             )}
 
@@ -614,7 +684,7 @@ export function AdminDashboardPage() {
 
             {/* ========== CONTENU ========== */}
             <Section 
-              title="Contenu genere" 
+              title="Contenu sauvegardé en banque" 
               icon={<FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
               color="bg-indigo-100 dark:bg-indigo-900/30"
             >

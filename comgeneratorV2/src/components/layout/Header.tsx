@@ -399,7 +399,7 @@ Scénarios pédagogiques
                 )}
                 {user && (
                   <Link
-                    to="/dashboard"
+                    to="/mon-espace"
                     className="hidden md:block px-2 lg:px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                   >
                     <span className="hidden lg:inline">Accéder à l'app</span>

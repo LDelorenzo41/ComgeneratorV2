@@ -31,7 +31,7 @@ export function PaymentSuccessPage() {
       setStatus('success');
       setMessage('Paiement déjà confirmé ! Redirection...');
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/mon-espace');
       }, 2000);
       return;
     }
@@ -90,7 +90,7 @@ export function PaymentSuccessPage() {
         
         // Redirection après 3 secondes
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/mon-espace');
         }, 3000);
       } else {
         setStatus('error');
