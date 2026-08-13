@@ -1,8 +1,8 @@
 // src/lib/generateCommunication.ts - Version sécurisée utilisant Edge Functions
-import { secureApi, type CommunicationParams } from './secureApi';
+import { secureApi } from './secureApi';
 import { supabase } from './supabase';
 import { countTokens } from './countTokens';
-import { TOKEN_UPDATED } from '../components/layout/Header';
+import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 
 // Interface maintenue pour compatibilité avec l'ancien code
 interface Params {
@@ -49,11 +49,8 @@ export async function generateCommunication({
     }
 
     const currentTokens = profile.tokens ?? 0;
-    const newTokens = currentTokens - tokensUsed;
-
-    console.log("Token actuels :", currentTokens);
-    console.log("Tokens utilisés :", tokensUsed);
-    console.log("Tokens restants :", newTokens);
+    // Clamp à 0 : le solde ne doit jamais devenir négatif
+    const newTokens = Math.max(0, currentTokens - tokensUsed);
 
     const { error: updateError } = await supabase
       .from('profiles')
@@ -63,7 +60,9 @@ export async function generateCommunication({
     if (updateError) {
       console.error('Erreur mise à jour des tokens :', updateError);
     } else {
-      window.dispatchEvent(new Event(TOKEN_UPDATED));
+      // tokenUpdateEvent est le bus écouté par useTokenBalance (un dispatch
+      // sur window n'était capté par personne)
+      tokenUpdateEvent.dispatchEvent(new Event(TOKEN_UPDATED));
     }
 
     return result.content;

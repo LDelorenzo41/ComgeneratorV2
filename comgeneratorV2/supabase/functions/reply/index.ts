@@ -125,9 +125,9 @@ const replyHandler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
+    return new Response(JSON.stringify({ error: 'Méthode non autorisée' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 
@@ -177,14 +177,24 @@ const replyHandler = async (req: Request): Promise<Response> => {
     const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
-      return new Response('Missing OPENAI_API_KEY', { 
-        status: 500, 
-        headers: corsHeaders 
+      return new Response(JSON.stringify({ error: 'Configuration serveur incomplète' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const body: ReplyParams = await req.json();
     const { message, ton, objectifs, signature, aiModel } = body;
+
+    // Validation minimale des entrées (évite un appel IA inutile sur message vide)
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return new Response(JSON.stringify({
+        error: 'Paramètres manquants : le message reçu est requis.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Résoudre la configuration API
     let aiConfig;

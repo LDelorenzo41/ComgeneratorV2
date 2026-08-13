@@ -1,35 +1,35 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom'; // ✅ AJOUT
 import { Select } from '../components/ui/Select';
-import { Button } from '../components/ui/Button';
 import Textarea from '../components/ui/Textarea';
 import { SignatureManager } from '../components/SignatureManager';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import copyToClipboard from '../lib/copyToClipboard';
 import { generateCommunication } from '../lib/generateCommunication';
-import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 
 import { logGeneration } from '../lib/usageStats';
-import { 
-  MessageSquare, 
-  Send, 
-  Reply, 
-  Copy, 
-  Sparkles, 
-  Users, 
-  Volume2, 
-  FileText, 
-  RefreshCw, 
+import {
+  MessageSquare,
+  Send,
+  Reply,
+  Copy,
+  Sparkles,
+  Users,
+  Volume2,
+  FileText,
+  RefreshCw,
   CheckCircle,
   CreditCard,
-  AlertCircle,
   PenTool,
   X
 } from 'lucide-react';
+
+// Longueur maximale des saisies envoyées à l'IA (protection coûts / erreurs de copier-coller)
+const MAX_INPUT_LENGTH = 10000;
 
 // ✅ AJOUT: Interface pour les signatures
 interface Signature {
@@ -50,6 +50,13 @@ export function CommunicationPage() {
   const [searchParams] = useSearchParams();
   const createSectionRef = React.useRef<HTMLDivElement>(null);
   const replySectionRef = React.useRef<HTMLDivElement>(null);
+
+  // ✅ AJOUT : Refs vers les blocs de résultat (scroll + focus après génération)
+  const createResultRef = React.useRef<HTMLDivElement>(null);
+  const replyResultRef = React.useRef<HTMLDivElement>(null);
+
+  // ✅ AJOUT : Message pour la région aria-live (lecteurs d'écran)
+  const [liveMessage, setLiveMessage] = React.useState('');
 
   // ✅ AJOUT : Effet pour scroller vers la bonne section selon le mode
   React.useEffect(() => {
@@ -98,6 +105,9 @@ export function CommunicationPage() {
     setTokenCount(tokenBalance ?? 0);
   }, [tokenBalance]);
 
+  // ✅ AJOUT: Présélection de la signature par défaut (une seule fois, au premier chargement)
+  const signaturesInitialized = React.useRef(false);
+
   // ✅ AJOUT: Récupération des signatures de l'utilisateur
   const fetchSignatures = React.useCallback(async () => {
     if (!user) return;
@@ -111,7 +121,27 @@ export function CommunicationPage() {
         .order('name');
 
       if (error) throw error;
-      setSignatures(data || []);
+      const list = data || [];
+      setSignatures(list);
+
+      const defaultId = list.find(s => s.is_default)?.id ?? '';
+      if (!signaturesInitialized.current) {
+        // Premier chargement : on présélectionne la signature par défaut
+        signaturesInitialized.current = true;
+        if (defaultId) {
+          setSelectedSignatureOutgoing(defaultId);
+          setSelectedSignatureIncoming(defaultId);
+        }
+      } else {
+        // Rechargements suivants (après édition dans la modale) : on ne touche à la
+        // sélection que si elle pointe vers une signature supprimée
+        setSelectedSignatureOutgoing(prev =>
+          prev && !list.some(s => s.id === prev) ? defaultId : prev
+        );
+        setSelectedSignatureIncoming(prev =>
+          prev && !list.some(s => s.id === prev) ? defaultId : prev
+        );
+      }
     } catch (error) {
       console.error('Erreur lors de la récupération des signatures:', error);
     }
@@ -128,14 +158,49 @@ export function CommunicationPage() {
     setContenu('');
     setGeneratedContent('');
     setError(null);
-    setSelectedSignatureOutgoing('');
+    // La signature par défaut est restaurée (cohérent avec la présélection initiale)
+    setSelectedSignatureOutgoing(signatures.find(s => s.is_default)?.id ?? '');
     setPointDeVue('troisieme');
   };
 
+  // ✅ AJOUT: Scroll + focus vers un bloc de résultat après génération
+  const scrollToResult = (ref: React.RefObject<HTMLDivElement>) => {
+    setTimeout(() => {
+      if (ref.current) {
+        ref.current.focus({ preventScroll: true });
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
+  // ✅ AJOUT: Message d'erreur lisible à partir d'une exception
+  const toUserErrorMessage = (err: unknown, fallback: string): string => {
+    if (err instanceof TypeError) {
+      // fetch qui échoue (réseau coupé, serveur injoignable)
+      return 'Problème de connexion. Vérifiez votre réseau et réessayez.';
+    }
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+    return fallback;
+  };
+
   // ✅ MODIFICATION: Fonction handleGenerate avec signature et point de vue
+  // Le décompte des crédits est effectué dans generateCommunication (un seul débit)
   const handleGenerate = async () => {
-    if (tokenCount === 0) {
+    if (tokenCount <= 0) {
       setError('Crédits insuffisants pour générer une communication.');
+      return;
+    }
+    if (!contenu.trim()) {
+      setError('Veuillez décrire le contenu à communiquer avant de lancer la génération.');
+      return;
+    }
+    if (contenu.length > MAX_INPUT_LENGTH) {
+      setError(
+        `Le contenu est trop long (${contenu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
       return;
     }
 
@@ -145,7 +210,7 @@ export function CommunicationPage() {
 
     try {
       // ✅ AJOUT: Récupération de la signature sélectionnée
-      const selectedSignature = selectedSignatureOutgoing 
+      const selectedSignature = selectedSignatureOutgoing
         ? signatures.find(s => s.id === selectedSignatureOutgoing)
         : null;
 
@@ -156,40 +221,19 @@ export function CommunicationPage() {
       }
 
       // ✅ MODIFICATION: Ajout de la signature dans les paramètres
-      const text = await generateCommunication({ 
-        destinataire, 
-        ton, 
+      const text = await generateCommunication({
+        destinataire,
+        ton,
         contenu: contenuAvecPointDeVue,
         signature: selectedSignature ? selectedSignature.content : null
       });
       setGeneratedContent(text);
       logGeneration('communication');
-      
-      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('tokens')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profile) {
-          const usedTokens = 1; // Ou calculé selon la logique métier
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
-            })
-            .eq('user_id', user.id);
-
-          if (!updateError) {
-            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
-          }
-        }
-      }
+      setLiveMessage('Communication générée. Le résultat est affiché sous le formulaire.');
+      scrollToResult(createResultRef);
 
     } catch (err: any) {
-      setError('Erreur lors de la génération');
+      setError(toUserErrorMessage(err, 'Erreur lors de la génération. Veuillez réessayer.'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -197,9 +241,21 @@ export function CommunicationPage() {
   };
 
   // ✅ MODIFICATION: Fonction handleGenerateReply avec signature
+  // Le décompte des crédits est effectué dans generateReply (un seul débit)
   const handleGenerateReply = async () => {
-    if (tokenCount === 0) {
+    if (tokenCount <= 0) {
       setReplyError('Crédits insuffisants pour générer une réponse.');
+      return;
+    }
+    if (!messageRecu.trim()) {
+      setReplyError('Veuillez coller le message reçu avant de lancer la génération.');
+      return;
+    }
+    if (messageRecu.length > MAX_INPUT_LENGTH) {
+      setReplyError(
+        `Le message reçu est trop long (${messageRecu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
       return;
     }
 
@@ -209,7 +265,7 @@ export function CommunicationPage() {
 
     try {
       // ✅ AJOUT: Récupération de la signature sélectionnée
-      const selectedSignature = selectedSignatureIncoming 
+      const selectedSignature = selectedSignatureIncoming
         ? signatures.find(s => s.id === selectedSignatureIncoming)
         : null;
 
@@ -223,44 +279,23 @@ export function CommunicationPage() {
 
       setGeneratedReply(reply);
       logGeneration('communication');
-      
-      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('tokens')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profile) {
-          const usedTokens = 1; // Ou calculé selon la logique métier
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
-            })
-            .eq('user_id', user.id);
-
-          if (!updateError) {
-            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
-          }
-        }
-      }
+      setLiveMessage('Réponse générée. Le résultat est affiché sous le formulaire.');
+      scrollToResult(replyResultRef);
     } catch (err: any) {
-      setReplyError('Erreur lors de la génération de la réponse.');
+      setReplyError(toUserErrorMessage(err, 'Erreur lors de la génération de la réponse. Veuillez réessayer.'));
       console.error(err);
     } finally {
       setLoadingReply(false);
     }
   };
 
-  const handleCopySuccess = (message: string) => {
+  const handleCopySuccess = () => {
     // Success feedback moderne
     const successDiv = document.createElement('div');
     successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
     successDiv.innerHTML = '✅ Message copié !';
     document.body.appendChild(successDiv);
-    
+
     setTimeout(() => {
       successDiv.style.transform = 'translateX(100%)';
       successDiv.style.opacity = '0';
@@ -270,11 +305,15 @@ export function CommunicationPage() {
 
   const handleCopy = async (text: string) => {
     await copyToClipboard(text);
-    handleCopySuccess(text);
+    setLiveMessage('Message copié dans le presse-papiers.');
+    handleCopySuccess();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      {/* ✅ AJOUT: Région aria-live pour annoncer les résultats aux lecteurs d'écran */}
+      <div className="sr-only" role="status" aria-live="polite">{liveMessage}</div>
+
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Header moderne */}
@@ -367,7 +406,9 @@ export function CommunicationPage() {
                     options={[
                       { value: 'Détendu', label: 'Détendu' },
                       { value: 'Neutre', label: 'Neutre' },
-                      { value: 'Stricte', label: 'Stricte' }
+                      // La valeur « Stricte » est conservée : les Edge Functions font un
+                      // switch sur cette chaîne exacte. Seul le libellé affiché est corrigé.
+                      { value: 'Stricte', label: 'Strict' }
                     ]}
                   />
                 </div>
@@ -431,7 +472,7 @@ export function CommunicationPage() {
                   onChange={(e) => setSelectedSignatureOutgoing(e.target.value)}
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   options={[
-                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    { value: '', label: 'Aucune signature' },
                     ...signatures.map(signature => ({
                       value: signature.id,
                       label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
@@ -472,7 +513,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={loading || tokenCount === 0}
+                disabled={loading || tokenCount <= 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -482,7 +523,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? (
+                  ) : tokenCount <= 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -500,7 +541,11 @@ export function CommunicationPage() {
 
           {/* Résultat de la communication générée */}
           {generatedContent && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div
+              ref={createResultRef}
+              tabIndex={-1}
+              className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 focus:outline-none"
+            >
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -596,7 +641,7 @@ export function CommunicationPage() {
                   onChange={(e) => setSelectedSignatureIncoming(e.target.value)}
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   options={[
-                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    { value: '', label: 'Aucune signature' },
                     ...signatures.map(signature => ({
                       value: signature.id,
                       label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
@@ -643,7 +688,8 @@ export function CommunicationPage() {
                     options={[
                       { value: 'Détendu', label: 'Détendu' },
                       { value: 'Neutre', label: 'Neutre' },
-                      { value: 'Stricte', label: 'Stricte' }
+                      // Valeur « Stricte » conservée (switch côté Edge Function), libellé corrigé
+                      { value: 'Stricte', label: 'Strict' }
                     ]}
                   />
                 </div>
@@ -671,7 +717,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerateReply}
-                disabled={loadingReply || tokenCount === 0}
+                disabled={loadingReply || tokenCount <= 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -681,7 +727,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? (
+                  ) : tokenCount <= 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -699,7 +745,11 @@ export function CommunicationPage() {
 
           {/* Résultat de la réponse générée */}
           {generatedReply && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div
+              ref={replyResultRef}
+              tabIndex={-1}
+              className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 focus:outline-none"
+            >
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">

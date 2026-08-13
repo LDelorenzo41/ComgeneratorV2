@@ -188,9 +188,9 @@ const communicationHandler = async (req: Request): Promise<Response> => {
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
+    return new Response(JSON.stringify({ error: 'Méthode non autorisée' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 
@@ -240,14 +240,25 @@ const communicationHandler = async (req: Request): Promise<Response> => {
     const MISTRAL_API_KEY = Deno.env.get("MISTRAL_API_KEY");
 
     if (!OPENAI_API_KEY) {
-      return new Response('Missing OPENAI_API_KEY', { 
-        status: 500, 
-        headers: corsHeaders 
+      return new Response(JSON.stringify({ error: 'Configuration serveur incomplète' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const body: CommunicationParams = await req.json();
     const { destinataire, ton, contenu, signature, aiModel } = body;
+
+    // Validation minimale des entrées (évite un appel IA inutile et un crash
+    // sur destinataire.toLowerCase() si le champ est absent)
+    if (!destinataire || typeof destinataire !== 'string' || !contenu || !contenu.trim()) {
+      return new Response(JSON.stringify({
+        error: 'Paramètres manquants : destinataire et contenu sont requis.'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Résoudre la configuration API
     let aiConfig;
@@ -367,9 +378,11 @@ Rédige maintenant le bilan complet en respectant SCRUPULEUSEMENT cette structur
         });
       } catch (error) {
         console.error('[communication] Commission API error:', error);
-        return new Response('API Error', { 
-          status: 500, 
-          headers: corsHeaders 
+        return new Response(JSON.stringify({
+          error: 'Erreur lors de la génération du bilan. Veuillez réessayer.'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }
@@ -449,17 +462,21 @@ Rédige maintenant cette communication en respectant scrupuleusement ces instruc
       });
     } catch (error) {
       console.error('[communication] Standard API error:', error);
-      return new Response('API Error', { 
-        status: 500, 
-        headers: corsHeaders 
+      return new Response(JSON.stringify({
+        error: 'Erreur lors de la génération de la communication. Veuillez réessayer.'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
   } catch (error) {
     console.error('[communication] Error:', error);
-    return new Response('Internal server error', { 
-      status: 500, 
-      headers: corsHeaders 
+    return new Response(JSON.stringify({
+      error: 'Une erreur est survenue. Veuillez réessayer.'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 };
