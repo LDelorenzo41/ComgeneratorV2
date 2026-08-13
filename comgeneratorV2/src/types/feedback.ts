@@ -12,6 +12,9 @@ export interface FeedbackSession {
   raison_achat: string | null;
   completed: boolean;
   created_at?: string;
+  // Lien avec le compte connecté (null pour une soumission anonyme) —
+  // utilisé par la RPC claim_feedback_reward pour verser la récompense
+  user_id?: string | null;
 }
 
 export interface FeedbackRating {
