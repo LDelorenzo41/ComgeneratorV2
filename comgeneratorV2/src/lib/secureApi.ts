@@ -163,10 +163,13 @@ class SecureApiService {
   }
 
   // Génération de communications
+  // remainingTokens : présent quand l'Edge Function a débité les crédits
+  // côté serveur (lot 1) ; absent avec une Edge Function non redéployée
   async generateCommunication(params: CommunicationParams) {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('communication', params);
   }
 
@@ -175,6 +178,7 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('reply', params);
   }
 
