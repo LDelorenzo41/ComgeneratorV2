@@ -158,11 +158,12 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
    - "premiere" si l'enseignant décrit ce qu'il a lui-même vu ou vécu (« j'ai constaté… »).
    - "troisieme" sinon. Pour tout autre destinataire, mets null.
 
-4. "contenu" — le brouillon réorganisé en brief clair (une liste de tirets) :
+4. "contenu" — une CHAÎNE DE CARACTÈRES unique (jamais un tableau) : le brouillon réorganisé en brief clair, sous forme de tirets séparés par des retours à la ligne (\n) À L'INTÉRIEUR de la chaîne :
    - CONSERVE TOUS les faits : noms, prénoms, classes, dates, heures, événements, demandes (rendez-vous, créneaux…).
    - N'invente RIEN, n'ajoute aucune formule de politesse.
    - Supprime seulement les hésitations, répétitions et digressions.
    - Ce n'est PAS le message final : c'est la liste des éléments que le message devra transmettre.
+   - Exemple de format attendu : "- Lucas Martin, 4e B\n- Troisième retard cette semaine\n- Proposer un rendez-vous jeudi ou vendredi"
 
 5. "manques" — un tableau de 0 à 4 courtes phrases signalant les informations CONCRÈTEMENT UTILES au message mais absentes du brouillon. Exemples :
    - un rendez-vous est proposé sans jour ni créneau précis ;
@@ -190,7 +191,22 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
       }
 
       const parsed = parseAIJson(content);
-      const contenu = parsed && typeof parsed.contenu === 'string' ? parsed.contenu.trim() : '';
+
+      // contenu : chaîne attendue, tableau de lignes toléré — en mode JSON,
+      // les modèles transforment volontiers « liste de tirets » en tableau,
+      // ce qui est une réponse exploitable, pas un échec
+      let contenu = '';
+      if (parsed && typeof parsed.contenu === 'string') {
+        contenu = parsed.contenu.trim();
+      } else if (parsed && Array.isArray(parsed.contenu)) {
+        contenu = (parsed.contenu as unknown[])
+          .filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
+          .map((line) => {
+            const t = line.trim();
+            return t.startsWith('-') || t.startsWith('•') ? t : `- ${t}`;
+          })
+          .join('\n');
+      }
 
       if (!parsed || !contenu) {
         // Le début de la réponse brute est journalisé pour diagnostic
@@ -214,13 +230,17 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
         : null;
 
       // Manques signalés : liste courte de chaînes, bornée (défense en
-      // profondeur contre une réponse IA mal formée)
-      const manques = Array.isArray(parsed.manques)
-        ? (parsed.manques as unknown[])
-            .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
-            .slice(0, 4)
-            .map((m) => m.trim().slice(0, 200))
-        : [];
+      // profondeur contre une réponse IA mal formée) ; une chaîne isolée
+      // est tolérée et enveloppée en tableau
+      const rawManques = Array.isArray(parsed.manques)
+        ? parsed.manques as unknown[]
+        : typeof parsed.manques === 'string' && parsed.manques.trim()
+          ? [parsed.manques]
+          : [];
+      const manques = rawManques
+        .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+        .slice(0, 4)
+        .map((m) => m.trim().slice(0, 200));
 
       // Débit du coût réel (aucun débit si l'analyse a échoué plus haut)
       const cost = computeTokenCost(usage, prompt, content);
