@@ -31,6 +31,7 @@ import {
   Wand2,
   Undo2,
   Loader2,
+  AlertTriangle,
   X
 } from 'lucide-react';
 
@@ -92,6 +93,8 @@ export function CommunicationPage() {
   // ✅ LOT 3 v0.2: Analyse de brouillon (pré-remplissage du formulaire)
   const [analyzingBrief, setAnalyzingBrief] = React.useState(false);
   const [briefBackup, setBriefBackup] = React.useState<string | null>(null);
+  // Informations manquantes signalées par l'analyse (créneau, prénom…)
+  const [briefManques, setBriefManques] = React.useState<string[]>([]);
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -172,6 +175,7 @@ export function CommunicationPage() {
     setSelectedSignatureOutgoing(signatures.find(s => s.is_default)?.id ?? '');
     setPointDeVue('troisieme');
     setBriefBackup(null);
+    setBriefManques([]);
   };
 
   // ✅ LOT 3 v0.2: Analyse du brouillon → pré-remplissage du formulaire.
@@ -209,7 +213,12 @@ export function CommunicationPage() {
         setPointDeVue(analysis.pointDeVue);
       }
       setContenu(analysis.contenu);
-      setLiveMessage('Formulaire pré-rempli depuis votre brouillon. Vérifiez les champs avant de générer.');
+      setBriefManques(analysis.manques);
+      setLiveMessage(
+        analysis.manques.length > 0
+          ? 'Formulaire pré-rempli. Des informations à préciser ont été signalées sous le champ.'
+          : 'Formulaire pré-rempli depuis votre brouillon. Vérifiez les champs avant de générer.'
+      );
     } catch (err) {
       setError(toUserErrorMessage(err, 'Erreur lors de l\'analyse du brouillon. Veuillez réessayer.'));
     } finally {
@@ -567,6 +576,7 @@ export function CommunicationPage() {
                   <DictationRecorder
                     disabled={loading || analyzingBrief}
                     buttonLabel="Dicter et pré-remplir le formulaire"
+                    buttonTitle="Dictez au micro : le formulaire est ensuite analysé et pré-rempli automatiquement (100 crédits par minute entamée + coût de l'analyse)"
                     processingLabel="Transcription et analyse en cours…"
                     onTranscript={async (text) => {
                       setAnalyzingBrief(true);
@@ -579,10 +589,16 @@ export function CommunicationPage() {
                           setPointDeVue(analysis.pointDeVue);
                         }
                         setContenu(analysis.contenu);
-                        setLiveMessage('Formulaire pré-rempli depuis votre dictée. Vérifiez les champs avant de générer.');
+                        setBriefManques(analysis.manques);
+                        setLiveMessage(
+                          analysis.manques.length > 0
+                            ? 'Formulaire pré-rempli depuis votre dictée. Des informations à préciser ont été signalées sous le champ.'
+                            : 'Formulaire pré-rempli depuis votre dictée. Vérifiez les champs avant de générer.'
+                        );
                       } catch {
                         // L'analyse a échoué : on conserve la dictée brute dans le champ
                         setContenu(prev => (prev.trim() ? `${prev}\n\n${text}` : text));
+                        setBriefManques([]);
                         setError('L\'analyse du brouillon a échoué — votre dictée a été déposée dans le champ. Vous pouvez la modifier puis cliquer « Analyser et pré-remplir le formulaire ».');
                         setLiveMessage('Dictée déposée dans le champ, analyse à relancer.');
                       } finally {
@@ -636,6 +652,38 @@ export function CommunicationPage() {
                         </>
                       )}
                     </button>
+                  </div>
+                )}
+
+                {/* ✅ Informations manquantes signalées par l'analyse */}
+                {briefManques.length > 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            À préciser avant de générer :
+                          </p>
+                          <ul className="mt-1 space-y-0.5 text-sm text-amber-700 dark:text-amber-300/90 list-disc list-inside">
+                            {briefManques.map((manque, index) => (
+                              <li key={index}>{manque}</li>
+                            ))}
+                          </ul>
+                          <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400/80">
+                            Complétez le champ ci-dessus si besoin — la génération fonctionnera aussi sans.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBriefManques([])}
+                        aria-label="Masquer ces suggestions"
+                        className="text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -834,6 +882,16 @@ export function CommunicationPage() {
                     <FileText className="w-4 h-4 inline mr-2" />
                     Objectifs de la réponse
                   </label>
+                  {/* ✅ Dictée simple des objectifs (pas d'analyse : champ court) */}
+                  {FEATURES.DICTATION_ENABLED && (
+                    <DictationRecorder
+                      disabled={loadingReply}
+                      buttonLabel="Dicter mes objectifs"
+                      onTranscript={(text) =>
+                        setObjectifsReponse(prev => (prev.trim() ? `${prev}\n${text}` : text))
+                      }
+                    />
+                  )}
                   <Textarea
                     rows={3}
                     placeholder="Quels éléments doit contenir la réponse ?"

@@ -11,6 +11,8 @@ export interface BriefAnalysis {
   ton: string;
   pointDeVue: 'premiere' | 'troisieme' | null;
   contenu: string;
+  /** Informations utiles absentes du brouillon (0 à 4 suggestions) */
+  manques: string[];
 }
 
 export async function analyzeCommunicationBrief(brouillon: string): Promise<BriefAnalysis> {
@@ -26,5 +28,6 @@ export async function analyzeCommunicationBrief(brouillon: string): Promise<Brie
     ton: result.ton,
     pointDeVue: result.pointDeVue ?? null,
     contenu: result.contenu,
+    manques: Array.isArray(result.manques) ? result.manques : [],
   };
 }

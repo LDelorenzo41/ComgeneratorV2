@@ -35,6 +35,54 @@ const RATE_LIMIT_PER_MINUTE = 10;
 const MISTRAL_TRANSCRIPTION_URL = 'https://api.mistral.ai/v1/audio/transcriptions';
 const MISTRAL_MODEL = 'voxtral-mini-latest';
 
+// Lexique Éducation nationale « soufflé » au modèle de transcription
+// (context_bias Voxtral, 100 termes max) : sigles et vocabulaire que les
+// claviers transcrivent mal. Complété par les matières de l'utilisateur.
+const EDUCATION_LEXICON = [
+  'PPRE', 'PAI', 'PAP', 'AESH', 'AED', 'ULIS', 'SEGPA', 'CPE', 'EDT',
+  'ENT', 'LSU', 'DNB', 'EPS', 'SVT', 'EMC', 'Pronote', 'ÉduConnect',
+  'vie scolaire', 'conseil de classe', 'conseil de discipline',
+  'commission éducative', 'carnet de correspondance', 'salle de permanence',
+  'professeur principal', 'professeure principale', 'chef d\'établissement',
+  'principal adjoint', 'principale adjointe', 'brevet blanc', 'oral blanc',
+  'retenue', 'exclusion de cours', 'rapport d\'incident', 'bulletin scolaire',
+  'rendez-vous', 'sixième', 'cinquième', 'quatrième', 'troisième',
+  'seconde', 'première', 'terminale', '6e', '5e', '4e', '3e'
+];
+
+/**
+ * Construit la liste de termes pour context_bias : lexique fixe + matières
+ * de l'utilisateur (table subjects). Best-effort : retourne le lexique seul
+ * en cas d'indisponibilité.
+ */
+async function buildContextBias(userId: string): Promise<string> {
+  const terms = new Set<string>(EDUCATION_LEXICON);
+
+  try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (url && key) {
+      const res = await fetch(
+        `${url}/rest/v1/subjects?user_id=eq.${userId}&select=name`,
+        { headers: { 'apikey': key, 'Authorization': `Bearer ${key}` } }
+      );
+      if (res.ok) {
+        const rows = await res.json();
+        for (const row of Array.isArray(rows) ? rows : []) {
+          if (typeof row?.name === 'string' && row.name.trim()) {
+            // Les virgules servent de séparateur dans context_bias
+            terms.add(row.name.trim().replace(/,/g, ' '));
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[transcribe] buildContextBias: matières indisponibles', error);
+  }
+
+  return [...terms].slice(0, 100).join(',');
+}
+
 const transcribeHandler = async (req: Request): Promise<Response> => {
   const corsHeaders = buildCorsHeaders(req);
 
@@ -111,17 +159,35 @@ const transcribeHandler = async (req: Request): Promise<Response> => {
     const rawLanguage = String(formData.get('language') ?? 'fr');
     const language = /^[a-z]{2}$/.test(rawLanguage) ? rawLanguage : 'fr';
 
-    // Relais vers Mistral
-    const mistralForm = new FormData();
-    mistralForm.append('file', file, file.name || 'dictee.webm');
-    mistralForm.append('model', MISTRAL_MODEL);
-    mistralForm.append('language', language);
+    // Relais vers Mistral, avec le lexique métier (context_bias).
+    // Si l'API refuse la requête avec le lexique (paramètre non reconnu,
+    // format…), on retente une fois SANS lexique avant d'abandonner :
+    // la transcription ne doit jamais échouer à cause d'une option de confort.
+    const buildForm = (withBias: string | null): FormData => {
+      const f = new FormData();
+      f.append('file', file, file.name || 'dictee.webm');
+      f.append('model', MISTRAL_MODEL);
+      f.append('language', language);
+      if (withBias) f.append('context_bias', withBias);
+      return f;
+    };
 
-    const mistralResponse = await fetch(MISTRAL_TRANSCRIPTION_URL, {
+    const contextBias = await buildContextBias(user.id);
+
+    let mistralResponse = await fetch(MISTRAL_TRANSCRIPTION_URL, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${MISTRAL_API_KEY}` },
-      body: mistralForm,
+      body: buildForm(contextBias),
     });
+
+    if (!mistralResponse.ok && (mistralResponse.status === 400 || mistralResponse.status === 422)) {
+      console.warn(`[transcribe] ${mistralResponse.status} avec context_bias, nouvel essai sans lexique`);
+      mistralResponse = await fetch(MISTRAL_TRANSCRIPTION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${MISTRAL_API_KEY}` },
+        body: buildForm(null),
+      });
+    }
 
     if (!mistralResponse.ok) {
       const errorText = await mistralResponse.text();

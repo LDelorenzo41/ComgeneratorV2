@@ -129,13 +129,14 @@ const briefHandler = async (req: Request): Promise<Response> => {
 ${brouillon}
 """
 
-Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte avant ou après, avec EXACTEMENT ces quatre clés :
+Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte avant ou après, avec EXACTEMENT ces cinq clés :
 
 {
   "destinataire": "...",
   "ton": "...",
   "pointDeVue": "...",
-  "contenu": "..."
+  "contenu": "...",
+  "manques": ["..."]
 }
 
 **RÈGLES :**
@@ -161,7 +162,14 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
    - CONSERVE TOUS les faits : noms, prénoms, classes, dates, heures, événements, demandes (rendez-vous, créneaux…).
    - N'invente RIEN, n'ajoute aucune formule de politesse.
    - Supprime seulement les hésitations, répétitions et digressions.
-   - Ce n'est PAS le message final : c'est la liste des éléments que le message devra transmettre.`;
+   - Ce n'est PAS le message final : c'est la liste des éléments que le message devra transmettre.
+
+5. "manques" — un tableau de 0 à 4 courtes phrases signalant les informations CONCRÈTEMENT UTILES au message mais absentes du brouillon. Exemples :
+   - un rendez-vous est proposé sans jour ni créneau précis ;
+   - un élève est évoqué sans prénom ni classe ;
+   - un incident est mentionné sans date ni lieu ;
+   - une demande est faite sans échéance.
+   Règles : chaque entrée est une phrase courte et actionnable (ex. "Le créneau du rendez-vous n'est pas précisé"). Ne signale que les manques réellement gênants pour rédiger le message — si le brouillon est complet, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
 
     const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 2500 : 1500;
 
@@ -196,17 +204,27 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
         ? parsed.pointDeVue
         : null;
 
+      // Manques signalés : liste courte de chaînes, bornée (défense en
+      // profondeur contre une réponse IA mal formée)
+      const manques = Array.isArray(parsed.manques)
+        ? (parsed.manques as unknown[])
+            .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+            .slice(0, 4)
+            .map((m) => m.trim().slice(0, 200))
+        : [];
+
       // Débit du coût réel (aucun débit si l'analyse a échoué plus haut)
       const cost = computeTokenCost(usage, prompt, content);
       const remainingTokens = await consumeCredits(user.id, cost, 'communication_brief', aiConfig.model);
 
-      console.log(`[communication-brief] Analyse OK (${contenu.length} caractères, ${cost} crédits)`);
+      console.log(`[communication-brief] Analyse OK (${contenu.length} caractères, ${manques.length} manque(s), ${cost} crédits)`);
 
       return jsonResponse(corsHeaders, 200, {
         destinataire,
         ton,
         pointDeVue,
         contenu,
+        manques,
         usage,
         ...(typeof remainingTokens === 'number' && { remainingTokens })
       });

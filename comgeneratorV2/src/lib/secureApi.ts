@@ -193,6 +193,7 @@ class SecureApiService {
       ton: string;
       pointDeVue: 'premiere' | 'troisieme' | null;
       contenu: string;
+      manques?: string[];
       usage: any;
       remainingTokens?: number;
     }>('communication-brief', params);

@@ -29,6 +29,8 @@ interface DictationRecorderProps {
   disabled?: boolean;
   /** Libellé du bouton déclencheur (défaut : « Dicter ») */
   buttonLabel?: string;
+  /** Infobulle du bouton déclencheur */
+  buttonTitle?: string;
   /** Libellé de la phase de traitement (défaut : « Transcription en cours… ») */
   processingLabel?: string;
 }
@@ -54,6 +56,7 @@ export function DictationRecorder({
   onTranscript,
   disabled,
   buttonLabel = 'Dicter',
+  buttonTitle = 'Dictez au micro : le texte transcrit est inséré dans le champ (100 crédits par minute entamée)',
   processingLabel = 'Transcription en cours…',
 }: DictationRecorderProps) {
   const [phase, setPhase] = React.useState<Phase>('idle');
@@ -219,16 +222,20 @@ export function DictationRecorder({
 
       {/* Déclencheur */}
       {phase === 'idle' && (
-        <button
-          type="button"
-          onClick={handleMicClick}
-          disabled={disabled}
-          title="Dictez au micro : le formulaire est ensuite analysé et pré-rempli automatiquement (100 crédits par minute entamée + coût de l'analyse)"
-          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Mic className="w-4 h-4" />
-          {buttonLabel}
-        </button>
+        <div className="inline-flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleMicClick}
+            disabled={disabled}
+            title={buttonTitle}
+            className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Mic className="w-4 h-4" />
+            {buttonLabel}
+          </button>
+          {/* Transparence : la transcription vocale passe par Mistral AI (UE) */}
+          <span className="text-xs text-gray-400 dark:text-gray-500">via Mistral AI 🇫🇷</span>
+        </div>
       )}
 
       {/* Encart d'information au premier usage */}
