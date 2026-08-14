@@ -1,35 +1,57 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom'; // ✅ AJOUT
 import { Select } from '../components/ui/Select';
-import { Button } from '../components/ui/Button';
 import Textarea from '../components/ui/Textarea';
 import { SignatureManager } from '../components/SignatureManager';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import copyToClipboard from '../lib/copyToClipboard';
 import { generateCommunication } from '../lib/generateCommunication';
-import { tokenUpdateEvent, TOKEN_UPDATED } from '../components/layout/Header';
 import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
+import { DictationRecorder } from '../components/communication/DictationRecorder';
+import { analyzeCommunicationBrief, analyzeReplyBrief, type BriefAnalysis } from '../lib/analyzeBrief';
+import { exportDocumentToPdf } from '../lib/documentPdfExport';
+import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
+import { FEATURES } from '../lib/features';
 
 import { logGeneration } from '../lib/usageStats';
-import { 
-  MessageSquare, 
-  Send, 
-  Reply, 
-  Copy, 
-  Sparkles, 
-  Users, 
-  Volume2, 
-  FileText, 
-  RefreshCw, 
+import {
+  MessageSquare,
+  Send,
+  Reply,
+  Copy,
+  Sparkles,
+  Users,
+  Volume2,
+  FileText,
+  RefreshCw,
   CheckCircle,
   CreditCard,
-  AlertCircle,
   PenTool,
+  Wand2,
+  Undo2,
+  Loader2,
+  AlertTriangle,
+  ClipboardList,
+  Eye,
+  Download,
   X
 } from 'lucide-react';
+
+// Type de production de la section « créer » : un message adressé, ou un
+// document administratif (sans destinataire ni ton)
+type DocType = 'message' | 'incident' | 'commission';
+
+// Valeurs historiques attendues par l'Edge Function communication
+const DOC_TYPE_TO_DESTINATAIRE: Record<Exclude<DocType, 'message'>, string> = {
+  incident: "Rapport d'incident",
+  commission: 'Commission disciplinaire'
+};
+
+// Longueur maximale des saisies envoyées à l'IA (protection coûts / erreurs de copier-coller)
+const MAX_INPUT_LENGTH = 10000;
 
 // ✅ AJOUT: Interface pour les signatures
 interface Signature {
@@ -51,6 +73,13 @@ export function CommunicationPage() {
   const createSectionRef = React.useRef<HTMLDivElement>(null);
   const replySectionRef = React.useRef<HTMLDivElement>(null);
 
+  // ✅ AJOUT : Refs vers les blocs de résultat (scroll + focus après génération)
+  const createResultRef = React.useRef<HTMLDivElement>(null);
+  const replyResultRef = React.useRef<HTMLDivElement>(null);
+
+  // ✅ AJOUT : Message pour la région aria-live (lecteurs d'écran)
+  const [liveMessage, setLiveMessage] = React.useState('');
+
   // ✅ AJOUT : Effet pour scroller vers la bonne section selon le mode
   React.useEffect(() => {
     const mode = searchParams.get('mode');
@@ -66,15 +95,31 @@ export function CommunicationPage() {
   }, [searchParams]);
 
   // Fonction 1
+  const [docType, setDocType] = React.useState<DocType>('message');
   const [destinataire, setDestinataire] = React.useState("Parents d'élèves");
   const [ton, setTon] = React.useState('Détendu');
   const [contenu, setContenu] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [generatedContent, setGeneratedContent] = React.useState('');
+  // Type de production du résultat affiché (fige le mode d'affichage même si
+  // l'utilisateur change le sélecteur après génération)
+  const [generatedDocType, setGeneratedDocType] = React.useState<DocType>('message');
+  const [resultView, setResultView] = React.useState<'preview' | 'edit'>('edit');
   const [error, setError] = React.useState<string | null>(null);
   
   // ✅ NOUVEAU: État pour le point de vue (rapport d'incident)
   const [pointDeVue, setPointDeVue] = React.useState<'troisieme' | 'premiere'>('troisieme');
+
+  // ✅ LOT 3 v0.2: Analyse de brouillon (pré-remplissage du formulaire)
+  const [analyzingBrief, setAnalyzingBrief] = React.useState(false);
+  const [briefBackup, setBriefBackup] = React.useState<string | null>(null);
+  // Informations manquantes signalées par l'analyse (créneau, prénom…)
+  const [briefManques, setBriefManques] = React.useState<string[]>([]);
+
+  // ✅ Analyse des objectifs de réponse (croisée avec le message reçu)
+  const [analyzingReply, setAnalyzingReply] = React.useState(false);
+  const [replyObjBackup, setReplyObjBackup] = React.useState<string | null>(null);
+  const [replyManques, setReplyManques] = React.useState<string[]>([]);
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -98,6 +143,9 @@ export function CommunicationPage() {
     setTokenCount(tokenBalance ?? 0);
   }, [tokenBalance]);
 
+  // ✅ AJOUT: Présélection de la signature par défaut (une seule fois, au premier chargement)
+  const signaturesInitialized = React.useRef(false);
+
   // ✅ AJOUT: Récupération des signatures de l'utilisateur
   const fetchSignatures = React.useCallback(async () => {
     if (!user) return;
@@ -111,7 +159,27 @@ export function CommunicationPage() {
         .order('name');
 
       if (error) throw error;
-      setSignatures(data || []);
+      const list = data || [];
+      setSignatures(list);
+
+      const defaultId = list.find(s => s.is_default)?.id ?? '';
+      if (!signaturesInitialized.current) {
+        // Premier chargement : on présélectionne la signature par défaut
+        signaturesInitialized.current = true;
+        if (defaultId) {
+          setSelectedSignatureOutgoing(defaultId);
+          setSelectedSignatureIncoming(defaultId);
+        }
+      } else {
+        // Rechargements suivants (après édition dans la modale) : on ne touche à la
+        // sélection que si elle pointe vers une signature supprimée
+        setSelectedSignatureOutgoing(prev =>
+          prev && !list.some(s => s.id === prev) ? defaultId : prev
+        );
+        setSelectedSignatureIncoming(prev =>
+          prev && !list.some(s => s.id === prev) ? defaultId : prev
+        );
+      }
     } catch (error) {
       console.error('Erreur lors de la récupération des signatures:', error);
     }
@@ -123,19 +191,191 @@ export function CommunicationPage() {
 
   // ✅ NOUVEAU: Fonction de réinitialisation complète
   const handleResetCommunication = () => {
+    setDocType('message');
     setDestinataire("Parents d'élèves");
     setTon('Détendu');
     setContenu('');
     setGeneratedContent('');
+    setGeneratedDocType('message');
+    setResultView('edit');
     setError(null);
-    setSelectedSignatureOutgoing('');
+    // La signature par défaut est restaurée (cohérent avec la présélection initiale)
+    setSelectedSignatureOutgoing(signatures.find(s => s.is_default)?.id ?? '');
     setPointDeVue('troisieme');
+    setBriefBackup(null);
+    setBriefManques([]);
+  };
+
+  // ✅ LOT 3 v0.2: Analyse du brouillon → pré-remplissage du formulaire.
+  // Le texte du champ (tapé, collé ou dicté) est restructuré en brief, et
+  // destinataire / ton / point de vue sont déduits. Chaque champ reste
+  // modifiable, et le brouillon d'origine est restaurable.
+  const handleAnalyzeBrief = async () => {
+    if (analyzingBrief || loading) return;
+    if (tokenCount <= 0) {
+      setError('Crédits insuffisants pour analyser le brouillon.');
+      return;
+    }
+    if (!contenu.trim()) {
+      setError('Écrivez ou dictez d\'abord votre brouillon dans le champ « Contenu à communiquer ».');
+      return;
+    }
+    if (contenu.length > MAX_INPUT_LENGTH) {
+      setError(
+        `Le brouillon est trop long (${contenu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
+      return;
+    }
+
+    setAnalyzingBrief(true);
+    setError(null);
+    const draft = contenu;
+
+    try {
+      const analysis = await analyzeCommunicationBrief(draft);
+      setBriefBackup(draft);
+      applyBriefAnalysis(analysis);
+      setLiveMessage(
+        analysis.manques.length > 0
+          ? 'Formulaire pré-rempli. Des informations à préciser ont été signalées sous le champ.'
+          : 'Formulaire pré-rempli depuis votre brouillon. Vérifiez les champs avant de générer.'
+      );
+    } catch (err) {
+      setError(toUserErrorMessage(err, 'Erreur lors de l\'analyse du brouillon. Veuillez réessayer.'));
+    } finally {
+      setAnalyzingBrief(false);
+    }
+  };
+
+  // ✅ Applique une analyse de brouillon au formulaire, y compris le type de
+  // production : un brief d'incident ou de commission bascule automatiquement
+  // le sélecteur « Que voulez-vous produire ? »
+  const applyBriefAnalysis = (analysis: BriefAnalysis) => {
+    if (analysis.destinataire === "Rapport d'incident") {
+      setDocType('incident');
+      if (analysis.pointDeVue) setPointDeVue(analysis.pointDeVue);
+    } else if (analysis.destinataire === 'Commission disciplinaire') {
+      setDocType('commission');
+    } else {
+      setDocType('message');
+      setDestinataire(analysis.destinataire);
+      setTon(analysis.ton);
+    }
+    setContenu(analysis.contenu);
+    setBriefManques(analysis.manques);
+  };
+
+  // Restaure le brouillon d'origine après une analyse
+  const handleRestoreDraft = () => {
+    if (briefBackup !== null) {
+      setContenu(briefBackup);
+      setBriefBackup(null);
+      setLiveMessage('Brouillon d\'origine rétabli.');
+    }
+  };
+
+  // ✅ Export PDF des documents structurés (rapport, bilan de commission)
+  const handleExportPdf = () => {
+    if (!generatedContent || generatedDocType === 'message') return;
+    const title = generatedDocType === 'incident'
+      ? "Rapport d'incident"
+      : 'Bilan pour commission disciplinaire';
+    const filenameBase = generatedDocType === 'incident' ? 'rapport-incident' : 'bilan-commission';
+    exportDocumentToPdf(title, generatedContent, filenameBase);
+    setLiveMessage('PDF téléchargé.');
+  };
+
+  // ✅ Analyse des objectifs de réponse, croisée avec le message reçu :
+  // ton suggéré, objectifs restructurés, et points du message sans réponse
+  const handleAnalyzeReply = async (objectifsSource?: string) => {
+    const objectifs = objectifsSource ?? objectifsReponse;
+    if (analyzingReply || loadingReply) return;
+    if (tokenCount <= 0) {
+      setReplyError('Crédits insuffisants pour analyser les objectifs.');
+      return;
+    }
+    if (!messageRecu.trim()) {
+      setReplyError('Collez d\'abord le message reçu : l\'analyse compare vos objectifs avec ce qu\'il demande.');
+      return;
+    }
+    if (!objectifs.trim()) {
+      setReplyError('Écrivez ou dictez d\'abord vos objectifs de réponse.');
+      return;
+    }
+    if (objectifs.length > MAX_INPUT_LENGTH || messageRecu.length > MAX_INPUT_LENGTH) {
+      setReplyError(`Texte trop long (maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')} caractères par champ).`);
+      return;
+    }
+
+    setAnalyzingReply(true);
+    setReplyError(null);
+
+    try {
+      const analysis = await analyzeReplyBrief(messageRecu, objectifs);
+      setReplyObjBackup(objectifs);
+      setTonReponse(analysis.ton);
+      setObjectifsReponse(analysis.contenu);
+      setReplyManques(analysis.manques);
+      setLiveMessage(
+        analysis.manques.length > 0
+          ? 'Objectifs pré-remplis. Des points du message sans réponse ont été signalés.'
+          : 'Objectifs pré-remplis. Vérifiez avant de générer.'
+      );
+    } catch (err) {
+      setReplyError(toUserErrorMessage(err, 'Erreur lors de l\'analyse des objectifs. Veuillez réessayer.'));
+    } finally {
+      setAnalyzingReply(false);
+    }
+  };
+
+  // Restaure les objectifs d'origine après une analyse
+  const handleRestoreReplyDraft = () => {
+    if (replyObjBackup !== null) {
+      setObjectifsReponse(replyObjBackup);
+      setReplyObjBackup(null);
+      setLiveMessage('Objectifs d\'origine rétablis.');
+    }
+  };
+
+  // ✅ AJOUT: Scroll + focus vers un bloc de résultat après génération
+  const scrollToResult = (ref: React.RefObject<HTMLDivElement>) => {
+    setTimeout(() => {
+      if (ref.current) {
+        ref.current.focus({ preventScroll: true });
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
+  // ✅ AJOUT: Message d'erreur lisible à partir d'une exception
+  const toUserErrorMessage = (err: unknown, fallback: string): string => {
+    if (err instanceof TypeError) {
+      // fetch qui échoue (réseau coupé, serveur injoignable)
+      return 'Problème de connexion. Vérifiez votre réseau et réessayez.';
+    }
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+    return fallback;
   };
 
   // ✅ MODIFICATION: Fonction handleGenerate avec signature et point de vue
+  // Le décompte des crédits est effectué dans generateCommunication (un seul débit)
   const handleGenerate = async () => {
-    if (tokenCount === 0) {
+    if (tokenCount <= 0) {
       setError('Crédits insuffisants pour générer une communication.');
+      return;
+    }
+    if (!contenu.trim()) {
+      setError('Veuillez décrire le contenu à communiquer avant de lancer la génération.');
+      return;
+    }
+    if (contenu.length > MAX_INPUT_LENGTH) {
+      setError(
+        `Le contenu est trop long (${contenu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
       return;
     }
 
@@ -145,51 +385,43 @@ export function CommunicationPage() {
 
     try {
       // ✅ AJOUT: Récupération de la signature sélectionnée
-      const selectedSignature = selectedSignatureOutgoing 
+      const selectedSignature = selectedSignatureOutgoing
         ? signatures.find(s => s.id === selectedSignatureOutgoing)
         : null;
 
+      // ✅ Le type de production pilote les paramètres : les documents
+      // (rapport, commission) partent avec leur valeur historique de
+      // « destinataire » et un ton neutre (leur registre est imposé serveur)
+      const effectiveDestinataire = docType === 'message'
+        ? destinataire
+        : DOC_TYPE_TO_DESTINATAIRE[docType];
+      const effectiveTon = docType === 'message' ? ton : 'Neutre';
+
       // ✅ NOUVEAU: Ajout du point de vue pour rapport d'incident
       let contenuAvecPointDeVue = contenu;
-      if (destinataire === "Rapport d'incident" && pointDeVue === 'premiere') {
+      if (docType === 'incident' && pointDeVue === 'premiere') {
         contenuAvecPointDeVue = `[IMPORTANT: Rédiger ce rapport à la PREMIÈRE PERSONNE du singulier (je, j'ai constaté, j'ai observé, etc.)]\n\n${contenu}`;
       }
 
       // ✅ MODIFICATION: Ajout de la signature dans les paramètres
-      const text = await generateCommunication({ 
-        destinataire, 
-        ton, 
+      const text = await generateCommunication({
+        destinataire: effectiveDestinataire,
+        ton: effectiveTon,
         contenu: contenuAvecPointDeVue,
         signature: selectedSignature ? selectedSignature.content : null
       });
       setGeneratedContent(text);
+      setGeneratedDocType(docType);
+      // Les documents s'ouvrent en aperçu mis en forme, les messages en édition
+      setResultView(docType === 'message' ? 'edit' : 'preview');
       logGeneration('communication');
-      
-      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('tokens')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profile) {
-          const usedTokens = 1; // Ou calculé selon la logique métier
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
-            })
-            .eq('user_id', user.id);
-
-          if (!updateError) {
-            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
-          }
-        }
-      }
+      setLiveMessage(docType === 'message'
+        ? 'Communication générée. Le résultat est affiché sous le formulaire.'
+        : 'Document généré. L\'aperçu est affiché sous le formulaire.');
+      scrollToResult(createResultRef);
 
     } catch (err: any) {
-      setError('Erreur lors de la génération');
+      setError(toUserErrorMessage(err, 'Erreur lors de la génération. Veuillez réessayer.'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -197,9 +429,21 @@ export function CommunicationPage() {
   };
 
   // ✅ MODIFICATION: Fonction handleGenerateReply avec signature
+  // Le décompte des crédits est effectué dans generateReply (un seul débit)
   const handleGenerateReply = async () => {
-    if (tokenCount === 0) {
+    if (tokenCount <= 0) {
       setReplyError('Crédits insuffisants pour générer une réponse.');
+      return;
+    }
+    if (!messageRecu.trim()) {
+      setReplyError('Veuillez coller le message reçu avant de lancer la génération.');
+      return;
+    }
+    if (messageRecu.length > MAX_INPUT_LENGTH) {
+      setReplyError(
+        `Le message reçu est trop long (${messageRecu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
       return;
     }
 
@@ -209,7 +453,7 @@ export function CommunicationPage() {
 
     try {
       // ✅ AJOUT: Récupération de la signature sélectionnée
-      const selectedSignature = selectedSignatureIncoming 
+      const selectedSignature = selectedSignatureIncoming
         ? signatures.find(s => s.id === selectedSignatureIncoming)
         : null;
 
@@ -223,44 +467,23 @@ export function CommunicationPage() {
 
       setGeneratedReply(reply);
       logGeneration('communication');
-      
-      // ✅ MODIFICATION: Nouvelle logique de mise à jour des tokens
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('tokens')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profile) {
-          const usedTokens = 1; // Ou calculé selon la logique métier
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
-            })
-            .eq('user_id', user.id);
-
-          if (!updateError) {
-            tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
-          }
-        }
-      }
+      setLiveMessage('Réponse générée. Le résultat est affiché sous le formulaire.');
+      scrollToResult(replyResultRef);
     } catch (err: any) {
-      setReplyError('Erreur lors de la génération de la réponse.');
+      setReplyError(toUserErrorMessage(err, 'Erreur lors de la génération de la réponse. Veuillez réessayer.'));
       console.error(err);
     } finally {
       setLoadingReply(false);
     }
   };
 
-  const handleCopySuccess = (message: string) => {
+  const handleCopySuccess = () => {
     // Success feedback moderne
     const successDiv = document.createElement('div');
     successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
     successDiv.innerHTML = '✅ Message copié !';
     document.body.appendChild(successDiv);
-    
+
     setTimeout(() => {
       successDiv.style.transform = 'translateX(100%)';
       successDiv.style.opacity = '0';
@@ -270,11 +493,15 @@ export function CommunicationPage() {
 
   const handleCopy = async (text: string) => {
     await copyToClipboard(text);
-    handleCopySuccess(text);
+    setLiveMessage('Message copié dans le presse-papiers.');
+    handleCopySuccess();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      {/* ✅ AJOUT: Région aria-live pour annoncer les résultats aux lecteurs d'écran */}
+      <div className="sr-only" role="status" aria-live="polite">{liveMessage}</div>
+
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Header moderne */}
@@ -326,6 +553,52 @@ export function CommunicationPage() {
               {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
               {tokenCount > 0 && <AICommunicationDisclaimer />}
 
+              {/* ✅ Que voulez-vous produire ? Message adressé, ou document
+                  administratif (rapport d'incident, dossier commission) —
+                  auparavant mélangés dans le menu « destinataire » */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Que voulez-vous produire ?
+                </label>
+                <div role="radiogroup" aria-label="Type de production" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {([
+                    { value: 'message' as DocType, label: 'Un message', icon: MessageSquare },
+                    { value: 'incident' as DocType, label: "Un rapport d'incident", icon: FileText },
+                    { value: 'commission' as DocType, label: 'Un dossier pour commission', icon: ClipboardList }
+                  ]).map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={docType === value}
+                      onClick={() => setDocType(value)}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${
+                        docType === value
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-300 dark:hover:border-blue-700'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {docType === 'incident' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Document factuel sans destinataire : date, heure, lieu, personnes impliquées,
+                    déroulé chronologique, mesures prises — versable au dossier administratif.
+                  </p>
+                )}
+                {docType === 'commission' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Bilan analytique de présentation en 6 parties (contexte, faits, analyse,
+                    impact, propositions, conclusion) — déposez vos notes en vrac, l'outil structure.
+                  </p>
+                )}
+              </div>
+
+              {/* Destinataire et ton : uniquement pour un message adressé */}
+              {docType === 'message' && (
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
@@ -347,9 +620,7 @@ export function CommunicationPage() {
                       {
                         value: "Chef(fe) d'établissement / Chef(fe) adjoint",
                         label: "Chef(fe) d'établissement / Chef(fe) adjoint"
-                      },
-                      { value: 'Commission disciplinaire', label: 'Commission disciplinaire' },
-                      { value: "Rapport d'incident", label: "Rapport d'incident" }
+                      }
                     ]}
                   />
                 </div>
@@ -367,14 +638,17 @@ export function CommunicationPage() {
                     options={[
                       { value: 'Détendu', label: 'Détendu' },
                       { value: 'Neutre', label: 'Neutre' },
-                      { value: 'Stricte', label: 'Stricte' }
+                      // La valeur « Stricte » est conservée : les Edge Functions font un
+                      // switch sur cette chaîne exacte. Seul le libellé affiché est corrigé.
+                      { value: 'Stricte', label: 'Strict' }
                     ]}
                   />
                 </div>
               </div>
+              )}
 
               {/* ✅ NOUVEAU: Choix du point de vue pour Rapport d'incident */}
-              {destinataire === "Rapport d'incident" && (
+              {docType === 'incident' && (
                 <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
                     <FileText className="w-4 h-4 inline mr-2" />
@@ -431,7 +705,7 @@ export function CommunicationPage() {
                   onChange={(e) => setSelectedSignatureOutgoing(e.target.value)}
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   options={[
-                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    { value: '', label: 'Aucune signature' },
                     ...signatures.map(signature => ({
                       value: signature.id,
                       label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
@@ -450,10 +724,44 @@ export function CommunicationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Contenu à communiquer
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    <FileText className="w-4 h-4 inline mr-2" />
+                    Contenu à communiquer
+                  </label>
+                </div>
+                {/* ✅ LOT 3 : dictée → analyse → formulaire pré-rempli, en un geste.
+                    Si l'analyse échoue, la dictée n'est pas perdue : le texte brut
+                    est déposé dans le champ et reste analysable manuellement. */}
+                {FEATURES.DICTATION_ENABLED && (
+                  <DictationRecorder
+                    disabled={loading || analyzingBrief}
+                    buttonLabel="Dicter et pré-remplir le formulaire"
+                    buttonTitle="Dictez au micro : le formulaire est ensuite analysé et pré-rempli automatiquement (100 crédits par minute entamée + coût de l'analyse)"
+                    processingLabel="Transcription et analyse en cours…"
+                    onTranscript={async (text) => {
+                      setAnalyzingBrief(true);
+                      try {
+                        const analysis = await analyzeCommunicationBrief(text);
+                        setBriefBackup(text);
+                        applyBriefAnalysis(analysis);
+                        setLiveMessage(
+                          analysis.manques.length > 0
+                            ? 'Formulaire pré-rempli depuis votre dictée. Des informations à préciser ont été signalées sous le champ.'
+                            : 'Formulaire pré-rempli depuis votre dictée. Vérifiez les champs avant de générer.'
+                        );
+                      } catch {
+                        // L'analyse a échoué : on conserve la dictée brute dans le champ
+                        setContenu(prev => (prev.trim() ? `${prev}\n\n${text}` : text));
+                        setBriefManques([]);
+                        setError('L\'analyse du brouillon a échoué — votre dictée a été déposée dans le champ. Vous pouvez la modifier puis cliquer « Analyser et pré-remplir le formulaire ».');
+                        setLiveMessage('Dictée déposée dans le champ, analyse à relancer.');
+                      } finally {
+                        setAnalyzingBrief(false);
+                      }
+                    }}
+                  />
+                )}
                 <Textarea
                   id="contenu"
                   rows={4}
@@ -462,6 +770,77 @@ export function CommunicationPage() {
                   placeholder="Décrivez les éléments à faire apparaître dans votre communication..."
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 />
+
+                {/* ✅ LOT 3 v0.2 : analyse du brouillon → pré-remplissage du formulaire */}
+                {FEATURES.BRIEF_ANALYSIS_ENABLED && (
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    {briefBackup !== null ? (
+                      <button
+                        type="button"
+                        onClick={handleRestoreDraft}
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                      >
+                        <Undo2 className="w-4 h-4" />
+                        Rétablir mon texte d'origine
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Astuce : notez vos idées en vrac (ou dictez-les), l'analyse organise le reste
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeBrief}
+                      disabled={analyzingBrief || loading || !contenu.trim()}
+                      title="Analyse votre brouillon et pré-remplit destinataire, ton et contenu (coût selon la longueur, généralement inférieur à une génération)"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {analyzingBrief ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Analyse en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4" />
+                          Analyser et pré-remplir le formulaire
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* ✅ Informations manquantes signalées par l'analyse */}
+                {briefManques.length > 0 && (
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            À préciser avant de générer :
+                          </p>
+                          <ul className="mt-1 space-y-0.5 text-sm text-amber-700 dark:text-amber-300/90 list-disc list-inside">
+                            {briefManques.map((manque, index) => (
+                              <li key={index}>{manque}</li>
+                            ))}
+                          </ul>
+                          <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400/80">
+                            Complétez le champ ci-dessus si besoin — la génération fonctionnera aussi sans.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBriefManques([])}
+                        aria-label="Masquer ces suggestions"
+                        className="text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -472,7 +851,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerate}
-                disabled={loading || tokenCount === 0}
+                disabled={loading || tokenCount <= 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -482,7 +861,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? (
+                  ) : tokenCount <= 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -500,31 +879,78 @@ export function CommunicationPage() {
 
           {/* Résultat de la communication générée */}
           {generatedContent && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div
+              ref={createResultRef}
+              tabIndex={-1}
+              className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 focus:outline-none"
+            >
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                     <CheckCircle className="w-5 h-5 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Communication générée
+                    {generatedDocType === 'incident'
+                      ? "Rapport d'incident généré"
+                      : generatedDocType === 'commission'
+                        ? 'Dossier pour commission généré'
+                        : 'Communication générée'}
                   </h2>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Votre message est prêt ! Vous pouvez l'éditer si nécessaire
+                  {generatedDocType === 'message'
+                    ? 'Votre message est prêt ! Vous pouvez l\'éditer si nécessaire'
+                    : 'Votre document est prêt ! Relisez-le, modifiez-le si besoin, puis exportez-le en PDF'}
                 </p>
               </div>
 
               <div className="space-y-6">
-                {/* ✅ MODIFICATION: Textarea redimensionnable (suppression de resize-none) */}
-                <Textarea
-                  rows={8}
-                  value={generatedContent}
-                  onChange={(e) => setGeneratedContent(e.target.value)}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-                />
+                {/* ✅ Documents : bascule Aperçu mis en forme / Modifier */}
+                {generatedDocType !== 'message' && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResultView('preview')}
+                      aria-pressed={resultView === 'preview'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-colors ${
+                        resultView === 'preview'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-green-300'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      Aperçu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setResultView('edit')}
+                      aria-pressed={resultView === 'edit'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-colors ${
+                        resultView === 'edit'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-green-300'
+                      }`}
+                    >
+                      <PenTool className="w-4 h-4" />
+                      Modifier
+                    </button>
+                  </div>
+                )}
 
-                {/* ✅ NOUVEAU: Deux boutons - Copier ET Nouvelle communication */}
+                {generatedDocType !== 'message' && resultView === 'preview' ? (
+                  <div className="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-gray-50 dark:bg-gray-900/40 max-h-[70vh] overflow-y-auto">
+                    <EnhancedMarkdownRenderer content={generatedContent} />
+                  </div>
+                ) : (
+                  <Textarea
+                    rows={generatedDocType === 'message' ? 8 : 16}
+                    value={generatedContent}
+                    onChange={(e) => setGeneratedContent(e.target.value)}
+                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                  />
+                )}
+
+                {/* ✅ Actions : Copier, PDF (documents), Nouvelle communication */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => handleCopy(generatedContent)}
@@ -533,9 +959,22 @@ export function CommunicationPage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                     <span className="relative flex items-center justify-center">
                       <Copy className="w-5 h-5 mr-3" />
-                      Copier le message
+                      {generatedDocType === 'message' ? 'Copier le message' : 'Copier le document'}
                     </span>
                   </button>
+
+                  {generatedDocType !== 'message' && (
+                    <button
+                      onClick={handleExportPdf}
+                      className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                      <span className="relative flex items-center justify-center">
+                        <Download className="w-5 h-5 mr-3" />
+                        Télécharger en PDF
+                      </span>
+                    </button>
+                  )}
 
                   <button
                     onClick={handleResetCommunication}
@@ -596,7 +1035,7 @@ export function CommunicationPage() {
                   onChange={(e) => setSelectedSignatureIncoming(e.target.value)}
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   options={[
-                    { value: '', label: 'Au choix de l\'utilisateur' },
+                    { value: '', label: 'Aucune signature' },
                     ...signatures.map(signature => ({
                       value: signature.id,
                       label: `${signature.name}${signature.is_default ? ' (par défaut)' : ''}`
@@ -643,7 +1082,8 @@ export function CommunicationPage() {
                     options={[
                       { value: 'Détendu', label: 'Détendu' },
                       { value: 'Neutre', label: 'Neutre' },
-                      { value: 'Stricte', label: 'Stricte' }
+                      // Valeur « Stricte » conservée (switch côté Edge Function), libellé corrigé
+                      { value: 'Stricte', label: 'Strict' }
                     ]}
                   />
                 </div>
@@ -653,6 +1093,47 @@ export function CommunicationPage() {
                     <FileText className="w-4 h-4 inline mr-2" />
                     Objectifs de la réponse
                   </label>
+                  {/* ✅ Dictée des objectifs → analyse croisée avec le message reçu.
+                      Si l'analyse échoue ou si le message reçu manque, la dictée
+                      est déposée dans le champ — rien n'est perdu. */}
+                  {FEATURES.DICTATION_ENABLED && (
+                    <DictationRecorder
+                      disabled={loadingReply || analyzingReply}
+                      buttonLabel="Dicter et pré-remplir"
+                      buttonTitle="Dictez vos objectifs : le ton est suggéré, les objectifs structurés, et les points du message restés sans réponse sont signalés (100 crédits par minute entamée + coût de l'analyse)"
+                      processingLabel="Transcription et analyse en cours…"
+                      onTranscript={async (text) => {
+                        const merged = objectifsReponse.trim() ? `${objectifsReponse}\n${text}` : text;
+                        if (!messageRecu.trim()) {
+                          setObjectifsReponse(merged);
+                          setReplyError('Dictée déposée dans les objectifs. Collez le message reçu puis cliquez « Analyser et pré-remplir » pour le croisement.');
+                          setLiveMessage('Dictée déposée dans les objectifs.');
+                          return;
+                        }
+                        setAnalyzingReply(true);
+                        setReplyError(null);
+                        try {
+                          const analysis = await analyzeReplyBrief(messageRecu, merged);
+                          setReplyObjBackup(merged);
+                          setTonReponse(analysis.ton);
+                          setObjectifsReponse(analysis.contenu);
+                          setReplyManques(analysis.manques);
+                          setLiveMessage(
+                            analysis.manques.length > 0
+                              ? 'Objectifs pré-remplis depuis votre dictée. Des points du message sans réponse ont été signalés.'
+                              : 'Objectifs pré-remplis depuis votre dictée. Vérifiez avant de générer.'
+                          );
+                        } catch {
+                          setObjectifsReponse(merged);
+                          setReplyManques([]);
+                          setReplyError('L\'analyse a échoué — votre dictée a été déposée dans les objectifs. Vous pouvez cliquer « Analyser et pré-remplir ».');
+                          setLiveMessage('Dictée déposée dans les objectifs, analyse à relancer.');
+                        } finally {
+                          setAnalyzingReply(false);
+                        }
+                      }}
+                    />
+                  )}
                   <Textarea
                     rows={3}
                     placeholder="Quels éléments doit contenir la réponse ?"
@@ -660,8 +1141,79 @@ export function CommunicationPage() {
                     onChange={(e) => setObjectifsReponse(e.target.value)}
                     className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   />
+
+                  {/* ✅ Analyse des objectifs tapés/collés (miroir du côté création) */}
+                  {FEATURES.BRIEF_ANALYSIS_ENABLED && (
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      {replyObjBackup !== null ? (
+                        <button
+                          type="button"
+                          onClick={handleRestoreReplyDraft}
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                        >
+                          <Undo2 className="w-4 h-4" />
+                          Rétablir mes objectifs d'origine
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          L'analyse vérifie que vos objectifs répondent à tout le message
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleAnalyzeReply()}
+                        disabled={analyzingReply || loadingReply || !objectifsReponse.trim() || !messageRecu.trim()}
+                        title="Compare vos objectifs avec le message reçu : ton suggéré, objectifs structurés, points sans réponse signalés"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {analyzingReply ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Analyse en cours…
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-4 h-4" />
+                            Analyser et pré-remplir
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* ✅ Points du message sans réponse, signalés par l'analyse */}
+              {replyManques.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          Avant de générer la réponse :
+                        </p>
+                        <ul className="mt-1 space-y-0.5 text-sm text-amber-700 dark:text-amber-300/90 list-disc list-inside">
+                          {replyManques.map((manque, index) => (
+                            <li key={index}>{manque}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400/80">
+                          Complétez vos objectifs si besoin — la génération fonctionnera aussi sans.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyManques([])}
+                      aria-label="Masquer ces suggestions"
+                      className="text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {replyError && (
                 <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
@@ -671,7 +1223,7 @@ export function CommunicationPage() {
 
               <button
                 onClick={handleGenerateReply}
-                disabled={loadingReply || tokenCount === 0}
+                disabled={loadingReply || tokenCount <= 0}
                 className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
@@ -681,7 +1233,7 @@ export function CommunicationPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
                       Génération en cours...
                     </>
-                  ) : tokenCount === 0 ? (
+                  ) : tokenCount <= 0 ? (
                     <>
                       <CreditCard className="w-5 h-5 mr-3" />
                       Crédits épuisés
@@ -699,7 +1251,11 @@ export function CommunicationPage() {
 
           {/* Résultat de la réponse générée */}
           {generatedReply && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div
+              ref={replyResultRef}
+              tabIndex={-1}
+              className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 focus:outline-none"
+            >
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -740,6 +1296,9 @@ export function CommunicationPage() {
                       setMessageRecu('');
                       setObjectifsReponse('');
                       setGeneratedReply('');
+                      setReplyError(null);
+                      setReplyObjBackup(null);
+                      setReplyManques([]);
                     }}
                     className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 font-bold py-4 px-8 rounded-xl border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
                   >

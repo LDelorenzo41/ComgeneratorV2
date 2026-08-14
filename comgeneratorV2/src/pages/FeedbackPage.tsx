@@ -40,7 +40,9 @@ const STEP_LABELS = [
 
 const TOTAL_STEPS = STEP_LABELS.length;
 
-const FEEDBACK_REWARD_TOKENS = 30000;
+// Montant de la récompense testeur : défini côté serveur dans la RPC
+// claim_feedback_reward (30 000). Les textes de FeedbackProfileSection et
+// FeedbackThankYou mentionnent ce montant — à tenir en cohérence.
 
 export function FeedbackPage() {
   const {
@@ -106,26 +108,15 @@ export function FeedbackPage() {
   };
 
   // Créditer les tokens de récompense
+  // ✅ LOT 1 : le crédit est effectué côté serveur (RPC SECURITY DEFINER avec
+  // vérification du feedback et récompense unique par compte). L'écriture
+  // directe de profiles.tokens depuis le client est désormais bloquée en base.
   const creditRewardTokens = async () => {
     if (!user) return;
 
     try {
-      const { data: profileData, error: fetchError } = await supabase
-        .from('profiles')
-        .select('tokens')
-        .eq('user_id', user.id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          tokens: (profileData?.tokens || 0) + FEEDBACK_REWARD_TOKENS,
-        })
-        .eq('user_id', user.id);
-
-      if (updateError) throw updateError;
+      const { error } = await supabase.rpc('claim_feedback_reward');
+      if (error) throw error;
 
       // Notifier le Header pour mettre à jour le solde affiché
       tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
@@ -189,6 +180,10 @@ export function FeedbackPage() {
           prevoit_acheter: profile.prevoit_acheter,
           raison_achat: profile.raison_achat,
           completed: true,
+          // Lien fiable avec le compte : l'email du formulaire est libre et
+          // peut différer de l'email du compte ; la récompense s'appuie sur
+          // user_id (RPC claim_feedback_reward)
+          user_id: user?.id ?? null,
         },
         allRatings,
         allComments

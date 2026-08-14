@@ -33,6 +33,12 @@ export interface ReplyParams {
   signature?: string | null;
 }
 
+export interface CommunicationBriefParams {
+  brouillon: string;
+  /** Présent = mode « réponse » : analyse croisée avec le message reçu */
+  messageRecu?: string;
+}
+
 export interface LessonParams {
   subject: string;
   topic: string;
@@ -116,16 +122,28 @@ class SecureApiService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Erreur ${functionName}:`, errorText);
-        
+
         if (response.status === 401) {
           throw new Error('Session expirée. Veuillez vous reconnecter.');
         }
-        
+
         if (response.status === 429) {
           throw new Error('Trop de requêtes. Veuillez réessayer dans quelques minutes.');
         }
-        
-        throw new Error(`Erreur lors de l'appel à ${functionName}: ${response.status}`);
+
+        // Les Edge Functions répondent en JSON { error: string } : on remonte ce
+        // message. Les réponses texte historiques restent tolérées (repli générique).
+        let serverMessage: string | null = null;
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed && typeof parsed.error === 'string' && parsed.error.trim()) {
+            serverMessage = parsed.error;
+          }
+        } catch {
+          // Réponse non JSON : message générique ci-dessous
+        }
+
+        throw new Error(serverMessage || `Erreur lors de l'appel à ${functionName}: ${response.status}`);
       }
 
       const data = await response.json();
@@ -151,10 +169,13 @@ class SecureApiService {
   }
 
   // Génération de communications
+  // remainingTokens : présent quand l'Edge Function a débité les crédits
+  // côté serveur (lot 1) ; absent avec une Edge Function non redéployée
   async generateCommunication(params: CommunicationParams) {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('communication', params);
   }
 
@@ -163,7 +184,22 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('reply', params);
+  }
+
+  // Analyse d'un brouillon de communication (pré-remplissage du formulaire).
+  // destinataire est null en mode « réponse » (messageRecu fourni).
+  async analyzeCommunicationBrief(params: CommunicationBriefParams) {
+    return this.makeRequest<{
+      destinataire: string | null;
+      ton: string;
+      pointDeVue: 'premiere' | 'troisieme' | null;
+      contenu: string;
+      manques?: string[];
+      usage: any;
+      remainingTokens?: number;
+    }>('communication-brief', params);
   }
 
   // Génération de séances

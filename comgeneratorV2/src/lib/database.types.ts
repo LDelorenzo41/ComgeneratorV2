@@ -27,6 +27,7 @@ export type Database = {
           raison_achat: string | null
           completed: boolean
           created_at: string
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -40,6 +41,7 @@ export type Database = {
           raison_achat?: string | null
           completed?: boolean
           created_at?: string
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -53,6 +55,7 @@ export type Database = {
           raison_achat?: string | null
           completed?: boolean
           created_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -491,6 +494,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          feedback_reward_claimed: boolean | null
           has_bank_access: boolean | null
           is_admin: boolean | null
           newsletter_subscription: boolean | null
@@ -499,6 +503,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          feedback_reward_claimed?: boolean | null
           has_bank_access?: boolean | null
           is_admin?: boolean | null
           newsletter_subscription?: boolean | null
@@ -507,6 +512,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          feedback_reward_claimed?: boolean | null
           has_bank_access?: boolean | null
           is_admin?: boolean | null
           newsletter_subscription?: boolean | null
@@ -753,6 +759,10 @@ export type Database = {
       [_ in never]: never
     }
         Functions: {
+      claim_feedback_reward: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       delete_user_account: {
         Args: Record<PropertyKey, never>
         Returns: undefined
