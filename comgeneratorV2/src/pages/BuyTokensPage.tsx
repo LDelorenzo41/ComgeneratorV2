@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, Bot, ClipboardList } from 'lucide-react';
+import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, Bot, ClipboardList, Layers, Mic, Wand2 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuthStore } from '../lib/store';
 
@@ -216,7 +216,7 @@ export function BuyTokensPage() {
               Un token = unité de mesure pour l'IA (environ 4 caractères de texte). Les estimations incluent la consommation complète : votre demande + la réponse générée.
             </p>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-5">
               <div className="flex flex-col items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
                 <PenTool className="w-5 h-5 text-green-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Appréciation</span>
@@ -230,12 +230,22 @@ export function BuyTokensPage() {
               <div className="flex flex-col items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
                 <MessageCircle className="w-5 h-5 text-purple-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Communication</span>
-                <span className="text-gray-600 dark:text-gray-400">~1 000</span>
+                <span className="text-gray-600 dark:text-gray-400">1k - 2k</span>
+              </div>
+              <div className="flex flex-col items-center p-3 bg-rose-50 dark:bg-rose-900/20 rounded-xl">
+                <ClipboardList className="w-5 h-5 text-rose-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white text-center">Rapport / dossier</span>
+                <span className="text-gray-600 dark:text-gray-400">2k - 4k</span>
               </div>
               <div className="flex flex-col items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
                 <BookOpen className="w-5 h-5 text-orange-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Séance</span>
                 <span className="text-gray-600 dark:text-gray-400">5k - 6k</span>
+              </div>
+              <div className="flex flex-col items-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl">
+                <Layers className="w-5 h-5 text-teal-600 mb-1" />
+                <span className="font-medium text-gray-900 dark:text-white text-center">Support / exercice</span>
+                <span className="text-gray-600 dark:text-gray-400">1 000 (forfait)</span>
               </div>
               <div className="flex flex-col items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
                 <ClipboardList className="w-5 h-5 text-amber-600 mb-1" />
@@ -248,9 +258,34 @@ export function BuyTokensPage() {
                 <span className="text-gray-600 dark:text-gray-400">2k - 4k</span>
               </div>
             </div>
-            
+
+            {/* Options facultatives de la page Communication */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
+              <p className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
+                Options facultatives de la page Communication (elles s'ajoutent à la génération)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="flex items-center justify-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <Mic className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Dictée vocale</span>
+                  <span className="text-gray-500 dark:text-gray-400">100 / min</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <Wand2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Analyse</span>
+                  <span className="text-gray-500 dark:text-gray-400">~1 200</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">Retouche</span>
+                  <span className="text-gray-500 dark:text-gray-400">~1 000</span>
+                </div>
+              </div>
+            </div>
+
             <p className="text-center text-xs text-gray-500 dark:text-gray-500">
-              * Estimations moyennes - La consommation varie selon vos demandes et la longueur souhaitée
+              * Estimations moyennes - La consommation varie selon vos demandes et la longueur souhaitée.
+              Le support pédagogique est au forfait (1 000 quel que soit sa longueur).
             </p>
           </div>
         </div>
