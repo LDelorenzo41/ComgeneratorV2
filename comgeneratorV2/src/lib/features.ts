@@ -15,6 +15,9 @@ export const FEATURES = {
   // Dictée vocale (transcription Mistral) sur la page Communication
   DICTATION_ENABLED: true,
 
+  // Analyse de brouillon (pré-remplissage du formulaire Communication)
+  BRIEF_ANALYSIS_ENABLED: true,
+
   // Autres features à venir...
 } as const;
 

@@ -33,6 +33,10 @@ export interface ReplyParams {
   signature?: string | null;
 }
 
+export interface CommunicationBriefParams {
+  brouillon: string;
+}
+
 export interface LessonParams {
   subject: string;
   topic: string;
@@ -180,6 +184,18 @@ class SecureApiService {
       usage: any;
       remainingTokens?: number;
     }>('reply', params);
+  }
+
+  // Analyse d'un brouillon de communication (pré-remplissage du formulaire)
+  async analyzeCommunicationBrief(params: CommunicationBriefParams) {
+    return this.makeRequest<{
+      destinataire: string;
+      ton: string;
+      pointDeVue: 'premiere' | 'troisieme' | null;
+      contenu: string;
+      usage: any;
+      remainingTokens?: number;
+    }>('communication-brief', params);
   }
 
   // Génération de séances

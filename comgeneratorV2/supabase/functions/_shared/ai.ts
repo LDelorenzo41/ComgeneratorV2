@@ -95,12 +95,15 @@ export interface AIResult {
 /**
  * Appelle l'API IA et retourne le contenu + l'usage.
  * Lance une AIApiError (avec le statut HTTP amont) en cas d'échec.
+ * opts.temperature : optionnelle, 0.7 par défaut (comportement historique) —
+ * les tâches d'extraction structurée utilisent une valeur basse.
  */
 export async function callAI(
   aiConfig: AIConfig,
   prompt: string,
   tokenLimit = 2000,
-  logTag = 'ai'
+  logTag = 'ai',
+  opts?: { temperature?: number }
 ): Promise<AIResult> {
   let requestBody: Record<string, unknown>;
 
@@ -122,7 +125,7 @@ export async function callAI(
     requestBody = {
       model: aiConfig.model,
       messages: [{ role: 'user', content: prompt }],
-      ...(aiConfig.supportsTemperature && { temperature: 0.7 }),
+      ...(aiConfig.supportsTemperature && { temperature: opts?.temperature ?? 0.7 }),
       [aiConfig.tokenParamName]: tokenLimit
     };
   }

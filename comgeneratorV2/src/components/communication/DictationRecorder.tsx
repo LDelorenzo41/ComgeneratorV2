@@ -208,7 +208,7 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
           type="button"
           onClick={handleMicClick}
           disabled={disabled}
-          title="Dicter le contenu au micro (1 000 crédits par minute entamée)"
+          title="Dicter le contenu au micro (100 crédits par minute entamée)"
           className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Mic className="w-4 h-4" />
@@ -229,8 +229,8 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
                 familiale…).
               </p>
               <p>
-                <strong>Coût :</strong> 1 000 crédits par minute entamée
-                (ex. : une dictée de 1 min 30 = 2 000 crédits). Durée maximale : 3 minutes.
+                <strong>Coût :</strong> 100 crédits par minute entamée
+                (ex. : une dictée de 1 min 30 = 200 crédits). Durée maximale : 3 minutes.
               </p>
             </div>
           </div>

@@ -18,8 +18,10 @@ import { buildCorsHeaders, jsonResponse } from '../_shared/http.ts';
 import { requireUser } from '../_shared/auth.ts';
 import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
 
-// Tarif : crédits débités par minute entamée (décision produit du 13/08/2026)
-const CREDITS_PER_MINUTE = 1000;
+// Tarif : crédits débités par minute entamée (décision produit du 14/08/2026 :
+// proche du coût réel — la dictée est une commodité face au micro du clavier,
+// pas une fonctionnalité premium)
+const CREDITS_PER_MINUTE = 100;
 
 // Durée maximale acceptée (le front limite déjà à 180 s ; marge serveur)
 const MAX_DURATION_SECONDS = 300;

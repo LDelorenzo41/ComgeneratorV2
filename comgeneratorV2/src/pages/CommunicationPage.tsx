@@ -11,6 +11,7 @@ import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 import { DictationRecorder } from '../components/communication/DictationRecorder';
+import { analyzeCommunicationBrief } from '../lib/analyzeBrief';
 import { FEATURES } from '../lib/features';
 
 import { logGeneration } from '../lib/usageStats';
@@ -27,6 +28,9 @@ import {
   CheckCircle,
   CreditCard,
   PenTool,
+  Wand2,
+  Undo2,
+  Loader2,
   X
 } from 'lucide-react';
 
@@ -84,6 +88,10 @@ export function CommunicationPage() {
   
   // ✅ NOUVEAU: État pour le point de vue (rapport d'incident)
   const [pointDeVue, setPointDeVue] = React.useState<'troisieme' | 'premiere'>('troisieme');
+
+  // ✅ LOT 3 v0.2: Analyse de brouillon (pré-remplissage du formulaire)
+  const [analyzingBrief, setAnalyzingBrief] = React.useState(false);
+  const [briefBackup, setBriefBackup] = React.useState<string | null>(null);
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -163,6 +171,59 @@ export function CommunicationPage() {
     // La signature par défaut est restaurée (cohérent avec la présélection initiale)
     setSelectedSignatureOutgoing(signatures.find(s => s.is_default)?.id ?? '');
     setPointDeVue('troisieme');
+    setBriefBackup(null);
+  };
+
+  // ✅ LOT 3 v0.2: Analyse du brouillon → pré-remplissage du formulaire.
+  // Le texte du champ (tapé, collé ou dicté) est restructuré en brief, et
+  // destinataire / ton / point de vue sont déduits. Chaque champ reste
+  // modifiable, et le brouillon d'origine est restaurable.
+  const handleAnalyzeBrief = async () => {
+    if (analyzingBrief || loading) return;
+    if (tokenCount <= 0) {
+      setError('Crédits insuffisants pour analyser le brouillon.');
+      return;
+    }
+    if (!contenu.trim()) {
+      setError('Écrivez ou dictez d\'abord votre brouillon dans le champ « Contenu à communiquer ».');
+      return;
+    }
+    if (contenu.length > MAX_INPUT_LENGTH) {
+      setError(
+        `Le brouillon est trop long (${contenu.length.toLocaleString('fr-FR')} caractères, ` +
+        `maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')}). Veuillez le raccourcir.`
+      );
+      return;
+    }
+
+    setAnalyzingBrief(true);
+    setError(null);
+    const draft = contenu;
+
+    try {
+      const analysis = await analyzeCommunicationBrief(draft);
+      setBriefBackup(draft);
+      setDestinataire(analysis.destinataire);
+      setTon(analysis.ton);
+      if (analysis.destinataire === "Rapport d'incident" && analysis.pointDeVue) {
+        setPointDeVue(analysis.pointDeVue);
+      }
+      setContenu(analysis.contenu);
+      setLiveMessage('Formulaire pré-rempli depuis votre brouillon. Vérifiez les champs avant de générer.');
+    } catch (err) {
+      setError(toUserErrorMessage(err, 'Erreur lors de l\'analyse du brouillon. Veuillez réessayer.'));
+    } finally {
+      setAnalyzingBrief(false);
+    }
+  };
+
+  // Restaure le brouillon d'origine après une analyse
+  const handleRestoreDraft = () => {
+    if (briefBackup !== null) {
+      setContenu(briefBackup);
+      setBriefBackup(null);
+      setLiveMessage('Brouillon d\'origine rétabli.');
+    }
   };
 
   // ✅ AJOUT: Scroll + focus vers un bloc de résultat après génération
@@ -516,6 +577,45 @@ export function CommunicationPage() {
                   placeholder="Décrivez les éléments à faire apparaître dans votre communication..."
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 />
+
+                {/* ✅ LOT 3 v0.2 : analyse du brouillon → pré-remplissage du formulaire */}
+                {FEATURES.BRIEF_ANALYSIS_ENABLED && (
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    {briefBackup !== null ? (
+                      <button
+                        type="button"
+                        onClick={handleRestoreDraft}
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                      >
+                        <Undo2 className="w-4 h-4" />
+                        Rétablir mon texte d'origine
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Astuce : notez vos idées en vrac (ou dictez-les), l'analyse organise le reste
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeBrief}
+                      disabled={analyzingBrief || loading || !contenu.trim()}
+                      title="Analyse votre brouillon et pré-remplit destinataire, ton et contenu (coût selon la longueur, généralement inférieur à une génération)"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {analyzingBrief ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Analyse en cours…
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4" />
+                          Analyser et pré-remplir le formulaire
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {error && (
