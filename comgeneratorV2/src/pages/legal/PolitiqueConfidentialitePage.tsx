@@ -98,10 +98,15 @@ export function PolitiqueConfidentialitePage() {
               <ul className="text-gray-700 space-y-2">
                 <li>• Appréciations générées</li>
                 <li>• Synthèses de bulletins</li>
-                <li>• Communications créées</li>
                 <li>• Séances pédagogiques</li>
                 <li>• Scénarios pédagogiques</li>
               </ul>
+              <p className="text-sm text-gray-600 mt-3 bg-purple-50 p-2 rounded">
+                <strong>Communications :</strong> les messages et documents générés par l'outil
+                Communication ne sont <strong>pas conservés</strong> par ProfAssist — ils
+                n'existent que le temps de votre session, sauf si vous les copiez ou les
+                exportez vous-même (PDF).
+              </p>
               <p className="text-sm text-gray-600 mt-3 bg-purple-50 p-2 rounded">
                 <strong>Propriété :</strong> Vous restez propriétaire
               </p>
