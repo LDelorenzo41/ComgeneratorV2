@@ -250,7 +250,7 @@ export function BuyTokensPage() {
               <div className="flex flex-col items-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
                 <ClipboardList className="w-5 h-5 text-amber-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Scénario</span>
-                <span className="text-gray-600 dark:text-gray-400">8k - 10k+</span>
+                <span className="text-gray-600 dark:text-gray-400">6k - 14k</span>
               </div>
               <div className="flex flex-col items-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
                 <Bot className="w-5 h-5 text-indigo-600 mb-1" />
@@ -285,7 +285,11 @@ export function BuyTokensPage() {
 
             <p className="text-center text-xs text-gray-500 dark:text-gray-500">
               * Estimations moyennes - La consommation varie selon vos demandes et la longueur souhaitée.
-              Le support pédagogique est au forfait (1 000 quel que soit sa longueur).
+              Le support pédagogique est au forfait (1 000 quelle que soit sa longueur).
+              <br />
+              <strong>Corpus documentaire :</strong> activer vos documents personnels sur une séance
+              ou un scénario ajoute leur contenu à la demande et peut <strong>doubler</strong> la
+              consommation — le haut de la fourchette correspond à ce cas.
             </p>
           </div>
         </div>

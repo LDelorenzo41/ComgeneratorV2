@@ -667,7 +667,14 @@ export function ScenarioPedagogiquePage() {
 
       const usedTokens: number = result.usage?.total_tokens ?? 0;
 
-      if (usedTokens > 0 && user) {
+      // ✅ remainingTokens présent = le débit a été fait côté serveur
+      // (Edge Function à jour). On notifie seulement l'interface, qui relit
+      // le solde. Le bloc ci-dessous n'est conservé qu'en repli, pour rester
+      // compatible avec une Edge Function pas encore redéployée.
+      if (typeof result.remainingTokens === 'number') {
+        tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+      } else if (usedTokens > 0 && user) {
+        // --- Repli : débit client historique ---
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('tokens')
@@ -1414,12 +1421,12 @@ export function ScenarioPedagogiquePage() {
                     Consommation de crédits importante
                   </h4>
                   <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 mb-3">
-                    <li>• La génération d'un scénario consomme un <strong>nombre significatif de tokens</strong> (5 000 à 10 000+)</li>
+                    <li>• Sans corpus ni document, un scénario consomme <strong>environ 6 000 tokens</strong></li>
                     {uploadedFiles.length > 0 && (
-                      <li>• <strong>Documents ajoutés :</strong> +{uploadedFiles.length} fichier(s) = consommation accrue</li>
+                      <li>• <strong>Documents ajoutés :</strong> {uploadedFiles.length} fichier(s) — leur contenu s'ajoute à la demande, la consommation augmente d'autant</li>
                     )}
                     {useRag && (
-                      <li>• <strong>Corpus activé :</strong> enrichissement par vos documents personnels = consommation accrue</li>
+                      <li>• <strong>Corpus activé :</strong> les extraits de vos documents sont ajoutés à la demande — consommation observée jusqu'à <strong>environ 14 000 tokens</strong>, soit plus du double</li>
                     )}
                   </ul>
                   <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
