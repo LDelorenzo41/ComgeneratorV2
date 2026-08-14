@@ -51,6 +51,11 @@ export function SynthesePage() {
   const [isDraggingPdf, setIsDraggingPdf] = React.useState(false);
   const [isDraggingScreenshot, setIsDraggingScreenshot] = React.useState(false);
   const [importError, setImportError] = React.useState<string | null>(null);
+  // Confirmation d'import : les aperçus sont plus bas dans la page, il faut
+  // annoncer le succès et y amener l'utilisateur
+  const [importSuccess, setImportSuccess] = React.useState<string | null>(null);
+  const pdfPreviewRef = React.useRef<HTMLDivElement | null>(null);
+  const capturePreviewRef = React.useRef<HTMLDivElement | null>(null);
   
   // ✅ NOUVEAUX ÉTATS POUR LES CONTRÔLES
   const [tone, setTone] = React.useState<'neutre' | 'encourageant' | 'analytique'>('neutre');
@@ -68,6 +73,16 @@ export function SynthesePage() {
     const desiredWidth = Math.min(containerWidth, 800);
     const viewport = page.getViewport({ scale: 1 });
     return desiredWidth / viewport.width;
+  };
+
+  // Amène l'utilisateur sur l'aperçu correspondant et confirme l'import
+  const confirmImport = (message: string, ref: React.RefObject<HTMLDivElement>) => {
+    setImportSuccess(message);
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    // La confirmation s'efface d'elle-même : l'aperçu prend le relais
+    setTimeout(() => setImportSuccess(null), 5000);
   };
 
   // Affichage du bulletin PDF (visionneuse) — le PDF n'est pas analysé :
@@ -93,6 +108,11 @@ export function SynthesePage() {
         viewport,
         canvas
       }).promise;
+
+      confirmImport(
+        `Bulletin « ${file.name} » affiché — capturez la partie à analyser.`,
+        pdfPreviewRef
+      );
     } catch (err) {
       console.error('Erreur lors de l\'ouverture du PDF :', err);
       setImportError('Ce PDF n\'a pas pu être ouvert. Vérifiez qu\'il n\'est pas protégé.');
@@ -120,6 +140,7 @@ export function SynthesePage() {
       const imageDataUrl = event.target?.result as string;
       setCapturedImage(imageDataUrl);
       console.log('📸 Capture d\'écran chargée avec succès');
+      confirmImport('Capture chargée — vérifiez l\'aperçu, puis générez la synthèse.', capturePreviewRef);
     };
     reader.onerror = () => setImportError('Impossible de lire ce fichier. Réessayez.');
     reader.readAsDataURL(file);
@@ -325,6 +346,17 @@ export function SynthesePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      {/* Confirmation d'import : visible immédiatement, quelle que soit la
+          position de défilement (les aperçus sont plus bas dans la page) */}
+      <div className="sr-only" role="status" aria-live="polite">{importSuccess}</div>
+      {importSuccess && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-[90vw]">
+          <div className="flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg">
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-medium">{importSuccess}</span>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         <div className="text-center mb-12">
@@ -489,32 +521,46 @@ export function SynthesePage() {
                   </div>
                   
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Monitor className="w-8 h-8 text-blue-500" />
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Monitor className="w-8 h-8 text-blue-500 flex-shrink-0" />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Windows</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Win + Shift + S</kbd>
                         </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Command className="w-8 h-8 text-blue-500" />
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-gray-100">Mac</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Cmd + Shift + 4</kbd>
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1.5">
+                          ✓ Copie directement dans le presse-papiers
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Printer className="w-8 h-8 text-blue-500" />
+
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Command className="w-8 h-8 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Mac</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Cmd + Ctrl + Shift + 4</kbd>
+                        </p>
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1.5">
+                          ✓ Copie dans le presse-papiers (avec <strong>Ctrl</strong>)
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Sans <strong>Ctrl</strong>, la capture est enregistrée sur le Bureau :
+                          déposez alors le fichier ci-dessous.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Printer className="w-8 h-8 text-blue-500 flex-shrink-0" />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Linux</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Print Screen</kbd>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Maj + Impr. écran</kbd>
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                          Selon votre environnement, la capture va dans le presse-papiers
+                          ou dans un fichier.
                         </p>
                       </div>
                     </div>
@@ -547,11 +593,11 @@ export function SynthesePage() {
                       : 'Glissez-déposez votre capture ici'}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    ou collez-la directement avec <kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Ctrl</kbd>
+                    ou, si votre capture est dans le presse-papiers, collez-la avec
+                    {' '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Ctrl</kbd>
                     {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd>
                     {' '}(<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Cmd</kbd>
                     {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd> sur Mac)
-                    {' '}— les raccourcis ci-dessus la placent dans votre presse-papiers
                   </p>
                   <label className={`group cursor-pointer inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ${
                     !tokensAvailable ? 'opacity-50 cursor-not-allowed transform-none' : ''
@@ -580,7 +626,7 @@ export function SynthesePage() {
 
           {/* Capture sélectionnée */}
           {capturedImage && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div ref={capturePreviewRef} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -949,7 +995,7 @@ export function SynthesePage() {
 
           {/* Aperçu du bulletin */}
           {pdfDoc && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div ref={pdfPreviewRef} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
