@@ -18,25 +18,32 @@ import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credit
 const RATE_LIMIT_PER_MINUTE = 10;
 
 /**
- * Nettoie le texte de sortie (supprime markdown résiduel si nécessaire)
+ * Nettoie le texte de sortie.
+ * keepMarkdown : pour les DOCUMENTS structurés (rapport d'incident, bilan de
+ * commission), le markdown (titres, gras) est conservé — le front l'affiche
+ * avec un rendu propre. Pour les messages, il est retiré comme historiquement.
  */
-function cleanOutputText(text) {
+function cleanOutputText(text, keepMarkdown = false) {
   if (!text) return text;
 
   let cleaned = text.trim();
 
-  // Supprimer les balises markdown de mise en forme excessive
-  cleaned = cleaned.replace(/\*\*/g, '');
-  cleaned = cleaned.replace(/\*/g, '');
-  cleaned = cleaned.replace(/`{1,3}/g, '');
+  if (!keepMarkdown) {
+    // Supprimer les balises markdown de mise en forme excessive
+    cleaned = cleaned.replace(/\*\*/g, '');
+    cleaned = cleaned.replace(/\*/g, '');
+    cleaned = cleaned.replace(/`{1,3}/g, '');
+  }
 
   // Supprimer les lignes vides multiples
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
   cleaned = cleaned.trim();
 
-  // Supprimer ponctuation orpheline au début
-  cleaned = cleaned.replace(/^[\s:\-\*]+/, '');
+  if (!keepMarkdown) {
+    // Supprimer ponctuation orpheline au début
+    cleaned = cleaned.replace(/^[\s:\-\*]+/, '');
+  }
 
   return cleaned;
 }
@@ -120,6 +127,9 @@ const communicationHandler = async (req: Request): Promise<Response> => {
 
     // ⚠️ CAS SPÉCIAL : Commission disciplinaire (prompt complètement différent)
     const isCommission = destinataire.toLowerCase() === "commission disciplinaire";
+
+    // Documents structurés : le markdown est conservé (rendu propre côté front)
+    const isDocument = isCommission || destinataire.toLowerCase() === "rapport d'incident";
 
     let prompt: string;
     let tokenLimit: number;
@@ -265,7 +275,7 @@ Rédige maintenant cette communication en respectant scrupuleusement ces instruc
         });
       }
 
-      const cleanedContent = cleanOutputText(content);
+      const cleanedContent = cleanOutputText(content, isDocument);
 
       // ✅ LOT 1 : Débit du coût réel côté serveur.
       // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le

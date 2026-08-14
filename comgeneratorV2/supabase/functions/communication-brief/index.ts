@@ -220,12 +220,24 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
    - Ce n'est PAS le message final : c'est la liste des éléments que le message devra transmettre.
    - Exemple de format attendu : "- Lucas Martin, 4e B\n- Troisième retard cette semaine\n- Proposer un rendez-vous jeudi ou vendredi"
 
-5. "manques" — un tableau de 0 à 4 courtes phrases signalant les informations CONCRÈTEMENT UTILES au message mais absentes du brouillon. Exemples :
+5. "manques" — un tableau de 0 à 5 courtes phrases signalant les informations CONCRÈTEMENT UTILES au message mais absentes du brouillon.
+   Cas général (messages) :
    - un rendez-vous est proposé sans jour ni créneau précis ;
    - un élève est évoqué sans prénom ni classe ;
-   - un incident est mentionné sans date ni lieu ;
    - une demande est faite sans échéance.
-   Règles : chaque entrée est une phrase courte et actionnable (ex. "Le créneau du rendez-vous n'est pas précisé"). Ne signale que les manques réellement gênants pour rédiger le message — si le brouillon est complet, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
+   Cas particulier — si tu as déduit "Rapport d'incident", vérifie SPÉCIFIQUEMENT les rubriques exigées d'un rapport administratif :
+   - date, heure et lieu précis de l'incident ;
+   - personnes impliquées (élèves, adultes) et témoins éventuels ;
+   - déroulé chronologique des faits ;
+   - mesures immédiates prises ;
+   - propos exacts tenus, si des paroles sont en cause.
+   Cas particulier — si tu as déduit "Commission disciplinaire", vérifie SPÉCIFIQUEMENT les rubriques d'un bilan de présentation :
+   - période concernée (depuis quand la situation dure) ;
+   - faits marquants datés ;
+   - sanctions et mesures déjà prises et leurs effets ;
+   - évolution (aggravation, stagnation, amélioration) ;
+   - impact sur la classe et les apprentissages.
+   Règles : chaque entrée est une phrase courte et actionnable (ex. "Le créneau du rendez-vous n'est pas précisé"). Ne signale que les manques réellement gênants — si le brouillon est complet, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
 
     const prompt = isReplyMode ? replyPrompt : createPrompt;
 
@@ -299,7 +311,7 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
           : [];
       const manques = rawManques
         .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
-        .slice(0, 4)
+        .slice(0, 5)
         .map((m) => m.trim().slice(0, 200));
 
       // Débit du coût réel (aucun débit si l'analyse a échoué plus haut)

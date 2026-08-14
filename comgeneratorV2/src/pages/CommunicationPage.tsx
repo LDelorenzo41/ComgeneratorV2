@@ -11,7 +11,9 @@ import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 import { DictationRecorder } from '../components/communication/DictationRecorder';
-import { analyzeCommunicationBrief, analyzeReplyBrief } from '../lib/analyzeBrief';
+import { analyzeCommunicationBrief, analyzeReplyBrief, type BriefAnalysis } from '../lib/analyzeBrief';
+import { exportDocumentToPdf } from '../lib/documentPdfExport';
+import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
 import { FEATURES } from '../lib/features';
 
 import { logGeneration } from '../lib/usageStats';
@@ -32,8 +34,21 @@ import {
   Undo2,
   Loader2,
   AlertTriangle,
+  ClipboardList,
+  Eye,
+  Download,
   X
 } from 'lucide-react';
+
+// Type de production de la section « créer » : un message adressé, ou un
+// document administratif (sans destinataire ni ton)
+type DocType = 'message' | 'incident' | 'commission';
+
+// Valeurs historiques attendues par l'Edge Function communication
+const DOC_TYPE_TO_DESTINATAIRE: Record<Exclude<DocType, 'message'>, string> = {
+  incident: "Rapport d'incident",
+  commission: 'Commission disciplinaire'
+};
 
 // Longueur maximale des saisies envoyées à l'IA (protection coûts / erreurs de copier-coller)
 const MAX_INPUT_LENGTH = 10000;
@@ -80,11 +95,16 @@ export function CommunicationPage() {
   }, [searchParams]);
 
   // Fonction 1
+  const [docType, setDocType] = React.useState<DocType>('message');
   const [destinataire, setDestinataire] = React.useState("Parents d'élèves");
   const [ton, setTon] = React.useState('Détendu');
   const [contenu, setContenu] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [generatedContent, setGeneratedContent] = React.useState('');
+  // Type de production du résultat affiché (fige le mode d'affichage même si
+  // l'utilisateur change le sélecteur après génération)
+  const [generatedDocType, setGeneratedDocType] = React.useState<DocType>('message');
+  const [resultView, setResultView] = React.useState<'preview' | 'edit'>('edit');
   const [error, setError] = React.useState<string | null>(null);
   
   // ✅ NOUVEAU: État pour le point de vue (rapport d'incident)
@@ -171,10 +191,13 @@ export function CommunicationPage() {
 
   // ✅ NOUVEAU: Fonction de réinitialisation complète
   const handleResetCommunication = () => {
+    setDocType('message');
     setDestinataire("Parents d'élèves");
     setTon('Détendu');
     setContenu('');
     setGeneratedContent('');
+    setGeneratedDocType('message');
+    setResultView('edit');
     setError(null);
     // La signature par défaut est restaurée (cohérent avec la présélection initiale)
     setSelectedSignatureOutgoing(signatures.find(s => s.is_default)?.id ?? '');
@@ -212,13 +235,7 @@ export function CommunicationPage() {
     try {
       const analysis = await analyzeCommunicationBrief(draft);
       setBriefBackup(draft);
-      setDestinataire(analysis.destinataire);
-      setTon(analysis.ton);
-      if (analysis.destinataire === "Rapport d'incident" && analysis.pointDeVue) {
-        setPointDeVue(analysis.pointDeVue);
-      }
-      setContenu(analysis.contenu);
-      setBriefManques(analysis.manques);
+      applyBriefAnalysis(analysis);
       setLiveMessage(
         analysis.manques.length > 0
           ? 'Formulaire pré-rempli. Des informations à préciser ont été signalées sous le champ.'
@@ -231,6 +248,24 @@ export function CommunicationPage() {
     }
   };
 
+  // ✅ Applique une analyse de brouillon au formulaire, y compris le type de
+  // production : un brief d'incident ou de commission bascule automatiquement
+  // le sélecteur « Que voulez-vous produire ? »
+  const applyBriefAnalysis = (analysis: BriefAnalysis) => {
+    if (analysis.destinataire === "Rapport d'incident") {
+      setDocType('incident');
+      if (analysis.pointDeVue) setPointDeVue(analysis.pointDeVue);
+    } else if (analysis.destinataire === 'Commission disciplinaire') {
+      setDocType('commission');
+    } else {
+      setDocType('message');
+      setDestinataire(analysis.destinataire);
+      setTon(analysis.ton);
+    }
+    setContenu(analysis.contenu);
+    setBriefManques(analysis.manques);
+  };
+
   // Restaure le brouillon d'origine après une analyse
   const handleRestoreDraft = () => {
     if (briefBackup !== null) {
@@ -238,6 +273,17 @@ export function CommunicationPage() {
       setBriefBackup(null);
       setLiveMessage('Brouillon d\'origine rétabli.');
     }
+  };
+
+  // ✅ Export PDF des documents structurés (rapport, bilan de commission)
+  const handleExportPdf = () => {
+    if (!generatedContent || generatedDocType === 'message') return;
+    const title = generatedDocType === 'incident'
+      ? "Rapport d'incident"
+      : 'Bilan pour commission disciplinaire';
+    const filenameBase = generatedDocType === 'incident' ? 'rapport-incident' : 'bilan-commission';
+    exportDocumentToPdf(title, generatedContent, filenameBase);
+    setLiveMessage('PDF téléchargé.');
   };
 
   // ✅ Analyse des objectifs de réponse, croisée avec le message reçu :
@@ -343,22 +389,35 @@ export function CommunicationPage() {
         ? signatures.find(s => s.id === selectedSignatureOutgoing)
         : null;
 
+      // ✅ Le type de production pilote les paramètres : les documents
+      // (rapport, commission) partent avec leur valeur historique de
+      // « destinataire » et un ton neutre (leur registre est imposé serveur)
+      const effectiveDestinataire = docType === 'message'
+        ? destinataire
+        : DOC_TYPE_TO_DESTINATAIRE[docType];
+      const effectiveTon = docType === 'message' ? ton : 'Neutre';
+
       // ✅ NOUVEAU: Ajout du point de vue pour rapport d'incident
       let contenuAvecPointDeVue = contenu;
-      if (destinataire === "Rapport d'incident" && pointDeVue === 'premiere') {
+      if (docType === 'incident' && pointDeVue === 'premiere') {
         contenuAvecPointDeVue = `[IMPORTANT: Rédiger ce rapport à la PREMIÈRE PERSONNE du singulier (je, j'ai constaté, j'ai observé, etc.)]\n\n${contenu}`;
       }
 
       // ✅ MODIFICATION: Ajout de la signature dans les paramètres
       const text = await generateCommunication({
-        destinataire,
-        ton,
+        destinataire: effectiveDestinataire,
+        ton: effectiveTon,
         contenu: contenuAvecPointDeVue,
         signature: selectedSignature ? selectedSignature.content : null
       });
       setGeneratedContent(text);
+      setGeneratedDocType(docType);
+      // Les documents s'ouvrent en aperçu mis en forme, les messages en édition
+      setResultView(docType === 'message' ? 'edit' : 'preview');
       logGeneration('communication');
-      setLiveMessage('Communication générée. Le résultat est affiché sous le formulaire.');
+      setLiveMessage(docType === 'message'
+        ? 'Communication générée. Le résultat est affiché sous le formulaire.'
+        : 'Document généré. L\'aperçu est affiché sous le formulaire.');
       scrollToResult(createResultRef);
 
     } catch (err: any) {
@@ -494,6 +553,52 @@ export function CommunicationPage() {
               {/* AJOUT : Disclaimer IA - seulement si tokens > 0 */}
               {tokenCount > 0 && <AICommunicationDisclaimer />}
 
+              {/* ✅ Que voulez-vous produire ? Message adressé, ou document
+                  administratif (rapport d'incident, dossier commission) —
+                  auparavant mélangés dans le menu « destinataire » */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Que voulez-vous produire ?
+                </label>
+                <div role="radiogroup" aria-label="Type de production" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {([
+                    { value: 'message' as DocType, label: 'Un message', icon: MessageSquare },
+                    { value: 'incident' as DocType, label: "Un rapport d'incident", icon: FileText },
+                    { value: 'commission' as DocType, label: 'Un dossier pour commission', icon: ClipboardList }
+                  ]).map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={docType === value}
+                      onClick={() => setDocType(value)}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${
+                        docType === value
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-300 dark:hover:border-blue-700'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {docType === 'incident' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Document factuel sans destinataire : date, heure, lieu, personnes impliquées,
+                    déroulé chronologique, mesures prises — versable au dossier administratif.
+                  </p>
+                )}
+                {docType === 'commission' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Bilan analytique de présentation en 6 parties (contexte, faits, analyse,
+                    impact, propositions, conclusion) — déposez vos notes en vrac, l'outil structure.
+                  </p>
+                )}
+              </div>
+
+              {/* Destinataire et ton : uniquement pour un message adressé */}
+              {docType === 'message' && (
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
@@ -515,9 +620,7 @@ export function CommunicationPage() {
                       {
                         value: "Chef(fe) d'établissement / Chef(fe) adjoint",
                         label: "Chef(fe) d'établissement / Chef(fe) adjoint"
-                      },
-                      { value: 'Commission disciplinaire', label: 'Commission disciplinaire' },
-                      { value: "Rapport d'incident", label: "Rapport d'incident" }
+                      }
                     ]}
                   />
                 </div>
@@ -542,9 +645,10 @@ export function CommunicationPage() {
                   />
                 </div>
               </div>
+              )}
 
               {/* ✅ NOUVEAU: Choix du point de vue pour Rapport d'incident */}
-              {destinataire === "Rapport d'incident" && (
+              {docType === 'incident' && (
                 <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">
                     <FileText className="w-4 h-4 inline mr-2" />
@@ -640,13 +744,7 @@ export function CommunicationPage() {
                       try {
                         const analysis = await analyzeCommunicationBrief(text);
                         setBriefBackup(text);
-                        setDestinataire(analysis.destinataire);
-                        setTon(analysis.ton);
-                        if (analysis.destinataire === "Rapport d'incident" && analysis.pointDeVue) {
-                          setPointDeVue(analysis.pointDeVue);
-                        }
-                        setContenu(analysis.contenu);
-                        setBriefManques(analysis.manques);
+                        applyBriefAnalysis(analysis);
                         setLiveMessage(
                           analysis.manques.length > 0
                             ? 'Formulaire pré-rempli depuis votre dictée. Des informations à préciser ont été signalées sous le champ.'
@@ -792,24 +890,67 @@ export function CommunicationPage() {
                     <CheckCircle className="w-5 h-5 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Communication générée
+                    {generatedDocType === 'incident'
+                      ? "Rapport d'incident généré"
+                      : generatedDocType === 'commission'
+                        ? 'Dossier pour commission généré'
+                        : 'Communication générée'}
                   </h2>
                 </div>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Votre message est prêt ! Vous pouvez l'éditer si nécessaire
+                  {generatedDocType === 'message'
+                    ? 'Votre message est prêt ! Vous pouvez l\'éditer si nécessaire'
+                    : 'Votre document est prêt ! Relisez-le, modifiez-le si besoin, puis exportez-le en PDF'}
                 </p>
               </div>
 
               <div className="space-y-6">
-                {/* ✅ MODIFICATION: Textarea redimensionnable (suppression de resize-none) */}
-                <Textarea
-                  rows={8}
-                  value={generatedContent}
-                  onChange={(e) => setGeneratedContent(e.target.value)}
-                  className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-                />
+                {/* ✅ Documents : bascule Aperçu mis en forme / Modifier */}
+                {generatedDocType !== 'message' && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setResultView('preview')}
+                      aria-pressed={resultView === 'preview'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-colors ${
+                        resultView === 'preview'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-green-300'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      Aperçu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setResultView('edit')}
+                      aria-pressed={resultView === 'edit'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-colors ${
+                        resultView === 'edit'
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-green-300'
+                      }`}
+                    >
+                      <PenTool className="w-4 h-4" />
+                      Modifier
+                    </button>
+                  </div>
+                )}
 
-                {/* ✅ NOUVEAU: Deux boutons - Copier ET Nouvelle communication */}
+                {generatedDocType !== 'message' && resultView === 'preview' ? (
+                  <div className="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-6 bg-gray-50 dark:bg-gray-900/40 max-h-[70vh] overflow-y-auto">
+                    <EnhancedMarkdownRenderer content={generatedContent} />
+                  </div>
+                ) : (
+                  <Textarea
+                    rows={generatedDocType === 'message' ? 8 : 16}
+                    value={generatedContent}
+                    onChange={(e) => setGeneratedContent(e.target.value)}
+                    className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                  />
+                )}
+
+                {/* ✅ Actions : Copier, PDF (documents), Nouvelle communication */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => handleCopy(generatedContent)}
@@ -818,9 +959,22 @@ export function CommunicationPage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                     <span className="relative flex items-center justify-center">
                       <Copy className="w-5 h-5 mr-3" />
-                      Copier le message
+                      {generatedDocType === 'message' ? 'Copier le message' : 'Copier le document'}
                     </span>
                   </button>
+
+                  {generatedDocType !== 'message' && (
+                    <button
+                      onClick={handleExportPdf}
+                      className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                      <span className="relative flex items-center justify-center">
+                        <Download className="w-5 h-5 mr-3" />
+                        Télécharger en PDF
+                      </span>
+                    </button>
+                  )}
 
                   <button
                     onClick={handleResetCommunication}
