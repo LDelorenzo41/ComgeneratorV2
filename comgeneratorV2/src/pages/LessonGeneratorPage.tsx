@@ -49,7 +49,6 @@ import {
   Lock,
   Upload,
   FileText,
-  Video,
   Database,
   BookMarked,
   Info,
@@ -1295,15 +1294,8 @@ export function LessonGeneratorPage() {
             Créez des séances pédagogiques personnalisées et professionnelles en quelques clics
           </p>
           
-          <a
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-6"
-          >
-            <Video className="w-4 h-4" />
-            <span className="underline hover:no-underline">Voir un court tuto vidéo</span>
-          </a>
+          {/* Lien « tuto vidéo » retiré : il pointait sur href="#" et ne menait
+              nulle part. À rétablir avec l'URL réelle quand la vidéo existera. */}
 
           <p className="text-sm italic text-gray-500 dark:text-gray-400 max-w-3xl mx-auto">
             La séance générée est une aide proposée par l'IA : elle peut contenir des approximations. Elle ne remplace pas votre expertise professionnelle, mais constitue une orientation à adapter avec votre jugement.
