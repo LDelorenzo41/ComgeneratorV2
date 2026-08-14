@@ -105,6 +105,11 @@ export function PolitiqueConfidentialitePage() {
               <p className="text-sm text-gray-600 mt-3 bg-purple-50 p-2 rounded">
                 <strong>Propriété :</strong> Vous restez propriétaire
               </p>
+              <p className="text-sm text-gray-600 mt-2 bg-purple-50 p-2 rounded">
+                <strong>Dictée vocale :</strong> vos enregistrements audio ne sont jamais
+                stockés — ils transitent vers Mistral AI pour transcription puis sont supprimés.
+                Seul le texte transcrit apparaît dans votre formulaire.
+              </p>
             </div>
 
             {/* Données de paiement */}
@@ -236,6 +241,21 @@ export function PolitiqueConfidentialitePage() {
               </p>
               <p className="text-gray-600 text-sm">
                 <strong>Garantie :</strong> OpenAI ne stocke pas les données transmises via l'API et ne les utilise pas pour l'entraînement de ses modèles.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">🇫🇷 Mistral AI</h3>
+              <p className="text-gray-700 mb-2">
+                Si vous choisissez le modèle Mistral dans vos paramètres, vos demandes de génération
+                sont transmises à Mistral AI (société française) pour traitement. La dictée vocale
+                transmet également votre enregistrement audio à Mistral AI pour transcription.
+              </p>
+              <p className="text-gray-600 text-sm">
+                <strong>Garantie :</strong> Données hébergées en Europe. L'audio de la dictée n'est
+                jamais conservé par ProfAssist : il transite vers Mistral AI pour transcription puis
+                est supprimé. Mistral AI n'utilise pas les données transmises via l'API pour
+                l'entraînement de ses modèles.
               </p>
             </div>
 
