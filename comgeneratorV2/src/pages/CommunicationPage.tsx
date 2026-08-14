@@ -10,6 +10,8 @@ import { generateCommunication } from '../lib/generateCommunication';
 import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
+import { DictationRecorder } from '../components/communication/DictationRecorder';
+import { FEATURES } from '../lib/features';
 
 import { logGeneration } from '../lib/usageStats';
 import {
@@ -491,10 +493,21 @@ export function CommunicationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Contenu à communiquer
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                    <FileText className="w-4 h-4 inline mr-2" />
+                    Contenu à communiquer
+                  </label>
+                </div>
+                {/* ✅ LOT 3 v0.1 : dictée vocale — le texte transcrit s'ajoute au champ */}
+                {FEATURES.DICTATION_ENABLED && (
+                  <DictationRecorder
+                    disabled={loading}
+                    onTranscript={(text) =>
+                      setContenu(prev => (prev.trim() ? `${prev}\n\n${text}` : text))
+                    }
+                  />
+                )}
                 <Textarea
                   id="contenu"
                   rows={4}
