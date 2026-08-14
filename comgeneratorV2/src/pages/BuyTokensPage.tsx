@@ -50,7 +50,7 @@ export function BuyTokensPage() {
       examples: {
         withBank: [
           '🎯 100 appréciations détaillées',
-          '💬 150 communications + 50 appréciations',
+          '💬 150 messages simples + 50 appréciations',
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
           '🗺️ 30 scénarios pédagogiques',
@@ -59,7 +59,7 @@ export function BuyTokensPage() {
         ],
         withoutBank: [
           '🎯 100 appréciations détaillées',
-          '💬 150 communications + 50 appréciations', 
+          '💬 150 messages simples + 50 appréciations', 
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
           '🗺️ 30 scénarios pédagogiques',
@@ -80,7 +80,7 @@ export function BuyTokensPage() {
       examples: {
         withBank: [
           '🎯 200 appréciations détaillées',
-          '💬 300 communications + 100 appréciations',
+          '💬 300 messages simples + 100 appréciations',
           '📄 150 synthèses + 110 appréciations',
           '📚 85 séances + 100 appréciations',
           '🗺️ 60 scénarios pédagogiques',
@@ -89,7 +89,7 @@ export function BuyTokensPage() {
         ],
         withoutBank: [
           '🎯 200 appréciations détaillées',
-          '💬 300 communications + 100 appréciations',
+          '💬 300 messages simples + 100 appréciations',
           '📄 150 synthèses + 110 appréciations', 
           '📚 85 séances + 100 appréciations',
           '🗺️ 60 scénarios pédagogiques',
