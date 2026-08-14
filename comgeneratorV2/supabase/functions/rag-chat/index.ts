@@ -7,6 +7,9 @@
 // - Observabilité du routing
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Le débit était déjà effectué côté serveur, mais par un helper local en
+// lecture-puis-écriture : non atomique et absent du registre.
+import { consumeCredits } from '../_shared/credits.ts';
 
 declare const Deno: {
   env: { get(key: string): string | undefined };
@@ -1684,24 +1687,14 @@ Réponds en français, de manière professionnelle et adaptée à un public ense
 // ============================================================================
 
 async function deductTokens(
-  serviceClient: any,
+  _serviceClient: any,
   userId: string,
   tokensUsed: number
 ): Promise<void> {
   if (tokensUsed <= 0) return;
-
-  const { data } = await serviceClient
-    .from('profiles')
-    .select('tokens')
-    .eq('user_id', userId)
-    .single();
-
-  if (data) {
-    await serviceClient
-      .from('profiles')
-      .update({ tokens: Math.max(0, data.tokens - tokensUsed) })
-      .eq('user_id', userId);
-  }
+  // Débit atomique et tracé dans credit_ledger. La signature est conservée
+  // pour ne toucher à aucun des appelants.
+  await consumeCredits(userId, tokensUsed, 'chatbot', CONFIG.chatModel);
 }
 
 // ============================================================================
