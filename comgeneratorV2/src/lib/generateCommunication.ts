@@ -12,12 +12,33 @@ interface Params {
   signature?: string | null;
 }
 
+export interface GeneratedCommunication {
+  /** Corps du message (sans la ligne Objet) */
+  content: string;
+  /** Objet extrait de la première ligne « Objet : … » du texte, sinon null */
+  objet: string | null;
+}
+
+// Sépare la ligne « Objet : … » du corps. Extraction côté client : elle
+// fonctionne que l'Edge Function déployée impose ou non la ligne Objet
+// (aucun couplage d'ordre de déploiement). Les documents (rapport,
+// commission) ne commencent pas par « Objet : » → objet null, texte intact.
+// Exportée : réutilisée après une retouche (le texte retouché peut inclure
+// une ligne Objet ajustée).
+export function splitObjet(raw: string): GeneratedCommunication {
+  const match = raw.match(/^\s*objet\s*:\s*(.+)\r?\n+([\s\S]*)$/i);
+  if (match && match[2].trim()) {
+    return { objet: match[1].trim(), content: match[2].trim() };
+  }
+  return { objet: null, content: raw };
+}
+
 export async function generateCommunication({
   destinataire,
   ton,
   contenu,
   signature
-}: Params): Promise<string> {
+}: Params): Promise<GeneratedCommunication> {
   try {
     // Appel sécurisé via Edge Function avec les paramètres corrects
     const result = await secureApi.generateCommunication({
@@ -33,14 +54,14 @@ export async function generateCommunication({
     // compatible avec une Edge Function pas encore redéployée.
     if (typeof result.remainingTokens === 'number') {
       tokenUpdateEvent.dispatchEvent(new Event(TOKEN_UPDATED));
-      return result.content;
+      return splitObjet(result.content);
     }
 
     // --- Repli : débit client historique ---
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       console.error("Utilisateur non trouvé");
-      return result.content;
+      return splitObjet(result.content);
     }
 
     // Calculer les tokens utilisés à partir de la réponse
@@ -54,7 +75,7 @@ export async function generateCommunication({
 
     if (profileError || !profile) {
       console.error('Erreur récupération profil :', profileError);
-      return result.content;
+      return splitObjet(result.content);
     }
 
     const currentTokens = profile.tokens ?? 0;
@@ -74,7 +95,7 @@ export async function generateCommunication({
       tokenUpdateEvent.dispatchEvent(new Event(TOKEN_UPDATED));
     }
 
-    return result.content;
+    return splitObjet(result.content);
 
   } catch (error: any) {
     console.error('Erreur lors de la génération de communication:', error);

@@ -39,6 +39,12 @@ export interface CommunicationBriefParams {
   messageRecu?: string;
 }
 
+export interface ReviseParams {
+  texte: string;
+  /** Type de retouche : whitelist côté serveur */
+  kind: 'shorter' | 'warmer' | 'firmer';
+}
+
 export interface LessonParams {
   subject: string;
   topic: string;
@@ -186,6 +192,15 @@ class SecureApiService {
       usage: any;
       remainingTokens?: number;
     }>('reply', params);
+  }
+
+  // Retouche en un clic d'un message généré (plus court, chaleureux, ferme)
+  async reviseCommunication(params: ReviseParams) {
+    return this.makeRequest<{
+      content: string;
+      usage: any;
+      remainingTokens?: number;
+    }>('communication-revise', params);
   }
 
   // Analyse d'un brouillon de communication (pré-remplissage du formulaire).
