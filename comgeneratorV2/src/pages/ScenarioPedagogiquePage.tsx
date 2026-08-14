@@ -667,7 +667,14 @@ export function ScenarioPedagogiquePage() {
 
       const usedTokens: number = result.usage?.total_tokens ?? 0;
 
-      if (usedTokens > 0 && user) {
+      // ✅ remainingTokens présent = le débit a été fait côté serveur
+      // (Edge Function à jour). On notifie seulement l'interface, qui relit
+      // le solde. Le bloc ci-dessous n'est conservé qu'en repli, pour rester
+      // compatible avec une Edge Function pas encore redéployée.
+      if (typeof result.remainingTokens === 'number') {
+        tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+      } else if (usedTokens > 0 && user) {
+        // --- Repli : débit client historique ---
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('tokens')

@@ -2,6 +2,19 @@
 // Edge Function pour la génération de scénarios pédagogiques
 // Avec support optionnel du RAG (Retrieval-Augmented Generation)
 // et des documents supports uploadés
+//
+// DÉBIT DES CRÉDITS CÔTÉ SERVEUR :
+//   - vérification du solde avant génération (402 si épuisé)
+//   - plafond de requêtes par minute (429)
+//   - débit du coût réel via consume_credits, tracé dans credit_ledger
+//   - le nouveau solde est renvoyé dans `remainingTokens` ; en son absence
+//     (échec du débit, migration non appliquée), le front conserve son
+//     débit client historique — aucune génération gratuite possible.
+
+import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
 
 declare const Deno: {
   env: {
@@ -618,6 +631,31 @@ const scenarioHandler = async (req: Request): Promise<Response> => {
     const { documentsContent, documentNames, aiModel } = data;
     const { cycle, cycleNum } = getCycleFromNiveau(data.niveau);
 
+    // ✅ Vérification du solde avant génération (et avant tout appel RAG,
+    // qui consomme lui aussi des ressources).
+    // Dégradation douce : si le solde est illisible (indisponibilité), on ne
+    // bloque pas la génération — le front garde alors son débit client.
+    const balance = await getBalance(user.id);
+    if (balance !== null && balance <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Crédits insuffisants. Rechargez votre compte pour continuer.'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(user.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Résoudre la configuration du modèle IA
     let aiConfig;
     try {
@@ -1043,11 +1081,25 @@ Génère maintenant le scénario pédagogique complet :`}`;
     console.log(`[scenario] Generated ${content.length} chars with ${aiConfig.model}`);
     console.log(`[scenario] RAG sources returned: ${ragSources.length}`);
 
+    // ✅ Débit du coût réel côté serveur (aucun plafond côté client sur les
+    // scénarios : le montant reste identique à celui d'aujourd'hui).
+    // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le
+    // front applique son débit client historique (aucun débit perdu).
+    const cost = aiData.usage?.total_tokens
+      || Math.ceil((effectiveSystemPrompt.length + userPrompt.length + content.length) / 4);
+    const remainingTokens = await consumeCredits(
+      user.id,
+      cost,
+      'scenario',
+      aiConfig.model
+    );
+
     return new Response(JSON.stringify({
       content,
       usage: aiData.usage,
       sources: ragSources.length > 0 ? ragSources : undefined,
       warnings: ragWarnings.length > 0 ? ragWarnings : undefined,
+      ...(typeof remainingTokens === 'number' && { remainingTokens }),
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
