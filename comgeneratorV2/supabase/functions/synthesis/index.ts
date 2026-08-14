@@ -1,5 +1,18 @@
 // supabase/functions/synthesis/index.ts
 // VERSION AVEC CHOIX DE MODÈLE IA (GPT-4o-mini, GPT-5 mini, Mistral Medium)
+//
+// DÉBIT DES CRÉDITS CÔTÉ SERVEUR :
+//   - vérification du solde avant génération (402 si épuisé)
+//   - plafond de requêtes par minute (429)
+//   - débit du coût réel via consume_credits, tracé dans credit_ledger
+//   - le nouveau solde est renvoyé dans `remainingTokens` ; en son absence
+//     (échec du débit, migration non appliquée), le front conserve son
+//     débit client historique — aucune génération gratuite possible.
+
+import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
@@ -209,6 +222,30 @@ const synthesisHandler = async (req) => {
       });
     }
 
+    // ✅ Vérification du solde avant génération.
+    // Dégradation douce : si le solde est illisible (indisponibilité), on ne
+    // bloque pas la génération — le front garde alors son débit client.
+    const balance = await getBalance(authUser.id);
+    if (balance !== null && balance <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Crédits insuffisants. Rechargez votre compte pour continuer.'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(authUser.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     // Résoudre la configuration API
     let aiConfig;
     try {
@@ -383,9 +420,22 @@ const synthesisHandler = async (req) => {
     // FIN LOGGING
 
 
+    // ✅ Débit du coût réel côté serveur.
+    // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le
+    // front applique son débit client historique (aucun débit perdu).
+    const cost = aiData.usage?.total_tokens
+      || Math.ceil((prompt.length + (content?.length || 0)) / 4);
+    const remainingTokens = await consumeCredits(
+      authUser.id,
+      cost,
+      'synthese',
+      aiConfig.model
+    );
+
     return new Response(JSON.stringify({
       content,
-      usage: aiData.usage
+      usage: aiData.usage,
+      ...(typeof remainingTokens === 'number' && { remainingTokens })
     }), {
       status: 200,
       headers: {

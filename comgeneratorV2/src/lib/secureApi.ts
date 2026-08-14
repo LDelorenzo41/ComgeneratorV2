@@ -238,6 +238,7 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('synthesis', params);
   }
 
