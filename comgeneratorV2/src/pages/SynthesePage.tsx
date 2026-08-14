@@ -42,14 +42,27 @@ export function SynthesePage() {
   const { user } = useAuthStore();
 
   const tokenCount = useTokenBalance();
+  // Défini tôt : référencé par les gestionnaires d'import et l'écouteur de collage
+  const tokensAvailable = tokenCount !== null && tokenCount > 0;
 
   const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
+  // Import : survol de dépôt et erreur de format (remplace les alert() natifs)
+  const [isDraggingPdf, setIsDraggingPdf] = React.useState(false);
+  const [isDraggingScreenshot, setIsDraggingScreenshot] = React.useState(false);
+  const [importError, setImportError] = React.useState<string | null>(null);
+  // Confirmation d'import : les aperçus sont plus bas dans la page, il faut
+  // annoncer le succès et y amener l'utilisateur
+  const [importSuccess, setImportSuccess] = React.useState<string | null>(null);
+  const pdfPreviewRef = React.useRef<HTMLDivElement | null>(null);
+  const capturePreviewRef = React.useRef<HTMLDivElement | null>(null);
   
   // ✅ NOUVEAUX ÉTATS POUR LES CONTRÔLES
   const [tone, setTone] = React.useState<'neutre' | 'encourageant' | 'analytique'>('neutre');
   const [maxChars, setMaxChars] = React.useState<number>(300);
   const [outputType, setOutputType] = React.useState<'complet' | 'essentiel'>('complet');
+  // Portée de l'analyse : les moyennes calibrent le niveau, ou commentaires seuls
+  const [sourceScope, setSourceScope] = React.useState<'moyennes' | 'appreciations'>('moyennes');
   
   const [summary, setSummary] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -62,46 +75,119 @@ export function SynthesePage() {
     return desiredWidth / viewport.width;
   };
 
+  // Amène l'utilisateur sur l'aperçu correspondant et confirme l'import
+  const confirmImport = (message: string, ref: React.RefObject<HTMLDivElement>) => {
+    setImportSuccess(message);
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    // La confirmation s'efface d'elle-même : l'aperçu prend le relais
+    setTimeout(() => setImportSuccess(null), 5000);
+  };
+
+  // Affichage du bulletin PDF (visionneuse) — le PDF n'est pas analysé :
+  // il sert à afficher le bulletin pour que l'utilisateur le capture.
+  const loadPdfFile = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      setPdfDoc(pdf);
+      setCapturedImage(null);
+
+      const page = await pdf.getPage(1);
+      const canvas = canvasRef.current!;
+      const containerWidth = canvas.parentElement?.clientWidth ?? 600;
+      const scale = getResponsiveScale(containerWidth, page);
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext('2d')!;
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({
+        canvasContext: ctx,
+        viewport,
+        canvas
+      }).promise;
+
+      confirmImport(
+        `Bulletin « ${file.name} » affiché — capturez la partie à analyser.`,
+        pdfPreviewRef
+      );
+    } catch (err) {
+      console.error('Erreur lors de l\'ouverture du PDF :', err);
+      setImportError('Ce PDF n\'a pas pu être ouvert. Vérifiez qu\'il n\'est pas protégé.');
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    setPdfDoc(pdf);
-    setCapturedImage(null);
-
-    const page = await pdf.getPage(1);
-    const canvas = canvasRef.current!;
-    const containerWidth = canvas.parentElement?.clientWidth ?? 600;
-    const scale = getResponsiveScale(containerWidth, page);
-    const viewport = page.getViewport({ scale });
-    const ctx = canvas.getContext('2d')!;
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-
-    await page.render({
-      canvasContext: ctx,
-      viewport,
-      canvas
-    }).promise;
+    setImportError(null);
+    await loadPdfFile(file);
   };
 
-  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Chargement d'une image de capture, quelle que soit son origine :
+  // sélection de fichier, glisser-déposer ou collage depuis le presse-papiers
+  const loadScreenshotFile = React.useCallback((file: File | null | undefined) => {
     if (!file || !file.type.startsWith('image/')) {
-      alert('Veuillez sélectionner une image valide.');
+      setImportError('Format non reconnu : déposez une image (PNG, JPG…).');
       return;
     }
 
+    setImportError(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       const imageDataUrl = event.target?.result as string;
       setCapturedImage(imageDataUrl);
       console.log('📸 Capture d\'écran chargée avec succès');
+      confirmImport('Capture chargée — vérifiez l\'aperçu, puis générez la synthèse.', capturePreviewRef);
     };
+    reader.onerror = () => setImportError('Impossible de lire ce fichier. Réessayez.');
     reader.readAsDataURL(file);
+  }, []);
+
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    loadScreenshotFile(e.target.files?.[0]);
   };
+
+  // Glisser-déposer d'une capture
+  const handleScreenshotDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingScreenshot(false);
+    if (!tokensAvailable) return;
+    loadScreenshotFile(e.dataTransfer.files?.[0]);
+  };
+
+  // Glisser-déposer du bulletin PDF
+  const handlePdfDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingPdf(false);
+    if (!tokensAvailable) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file || file.type !== 'application/pdf') {
+      setImportError('Format non reconnu : déposez un fichier PDF.');
+      return;
+    }
+    setImportError(null);
+    await loadPdfFile(file);
+  };
+
+  // Collage depuis le presse-papiers (Win+Shift+S, Cmd+Shift+4 y déposent
+  // directement la capture) — actif sur toute la page
+  React.useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!tokensAvailable) return;
+      const item = Array.from(e.clipboardData?.items ?? [])
+        .find((i) => i.type.startsWith('image/'));
+      if (!item) return;
+      e.preventDefault();
+      loadScreenshotFile(item.getAsFile());
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [tokensAvailable, loadScreenshotFile]);
 
   const extractTextFromCapture = async (): Promise<string> => {
     if (!capturedImage) return '';
@@ -157,9 +243,9 @@ export function SynthesePage() {
       const result = await secureApi.generateSynthesis({
         extractedText: extracted,
         maxChars: maxChars,
-        // @ts-ignore - Ces paramètres seront utilisés après la mise à jour de l'Edge Function
         tone: tone,
-        outputType: outputType
+        outputType: outputType,
+        sourceScope: sourceScope
       });
 
       const content = result.content;
@@ -170,8 +256,14 @@ export function SynthesePage() {
 
       const usedTokens: number = result.usage?.total_tokens ?? 0;
 
-      // Mise à jour des tokens
-      if (usedTokens > 0 && user) {
+      // ✅ remainingTokens présent = le débit a été fait côté serveur
+      // (Edge Function à jour). On notifie seulement l'interface, qui relit
+      // le solde. Le bloc ci-dessous n'est conservé qu'en repli, pour rester
+      // compatible avec une Edge Function pas encore redéployée.
+      if (typeof result.remainingTokens === 'number') {
+        tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+      } else if (usedTokens > 0 && user) {
+        // --- Repli : débit client historique ---
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('tokens')
@@ -181,8 +273,8 @@ export function SynthesePage() {
         if (!profileError && profile) {
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            .update({
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens)
             })
             .eq('user_id', user.id);
 
@@ -237,6 +329,7 @@ export function SynthesePage() {
     setTone('neutre');
     setMaxChars(300);
     setOutputType('complet');
+    setSourceScope('moyennes');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -249,12 +342,26 @@ export function SynthesePage() {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
     }
+    // Les blocs du dessus disparaissent : sans cela l'utilisateur reste en
+    // bas d'une page devenue courte, loin de l'étape 1
+    setImportError(null);
+    setImportSuccess(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const tokensAvailable = tokenCount !== null && tokenCount > 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+      {/* Confirmation d'import : visible immédiatement, quelle que soit la
+          position de défilement (les aperçus sont plus bas dans la page) */}
+      <div className="sr-only" role="status" aria-live="polite">{importSuccess}</div>
+      {importSuccess && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-[90vw]">
+          <div className="flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg">
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-medium">{importSuccess}</span>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         <div className="text-center mb-12">
@@ -345,7 +452,10 @@ export function SynthesePage() {
                   <Upload className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Étape 1 : Uploadez votre bulletin PDF
+                  Étape 1 : Affichez votre bulletin PDF
+                  <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    facultatif
+                  </span>
                   {!tokensAvailable && (
                     <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
                       Indisponible
@@ -354,15 +464,28 @@ export function SynthesePage() {
                 </h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400">
-                Commencez par télécharger le bulletin scolaire que vous souhaitez analyser
+                Affichez ici le bulletin pour le capturer confortablement à l'écran.
+                Vous avez déjà votre capture ? <strong>Passez directement à l'étape 2.</strong>
               </p>
             </div>
-            
-            <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
-              <Input 
+
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (tokensAvailable) setIsDraggingPdf(true); }}
+              onDragLeave={() => setIsDraggingPdf(false)}
+              onDrop={handlePdfDrop}
+              className={`rounded-2xl p-6 border-2 border-dashed transition-all duration-200 ${
+                isDraggingPdf
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20'
+              }`}
+            >
+              <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-3">
+                {isDraggingPdf ? 'Relâchez pour ouvrir le bulletin' : 'Glissez-déposez votre PDF ici, ou sélectionnez-le :'}
+              </p>
+              <Input
                 ref={fileInputRef}
-                type="file" 
-                accept="application/pdf" 
+                type="file"
+                accept="application/pdf"
                 onChange={handleFileChange}
                 disabled={!tokensAvailable}
                 className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
@@ -370,8 +493,9 @@ export function SynthesePage() {
             </div>
           </div>
 
-          {/* Étape 2: Capture d'écran */}
-          {pdfDoc && (
+          {/* Étape 2: Capture d'écran — toujours visible : l'utilisateur peut
+              arriver avec sa capture déjà prête, sans passer par le PDF */}
+          {(
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
@@ -402,32 +526,46 @@ export function SynthesePage() {
                   </div>
                   
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Monitor className="w-8 h-8 text-blue-500" />
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Monitor className="w-8 h-8 text-blue-500 flex-shrink-0" />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Windows</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Win + Shift + S</kbd>
                         </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Command className="w-8 h-8 text-blue-500" />
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-gray-100">Mac</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Cmd + Shift + 4</kbd>
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1.5">
+                          ✓ Copie directement dans le presse-papiers
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
-                      <Printer className="w-8 h-8 text-blue-500" />
+
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Command className="w-8 h-8 text-blue-500 flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Mac</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Cmd + Ctrl + Shift + 4</kbd>
+                        </p>
+                        <p className="text-xs text-green-700 dark:text-green-400 mt-1.5">
+                          ✓ Copie dans le presse-papiers (avec <strong>Ctrl</strong>)
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Sans <strong>Ctrl</strong>, la capture est enregistrée sur le Bureau :
+                          déposez alors le fichier ci-dessous.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-800 rounded-xl">
+                      <Printer className="w-8 h-8 text-blue-500 flex-shrink-0" />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Linux</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Print Screen</kbd>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <kbd className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs">Maj + Impr. écran</kbd>
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                          Selon votre environnement, la capture va dans le presse-papiers
+                          ou dans un fichier.
                         </p>
                       </div>
                     </div>
@@ -440,29 +578,60 @@ export function SynthesePage() {
                   </div>
                 </div>
                 
-                <div className="text-center">
+                {/* Zone de dépôt : glisser-déposer, collage ou sélection */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); if (tokensAvailable) setIsDraggingScreenshot(true); }}
+                  onDragLeave={() => setIsDraggingScreenshot(false)}
+                  onDrop={handleScreenshotDrop}
+                  className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 ${
+                    isDraggingScreenshot
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                      : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40'
+                  }`}
+                >
+                  <Camera className={`w-10 h-10 mx-auto mb-3 ${
+                    isDraggingScreenshot ? 'text-purple-600' : 'text-gray-400 dark:text-gray-500'
+                  }`} />
+                  <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    {isDraggingScreenshot
+                      ? 'Relâchez pour déposer votre capture'
+                      : 'Glissez-déposez votre capture ici'}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    ou, si votre capture est dans le presse-papiers, collez-la avec
+                    {' '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Ctrl</kbd>
+                    {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd>
+                    {' '}(<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Cmd</kbd>
+                    {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd> sur Mac)
+                  </p>
                   <label className={`group cursor-pointer inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ${
                     !tokensAvailable ? 'opacity-50 cursor-not-allowed transform-none' : ''
                   }`}>
-                    <input 
+                    <input
                       ref={screenshotInputRef}
-                      type="file" 
-                      accept="image/*" 
+                      type="file"
+                      accept="image/*"
                       onChange={handleScreenshotUpload}
                       disabled={!tokensAvailable}
                       className="hidden"
                     />
                     <Camera className="w-5 h-5" />
-                    <span>Sélectionner votre capture d'écran</span>
+                    <span>Sélectionner un fichier</span>
                   </label>
                 </div>
+
+                {importError && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                    <p className="text-sm text-red-700 dark:text-red-300">{importError}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Capture sélectionnée */}
           {capturedImage && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div ref={capturePreviewRef} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
@@ -612,6 +781,62 @@ export function SynthesePage() {
                       <span>275</span>
                       <span>500</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* ✅ PORTÉE DE L'ANALYSE - BOUTONS RADIO */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <Eye className="w-4 h-4 inline mr-2" />
+                    Sur quoi baser la synthèse ?
+                  </label>
+                  <div className="space-y-3">
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      sourceScope === 'moyennes'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="sourceScope"
+                        value="moyennes"
+                        checked={sourceScope === 'moyennes'}
+                        onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Tenir compte des moyennes</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Votre capture contient les colonnes de moyennes : le niveau global est calibré
+                          dessus, notamment l'écart avec la moyenne de classe. Aucun chiffre n'est cité
+                          dans le texte produit.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      sourceScope === 'appreciations'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="sourceScope"
+                        value="appreciations"
+                        checked={sourceScope === 'appreciations'}
+                        onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Uniquement les appréciations</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Votre capture ne contient pas de moyennes, ou elles sont peu lisibles :
+                          seuls les commentaires des professeurs sont analysés.
+                        </p>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
@@ -775,7 +1000,7 @@ export function SynthesePage() {
 
           {/* Aperçu du bulletin */}
           {pdfDoc && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
+            <div ref={pdfPreviewRef} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">

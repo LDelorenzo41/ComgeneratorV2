@@ -239,8 +239,14 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
       const usedTokens = generatedResult.usedTokens;
 
-      // ✅ MODIFICATION : Nouvelle logique de mise à jour des tokens
-      if (user) {
+      // ✅ remainingTokens présent = le débit a été fait côté serveur
+      // (Edge Function à jour). On notifie seulement l'interface, qui relit
+      // le solde. Le bloc ci-dessous n'est conservé qu'en repli, pour rester
+      // compatible avec une Edge Function pas encore redéployée.
+      if (typeof generatedResult.remainingTokens === 'number') {
+        tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+      } else if (user) {
+        // --- Repli : débit client historique ---
         const { data: profile } = await supabase
           .from('profiles')
           .select('tokens')
@@ -250,8 +256,8 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
         if (profile) {
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ 
-              tokens: Math.max(0, (profile.tokens || 0) - usedTokens) 
+            .update({
+              tokens: Math.max(0, (profile.tokens || 0) - usedTokens)
             })
             .eq('user_id', user.id);
 

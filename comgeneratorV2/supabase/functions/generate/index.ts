@@ -1,4 +1,17 @@
 // supabase/functions/generate/index.ts
+//
+// DÉBIT DES CRÉDITS CÔTÉ SERVEUR :
+//   - vérification du solde avant génération (402 si épuisé)
+//   - plafond de requêtes par minute (429)
+//   - débit du coût réel via consume_credits, tracé dans credit_ledger
+//   - le nouveau solde est renvoyé dans `remainingTokens` ; en son absence
+//     (échec du débit, migration non appliquée), le front conserve son
+//     débit client historique — aucune génération gratuite possible.
+
+import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
@@ -264,6 +277,30 @@ const generateHandler = async (req) => {
         error: 'Veuillez évaluer au moins un critère avant de générer une appréciation.'
       }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Vérification du solde avant génération.
+    // Dégradation douce : si le solde est illisible (indisponibilité), on ne
+    // bloque pas la génération — le front garde alors son débit client.
+    const balance = await getBalance(authUser.id);
+    if (balance !== null && balance <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Crédits insuffisants. Rechargez votre compte pour continuer.'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(authUser.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -711,10 +748,21 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
       addressMode: params.addressMode
     });
 
+    // ✅ Débit du coût réel côté serveur.
+    // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le
+    // front applique son débit client historique (aucun débit perdu).
+    const remainingTokens = await consumeCredits(
+      authUser.id,
+      usedTokens,
+      'appreciation',
+      aiConfig.model
+    );
+
     return new Response(JSON.stringify({
       detailed,
       summary,
-      usedTokens
+      usedTokens,
+      ...(typeof remainingTokens === 'number' && { remainingTokens })
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

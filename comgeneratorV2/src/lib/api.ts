@@ -6,7 +6,7 @@ import type { AppreciationTone } from './types';
 export type { GenerateAppreciationParams };
 
 // Fonction principale - maintenant utilise secureApi au lieu d'OpenAI direct
-export async function generateAppreciation(params: GenerateAppreciationParams): Promise<{ detailed: string; summary: string; usedTokens: number }> {
+export async function generateAppreciation(params: GenerateAppreciationParams): Promise<{ detailed: string; summary: string; usedTokens: number; remainingTokens?: number }> {
   try {
     // Validation locale (garde la même logique qu'avant)
     const evaluatedCriteriaCount = params.criteria.filter(c => c.value > 0).length;
@@ -20,7 +20,9 @@ export async function generateAppreciation(params: GenerateAppreciationParams): 
     return {
       detailed: result.detailed,
       summary: result.summary,
-      usedTokens: result.usedTokens
+      usedTokens: result.usedTokens,
+      // Présent = le débit a été fait côté serveur (voir AppreciationForm)
+      remainingTokens: result.remainingTokens
     };
   } catch (error: any) {
     console.error('Erreur lors de la génération de l\'appréciation:', error);

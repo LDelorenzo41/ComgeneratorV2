@@ -61,6 +61,12 @@ export interface SynthesisParams {
   maxChars: number;
   tone?: 'neutre' | 'encourageant' | 'analytique';
   outputType?: 'complet' | 'essentiel';
+  /**
+   * 'moyennes' : la capture contient les colonnes de moyennes, elles
+   * calibrent le niveau global (défaut).
+   * 'appreciations' : commentaires seuls, les nombres sont ignorés.
+   */
+  sourceScope?: 'moyennes' | 'appreciations';
 }
 
 // Interface - Génération de supports pédagogiques (exercices)
@@ -166,11 +172,14 @@ class SecureApiService {
   }
 
   // Génération d'appréciations
+  // remainingTokens : présent quand l'Edge Function a débité les crédits
+  // côté serveur ; absent avec une Edge Function non redéployée
   async generateAppreciation(params: GenerateAppreciationParams) {
     return this.makeRequest<{
       detailed: string;
       summary: string;
       usedTokens: number;
+      remainingTokens?: number;
     }>('generate', params);
   }
 
@@ -235,6 +244,7 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
     }>('synthesis', params);
   }
 

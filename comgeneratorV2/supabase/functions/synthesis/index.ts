@@ -1,5 +1,18 @@
 // supabase/functions/synthesis/index.ts
 // VERSION AVEC CHOIX DE MODÈLE IA (GPT-4o-mini, GPT-5 mini, Mistral Medium)
+//
+// DÉBIT DES CRÉDITS CÔTÉ SERVEUR :
+//   - vérification du solde avant génération (402 si épuisé)
+//   - plafond de requêtes par minute (429)
+//   - débit du coût réel via consume_credits, tracé dans credit_ledger
+//   - le nouveau solde est renvoyé dans `remainingTokens` ; en son absence
+//     (échec du débit, migration non appliquée), le front conserve son
+//     débit client historique — aucune génération gratuite possible.
+
+import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
@@ -192,11 +205,16 @@ const synthesisHandler = async (req) => {
     }
 
     const params = await req.json();
-    const { 
-      extractedText, 
+    const {
+      extractedText,
       maxChars,
       tone = 'neutre',
       outputType = 'complet',
+      // 'moyennes' : la capture contient les colonnes de moyennes, elles
+      // calibrent le niveau global. 'appreciations' : commentaires seuls
+      // (comportement historique). Défaut 'moyennes' — le prompt reste
+      // robuste si aucune moyenne n'est finalement lisible.
+      sourceScope = 'moyennes',
       aiModel
     } = params;
 
@@ -205,6 +223,30 @@ const synthesisHandler = async (req) => {
         error: 'Aucun texte détecté dans votre capture d\'écran.'
       }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Vérification du solde avant génération.
+    // Dégradation douce : si le solde est illisible (indisponibilité), on ne
+    // bloque pas la génération — le front garde alors son débit client.
+    const balance = await getBalance(authUser.id);
+    if (balance !== null && balance <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Crédits insuffisants. Rechargez votre compte pour continuer.'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(authUser.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -226,9 +268,10 @@ const synthesisHandler = async (req) => {
 
     // Construire le prompt de base
     const toneInstructions = getToneInstructions(tone);
-    const basePrompt = outputType === 'essentiel' 
-      ? buildEssentialPrompt(extractedText, maxChars, toneInstructions)
-      : buildCompletePrompt(extractedText, maxChars, toneInstructions);
+    const gradesInstructions = getGradesInstructions(sourceScope);
+    const basePrompt = outputType === 'essentiel'
+      ? buildEssentialPrompt(extractedText, maxChars, toneInstructions, gradesInstructions)
+      : buildCompletePrompt(extractedText, maxChars, toneInstructions, gradesInstructions);
 
     // Adapter le prompt selon le modèle (renforcement pour Mistral)
     const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig.model);
@@ -383,9 +426,22 @@ const synthesisHandler = async (req) => {
     // FIN LOGGING
 
 
+    // ✅ Débit du coût réel côté serveur.
+    // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le
+    // front applique son débit client historique (aucun débit perdu).
+    const cost = aiData.usage?.total_tokens
+      || Math.ceil((prompt.length + (content?.length || 0)) / 4);
+    const remainingTokens = await consumeCredits(
+      authUser.id,
+      cost,
+      'synthese',
+      aiConfig.model
+    );
+
     return new Response(JSON.stringify({
       content,
-      usage: aiData.usage
+      usage: aiData.usage,
+      ...(typeof remainingTokens === 'number' && { remainingTokens })
     }), {
       status: 200,
       headers: {
@@ -442,16 +498,46 @@ function getToneInstructions(tone) {
 // FONCTIONS HELPER - PROMPTS
 // =====================================================
 
-function buildCompletePrompt(extractedText, maxChars, toneInstructions) {
+/**
+ * Instructions de prise en compte des moyennes chiffrées.
+ * Le texte fourni provient de l'OCR d'un tableau de bulletin : les colonnes
+ * (matière, nb de notes, moyenne élève, moyenne classe, appréciation) y sont
+ * aplaties ligne par ligne. Sans consigne explicite, le modèle ignore les
+ * nombres et sous-évalue systématiquement le niveau réel de l'élève.
+ */
+function getGradesInstructions(sourceScope) {
+  if (sourceScope === 'appreciations') {
+    return `**PRISE EN COMPTE DES NOTES : NON**
+- Le texte peut contenir des nombres (moyennes, nombre de notes) : IGNORE-LES totalement.
+- Fonde ton appréciation UNIQUEMENT sur le contenu qualitatif des commentaires des professeurs.`;
+  }
+
+  return `**PRISE EN COMPTE DES NOTES : OUI — POINT CRITIQUE**
+Le texte provient de l'OCR d'un tableau de bulletin. Chaque ligne suit généralement l'ordre :
+MATIÈRE — nombre de notes — **moyenne de l'élève** — **moyenne de la classe** — appréciation du professeur.
+Sur une ligne du type "HISTOIRE-GEOGRAPHIE 4/4 18,69 14,84 Un excellent ensemble...",
+18,69 est la moyenne de l'ÉLÈVE et 14,84 celle de la CLASSE.
+
+- **Calibre le niveau global sur les moyennes**, pas seulement sur le ton des commentaires.
+- **L'écart élève / classe est l'indicateur déterminant** : un élève régulièrement très au-dessus de la moyenne de classe est un excellent élève, et l'appréciation doit le dire clairement.
+- Repères indicatifs sur 20 : 16 et plus = excellent ; 14 à 16 = très bon ; 12 à 14 = satisfaisant ; 10 à 12 = fragile ; moins de 10 = difficultés.
+- **N'ATTÉNUE JAMAIS un excellent bilan** : ne parle pas de résultats « satisfaisants » ni d'axes d'amélioration génériques quand les moyennes sont excellentes. Pour un très bon bulletin, les « axes d'amélioration » doivent être précis et repris des commentaires (ex. participation orale), ou simplement remplacés par des encouragements à poursuivre.
+- Si aucune moyenne n'est lisible dans le texte, fonde-toi uniquement sur les commentaires.
+- L'OCR peut être imparfait : ignore les fragments incohérents, n'invente aucun chiffre, et ne cite AUCUN nombre dans ta rédaction (les moyennes figurent déjà dans le bulletin).`;
+}
+
+function buildCompletePrompt(extractedText, maxChars, toneInstructions, gradesInstructions) {
   return `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**
-Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et rédiger une appréciation générale cohérente et professionnelle qui sera placée en pied de bulletin.
+Tu dois analyser un bulletin scolaire (moyennes et commentaires des professeurs) et rédiger une appréciation générale cohérente et professionnelle qui sera placée en pied de bulletin.
 
-**COMMENTAIRES À ANALYSER :**
+**BULLETIN À ANALYSER :**
 """
 ${extractedText}
 """
+
+${gradesInstructions}
 
 **INSTRUCTIONS D'ANALYSE :**
 
@@ -500,16 +586,18 @@ ${extractedText}
 Rédige maintenant l'appréciation générale en respectant SCRUPULEUSEMENT ces instructions, notamment la limite de ${maxChars} caractères.`;
 }
 
-function buildEssentialPrompt(extractedText, maxChars, toneInstructions) {
+function buildEssentialPrompt(extractedText, maxChars, toneInstructions, gradesInstructions) {
   return `Tu es un expert en pédagogie et en évaluation scolaire, spécialisé dans la rédaction d'appréciations générales de bulletin.
 
 **CONTEXTE ET MISSION :**
-Tu dois analyser les commentaires de plusieurs professeurs extraits d'un bulletin scolaire et identifier LA TENDANCE GLOBALE DOMINANTE qui caractérise le bilan de l'élève, puis rédiger une synthèse concise centrée sur cette vision d'ensemble.
+Tu dois analyser un bulletin scolaire (moyennes et commentaires des professeurs) et identifier LA TENDANCE GLOBALE DOMINANTE qui caractérise le bilan de l'élève, puis rédiger une synthèse concise centrée sur cette vision d'ensemble.
 
-**COMMENTAIRES À ANALYSER :**
+**BULLETIN À ANALYSER :**
 """
 ${extractedText}
 """
+
+${gradesInstructions}
 
 **INSTRUCTIONS D'ANALYSE CRITIQUE :**
 
