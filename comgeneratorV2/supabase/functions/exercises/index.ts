@@ -1,5 +1,17 @@
 // supabase/functions/exercises/index.ts
 // Edge function pour générer des supports pédagogiques (exercices, fiches, QCM...)
+//
+// Le débit était déjà effectué côté serveur (forfait de 1 000 tokens), mais
+// par un helper local en lecture-puis-écriture : non atomique et absent du
+// registre. Il passe désormais par consume_credits.
+
+import { consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
+
+// Forfait appliqué à chaque support généré, quelle que soit sa longueur
+const EXERCISE_COST = 1000;
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
@@ -66,27 +78,6 @@ async function createServiceClient() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   return createClient(supabaseUrl, serviceRoleKey);
-}
-
-async function deductTokens(
-  serviceClient: any,
-  userId: string,
-  tokensUsed: number
-): Promise<void> {
-  if (tokensUsed <= 0) return;
-
-  const { data } = await serviceClient
-    .from('profiles')
-    .select('tokens')
-    .eq('user_id', userId)
-    .single();
-
-  if (data) {
-    await serviceClient
-      .from('profiles')
-      .update({ tokens: Math.max(0, data.tokens - tokensUsed) })
-      .eq('user_id', userId);
-  }
 }
 
 function cleanOutputText(text: string): string {
@@ -278,11 +269,22 @@ const exercisesHandler = async (req: Request): Promise<Response> => {
       .eq('user_id', authUser.id)
       .single();
 
-    if (!profile || profile.tokens < 1000) {
+    if (!profile || profile.tokens < EXERCISE_COST) {
       return new Response(JSON.stringify({
         error: 'Tokens insuffisants. Il vous faut au moins 1 000 tokens pour générer un support.'
       }), {
         status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(authUser.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -510,8 +512,8 @@ Génère maintenant le support, prêt à être imprimé et distribué aux élèv
 
     const cleanedContent = cleanOutputText(content);
 
-    // Déduction de 1000 tokens
-    await deductTokens(serviceClient, authUser.id, 1000);
+    // Déduction du forfait, atomique et tracée dans credit_ledger
+    await consumeCredits(authUser.id, EXERCISE_COST, 'exercise', aiConfig.model);
 
     return new Response(JSON.stringify({
       content: cleanedContent,
