@@ -1,5 +1,18 @@
 // supabase/functions/lessons/index.ts
 // VERSION CORRIGÉE : SOLUTION FINALE (Nettoyage robuste + Prompt strict Mistral)
+//
+// DÉBIT DES CRÉDITS CÔTÉ SERVEUR :
+//   - vérification du solde avant génération (402 si épuisé)
+//   - plafond de requêtes par minute (429)
+//   - débit du coût réel via consume_credits, tracé dans credit_ledger
+//   - le nouveau solde est renvoyé dans `remainingTokens` ; en son absence
+//     (échec du débit, migration non appliquée), le front conserve son
+//     débit client historique — aucune génération gratuite possible.
+
+import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credits.ts';
+
+// Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
+const RATE_LIMIT_PER_MINUTE = 10;
 
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
@@ -338,6 +351,31 @@ const lessonsHandler = async (req: Request): Promise<Response> => {
     }
 
     const data: LessonRequest = await req.json();
+
+    // ✅ Vérification du solde avant génération (et avant tout appel RAG,
+    // qui consomme lui aussi des ressources).
+    // Dégradation douce : si le solde est illisible (indisponibilité), on ne
+    // bloque pas la génération — le front garde alors son débit client.
+    const balance = await getBalance(authUser.id);
+    if (balance !== null && balance <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Crédits insuffisants. Rechargez votre compte pour continuer.'
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ✅ Plafond de requêtes par minute
+    const recentDebits = await countRecentDebits(authUser.id, 60);
+    if (recentDebits !== null && recentDebits >= RATE_LIMIT_PER_MINUTE) {
+      return new Response(JSON.stringify({
+        error: 'Trop de requêtes. Veuillez patienter une minute avant de réessayer.'
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
     // Résoudre la configuration API
     let aiConfig;
@@ -1247,11 +1285,28 @@ Génère maintenant cette séance avec le niveau d'expertise attendu.`}`;
     const isMistral = aiConfig.model === 'mistral-medium-latest';
     const cleanedContent = cleanOutputText(content, isMistral);
 
+    // ✅ Débit côté serveur, avec le MÊME PLAFOND que le débit client
+    // historique (5 000, ou 6 000 si contexte externe RAG/document) : sans
+    // lui, une séance coûteuse serait soudain facturée plus qu'avant.
+    // `remainingTokens` n'est renvoyé que si le débit a réussi : sinon le
+    // front applique son débit client historique (aucun débit perdu).
+    const rawCost = aiData.usage?.total_tokens
+      || Math.ceil((systemPrompt.length + userPromptContent.length + content.length) / 4);
+    const hasExternalContext = !!(data.useRag || data.documentContext);
+    const cost = Math.min(rawCost, hasExternalContext ? 6000 : 5000);
+    const remainingTokens = await consumeCredits(
+      authUser.id,
+      cost,
+      'lesson',
+      aiConfig.model
+    );
+
     return new Response(JSON.stringify({
       content: cleanedContent,
       usage: aiData.usage,
       ...(ragSources.length > 0 && { sources: ragSources }),
       ...(ragWarnings.length > 0 && { warnings: ragWarnings }),
+      ...(typeof remainingTokens === 'number' && { remainingTokens }),
     }), {
       status: 200,
       headers: {
