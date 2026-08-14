@@ -342,6 +342,11 @@ export function SynthesePage() {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
     }
+    // Les blocs du dessus disparaissent : sans cela l'utilisateur reste en
+    // bas d'une page devenue courte, loin de l'étape 1
+    setImportError(null);
+    setImportSuccess(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
