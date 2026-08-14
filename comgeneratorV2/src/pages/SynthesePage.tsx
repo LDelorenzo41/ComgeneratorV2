@@ -42,9 +42,15 @@ export function SynthesePage() {
   const { user } = useAuthStore();
 
   const tokenCount = useTokenBalance();
+  // Défini tôt : référencé par les gestionnaires d'import et l'écouteur de collage
+  const tokensAvailable = tokenCount !== null && tokenCount > 0;
 
   const [pdfDoc, setPdfDoc] = React.useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
+  // Import : survol de dépôt et erreur de format (remplace les alert() natifs)
+  const [isDraggingPdf, setIsDraggingPdf] = React.useState(false);
+  const [isDraggingScreenshot, setIsDraggingScreenshot] = React.useState(false);
+  const [importError, setImportError] = React.useState<string | null>(null);
   
   // ✅ NOUVEAUX ÉTATS POUR LES CONTRÔLES
   const [tone, setTone] = React.useState<'neutre' | 'encourageant' | 'analytique'>('neutre');
@@ -64,46 +70,103 @@ export function SynthesePage() {
     return desiredWidth / viewport.width;
   };
 
+  // Affichage du bulletin PDF (visionneuse) — le PDF n'est pas analysé :
+  // il sert à afficher le bulletin pour que l'utilisateur le capture.
+  const loadPdfFile = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      setPdfDoc(pdf);
+      setCapturedImage(null);
+
+      const page = await pdf.getPage(1);
+      const canvas = canvasRef.current!;
+      const containerWidth = canvas.parentElement?.clientWidth ?? 600;
+      const scale = getResponsiveScale(containerWidth, page);
+      const viewport = page.getViewport({ scale });
+      const ctx = canvas.getContext('2d')!;
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({
+        canvasContext: ctx,
+        viewport,
+        canvas
+      }).promise;
+    } catch (err) {
+      console.error('Erreur lors de l\'ouverture du PDF :', err);
+      setImportError('Ce PDF n\'a pas pu être ouvert. Vérifiez qu\'il n\'est pas protégé.');
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    setPdfDoc(pdf);
-    setCapturedImage(null);
-
-    const page = await pdf.getPage(1);
-    const canvas = canvasRef.current!;
-    const containerWidth = canvas.parentElement?.clientWidth ?? 600;
-    const scale = getResponsiveScale(containerWidth, page);
-    const viewport = page.getViewport({ scale });
-    const ctx = canvas.getContext('2d')!;
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-
-    await page.render({
-      canvasContext: ctx,
-      viewport,
-      canvas
-    }).promise;
+    setImportError(null);
+    await loadPdfFile(file);
   };
 
-  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Chargement d'une image de capture, quelle que soit son origine :
+  // sélection de fichier, glisser-déposer ou collage depuis le presse-papiers
+  const loadScreenshotFile = React.useCallback((file: File | null | undefined) => {
     if (!file || !file.type.startsWith('image/')) {
-      alert('Veuillez sélectionner une image valide.');
+      setImportError('Format non reconnu : déposez une image (PNG, JPG…).');
       return;
     }
 
+    setImportError(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       const imageDataUrl = event.target?.result as string;
       setCapturedImage(imageDataUrl);
       console.log('📸 Capture d\'écran chargée avec succès');
     };
+    reader.onerror = () => setImportError('Impossible de lire ce fichier. Réessayez.');
     reader.readAsDataURL(file);
+  }, []);
+
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    loadScreenshotFile(e.target.files?.[0]);
   };
+
+  // Glisser-déposer d'une capture
+  const handleScreenshotDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingScreenshot(false);
+    if (!tokensAvailable) return;
+    loadScreenshotFile(e.dataTransfer.files?.[0]);
+  };
+
+  // Glisser-déposer du bulletin PDF
+  const handlePdfDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingPdf(false);
+    if (!tokensAvailable) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file || file.type !== 'application/pdf') {
+      setImportError('Format non reconnu : déposez un fichier PDF.');
+      return;
+    }
+    setImportError(null);
+    await loadPdfFile(file);
+  };
+
+  // Collage depuis le presse-papiers (Win+Shift+S, Cmd+Shift+4 y déposent
+  // directement la capture) — actif sur toute la page
+  React.useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!tokensAvailable) return;
+      const item = Array.from(e.clipboardData?.items ?? [])
+        .find((i) => i.type.startsWith('image/'));
+      if (!item) return;
+      e.preventDefault();
+      loadScreenshotFile(item.getAsFile());
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [tokensAvailable, loadScreenshotFile]);
 
   const extractTextFromCapture = async (): Promise<string> => {
     if (!capturedImage) return '';
@@ -260,8 +323,6 @@ export function SynthesePage() {
     }
   };
 
-  const tokensAvailable = tokenCount !== null && tokenCount > 0;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -354,7 +415,10 @@ export function SynthesePage() {
                   <Upload className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Étape 1 : Uploadez votre bulletin PDF
+                  Étape 1 : Affichez votre bulletin PDF
+                  <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    facultatif
+                  </span>
                   {!tokensAvailable && (
                     <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
                       Indisponible
@@ -363,15 +427,28 @@ export function SynthesePage() {
                 </h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400">
-                Commencez par télécharger le bulletin scolaire que vous souhaitez analyser
+                Affichez ici le bulletin pour le capturer confortablement à l'écran.
+                Vous avez déjà votre capture ? <strong>Passez directement à l'étape 2.</strong>
               </p>
             </div>
-            
-            <div className="bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20 rounded-2xl p-6 border-2 border-dashed border-gray-300 dark:border-gray-600">
-              <Input 
+
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (tokensAvailable) setIsDraggingPdf(true); }}
+              onDragLeave={() => setIsDraggingPdf(false)}
+              onDrop={handlePdfDrop}
+              className={`rounded-2xl p-6 border-2 border-dashed transition-all duration-200 ${
+                isDraggingPdf
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20'
+              }`}
+            >
+              <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-3">
+                {isDraggingPdf ? 'Relâchez pour ouvrir le bulletin' : 'Glissez-déposez votre PDF ici, ou sélectionnez-le :'}
+              </p>
+              <Input
                 ref={fileInputRef}
-                type="file" 
-                accept="application/pdf" 
+                type="file"
+                accept="application/pdf"
                 onChange={handleFileChange}
                 disabled={!tokensAvailable}
                 className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
@@ -379,8 +456,9 @@ export function SynthesePage() {
             </div>
           </div>
 
-          {/* Étape 2: Capture d'écran */}
-          {pdfDoc && (
+          {/* Étape 2: Capture d'écran — toujours visible : l'utilisateur peut
+              arriver avec sa capture déjà prête, sans passer par le PDF */}
+          {(
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
@@ -449,22 +527,53 @@ export function SynthesePage() {
                   </div>
                 </div>
                 
-                <div className="text-center">
+                {/* Zone de dépôt : glisser-déposer, collage ou sélection */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); if (tokensAvailable) setIsDraggingScreenshot(true); }}
+                  onDragLeave={() => setIsDraggingScreenshot(false)}
+                  onDrop={handleScreenshotDrop}
+                  className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 ${
+                    isDraggingScreenshot
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                      : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40'
+                  }`}
+                >
+                  <Camera className={`w-10 h-10 mx-auto mb-3 ${
+                    isDraggingScreenshot ? 'text-purple-600' : 'text-gray-400 dark:text-gray-500'
+                  }`} />
+                  <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    {isDraggingScreenshot
+                      ? 'Relâchez pour déposer votre capture'
+                      : 'Glissez-déposez votre capture ici'}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    ou collez-la directement avec <kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Ctrl</kbd>
+                    {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd>
+                    {' '}(<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Cmd</kbd>
+                    {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd> sur Mac)
+                    {' '}— les raccourcis ci-dessus la placent dans votre presse-papiers
+                  </p>
                   <label className={`group cursor-pointer inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ${
                     !tokensAvailable ? 'opacity-50 cursor-not-allowed transform-none' : ''
                   }`}>
-                    <input 
+                    <input
                       ref={screenshotInputRef}
-                      type="file" 
-                      accept="image/*" 
+                      type="file"
+                      accept="image/*"
                       onChange={handleScreenshotUpload}
                       disabled={!tokensAvailable}
                       className="hidden"
                     />
                     <Camera className="w-5 h-5" />
-                    <span>Sélectionner votre capture d'écran</span>
+                    <span>Sélectionner un fichier</span>
                   </label>
                 </div>
+
+                {importError && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                    <p className="text-sm text-red-700 dark:text-red-300">{importError}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
