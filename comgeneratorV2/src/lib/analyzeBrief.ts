@@ -24,9 +24,41 @@ export async function analyzeCommunicationBrief(brouillon: string): Promise<Brie
   }
 
   return {
-    destinataire: result.destinataire,
+    destinataire: result.destinataire ?? "Parents d'élèves",
     ton: result.ton,
     pointDeVue: result.pointDeVue ?? null,
+    contenu: result.contenu,
+    manques: Array.isArray(result.manques) ? result.manques : [],
+  };
+}
+
+export interface ReplyBriefAnalysis {
+  ton: string;
+  contenu: string;
+  /** Points du message reçu non couverts + informations pratiques absentes */
+  manques: string[];
+}
+
+/**
+ * Mode « réponse » : analyse croisée du message reçu et des objectifs de
+ * l'enseignant — ton suggéré, objectifs restructurés, et surtout les points
+ * du message restés sans réponse.
+ */
+export async function analyzeReplyBrief(
+  messageRecu: string,
+  objectifs: string
+): Promise<ReplyBriefAnalysis> {
+  const result = await secureApi.analyzeCommunicationBrief({
+    brouillon: objectifs,
+    messageRecu,
+  });
+
+  if (typeof result.remainingTokens === 'number') {
+    tokenUpdateEvent.dispatchEvent(new Event(TOKEN_UPDATED));
+  }
+
+  return {
+    ton: result.ton,
     contenu: result.contenu,
     manques: Array.isArray(result.manques) ? result.manques : [],
   };

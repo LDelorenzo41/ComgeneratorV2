@@ -11,7 +11,7 @@ import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
 import { DictationRecorder } from '../components/communication/DictationRecorder';
-import { analyzeCommunicationBrief } from '../lib/analyzeBrief';
+import { analyzeCommunicationBrief, analyzeReplyBrief } from '../lib/analyzeBrief';
 import { FEATURES } from '../lib/features';
 
 import { logGeneration } from '../lib/usageStats';
@@ -95,6 +95,11 @@ export function CommunicationPage() {
   const [briefBackup, setBriefBackup] = React.useState<string | null>(null);
   // Informations manquantes signalées par l'analyse (créneau, prénom…)
   const [briefManques, setBriefManques] = React.useState<string[]>([]);
+
+  // ✅ Analyse des objectifs de réponse (croisée avec le message reçu)
+  const [analyzingReply, setAnalyzingReply] = React.useState(false);
+  const [replyObjBackup, setReplyObjBackup] = React.useState<string | null>(null);
+  const [replyManques, setReplyManques] = React.useState<string[]>([]);
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -232,6 +237,58 @@ export function CommunicationPage() {
       setContenu(briefBackup);
       setBriefBackup(null);
       setLiveMessage('Brouillon d\'origine rétabli.');
+    }
+  };
+
+  // ✅ Analyse des objectifs de réponse, croisée avec le message reçu :
+  // ton suggéré, objectifs restructurés, et points du message sans réponse
+  const handleAnalyzeReply = async (objectifsSource?: string) => {
+    const objectifs = objectifsSource ?? objectifsReponse;
+    if (analyzingReply || loadingReply) return;
+    if (tokenCount <= 0) {
+      setReplyError('Crédits insuffisants pour analyser les objectifs.');
+      return;
+    }
+    if (!messageRecu.trim()) {
+      setReplyError('Collez d\'abord le message reçu : l\'analyse compare vos objectifs avec ce qu\'il demande.');
+      return;
+    }
+    if (!objectifs.trim()) {
+      setReplyError('Écrivez ou dictez d\'abord vos objectifs de réponse.');
+      return;
+    }
+    if (objectifs.length > MAX_INPUT_LENGTH || messageRecu.length > MAX_INPUT_LENGTH) {
+      setReplyError(`Texte trop long (maximum ${MAX_INPUT_LENGTH.toLocaleString('fr-FR')} caractères par champ).`);
+      return;
+    }
+
+    setAnalyzingReply(true);
+    setReplyError(null);
+
+    try {
+      const analysis = await analyzeReplyBrief(messageRecu, objectifs);
+      setReplyObjBackup(objectifs);
+      setTonReponse(analysis.ton);
+      setObjectifsReponse(analysis.contenu);
+      setReplyManques(analysis.manques);
+      setLiveMessage(
+        analysis.manques.length > 0
+          ? 'Objectifs pré-remplis. Des points du message sans réponse ont été signalés.'
+          : 'Objectifs pré-remplis. Vérifiez avant de générer.'
+      );
+    } catch (err) {
+      setReplyError(toUserErrorMessage(err, 'Erreur lors de l\'analyse des objectifs. Veuillez réessayer.'));
+    } finally {
+      setAnalyzingReply(false);
+    }
+  };
+
+  // Restaure les objectifs d'origine après une analyse
+  const handleRestoreReplyDraft = () => {
+    if (replyObjBackup !== null) {
+      setObjectifsReponse(replyObjBackup);
+      setReplyObjBackup(null);
+      setLiveMessage('Objectifs d\'origine rétablis.');
     }
   };
 
@@ -882,14 +939,45 @@ export function CommunicationPage() {
                     <FileText className="w-4 h-4 inline mr-2" />
                     Objectifs de la réponse
                   </label>
-                  {/* ✅ Dictée simple des objectifs (pas d'analyse : champ court) */}
+                  {/* ✅ Dictée des objectifs → analyse croisée avec le message reçu.
+                      Si l'analyse échoue ou si le message reçu manque, la dictée
+                      est déposée dans le champ — rien n'est perdu. */}
                   {FEATURES.DICTATION_ENABLED && (
                     <DictationRecorder
-                      disabled={loadingReply}
-                      buttonLabel="Dicter mes objectifs"
-                      onTranscript={(text) =>
-                        setObjectifsReponse(prev => (prev.trim() ? `${prev}\n${text}` : text))
-                      }
+                      disabled={loadingReply || analyzingReply}
+                      buttonLabel="Dicter et pré-remplir"
+                      buttonTitle="Dictez vos objectifs : le ton est suggéré, les objectifs structurés, et les points du message restés sans réponse sont signalés (100 crédits par minute entamée + coût de l'analyse)"
+                      processingLabel="Transcription et analyse en cours…"
+                      onTranscript={async (text) => {
+                        const merged = objectifsReponse.trim() ? `${objectifsReponse}\n${text}` : text;
+                        if (!messageRecu.trim()) {
+                          setObjectifsReponse(merged);
+                          setReplyError('Dictée déposée dans les objectifs. Collez le message reçu puis cliquez « Analyser et pré-remplir » pour le croisement.');
+                          setLiveMessage('Dictée déposée dans les objectifs.');
+                          return;
+                        }
+                        setAnalyzingReply(true);
+                        setReplyError(null);
+                        try {
+                          const analysis = await analyzeReplyBrief(messageRecu, merged);
+                          setReplyObjBackup(merged);
+                          setTonReponse(analysis.ton);
+                          setObjectifsReponse(analysis.contenu);
+                          setReplyManques(analysis.manques);
+                          setLiveMessage(
+                            analysis.manques.length > 0
+                              ? 'Objectifs pré-remplis depuis votre dictée. Des points du message sans réponse ont été signalés.'
+                              : 'Objectifs pré-remplis depuis votre dictée. Vérifiez avant de générer.'
+                          );
+                        } catch {
+                          setObjectifsReponse(merged);
+                          setReplyManques([]);
+                          setReplyError('L\'analyse a échoué — votre dictée a été déposée dans les objectifs. Vous pouvez cliquer « Analyser et pré-remplir ».');
+                          setLiveMessage('Dictée déposée dans les objectifs, analyse à relancer.');
+                        } finally {
+                          setAnalyzingReply(false);
+                        }
+                      }}
                     />
                   )}
                   <Textarea
@@ -899,8 +987,79 @@ export function CommunicationPage() {
                     onChange={(e) => setObjectifsReponse(e.target.value)}
                     className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   />
+
+                  {/* ✅ Analyse des objectifs tapés/collés (miroir du côté création) */}
+                  {FEATURES.BRIEF_ANALYSIS_ENABLED && (
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      {replyObjBackup !== null ? (
+                        <button
+                          type="button"
+                          onClick={handleRestoreReplyDraft}
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                        >
+                          <Undo2 className="w-4 h-4" />
+                          Rétablir mes objectifs d'origine
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          L'analyse vérifie que vos objectifs répondent à tout le message
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleAnalyzeReply()}
+                        disabled={analyzingReply || loadingReply || !objectifsReponse.trim() || !messageRecu.trim()}
+                        title="Compare vos objectifs avec le message reçu : ton suggéré, objectifs structurés, points sans réponse signalés"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {analyzingReply ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Analyse en cours…
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="w-4 h-4" />
+                            Analyser et pré-remplir
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* ✅ Points du message sans réponse, signalés par l'analyse */}
+              {replyManques.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          Avant de générer la réponse :
+                        </p>
+                        <ul className="mt-1 space-y-0.5 text-sm text-amber-700 dark:text-amber-300/90 list-disc list-inside">
+                          {replyManques.map((manque, index) => (
+                            <li key={index}>{manque}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400/80">
+                          Complétez vos objectifs si besoin — la génération fonctionnera aussi sans.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyManques([])}
+                      aria-label="Masquer ces suggestions"
+                      className="text-amber-400 hover:text-amber-600 dark:hover:text-amber-200 transition-colors flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {replyError && (
                 <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
@@ -983,6 +1142,9 @@ export function CommunicationPage() {
                       setMessageRecu('');
                       setObjectifsReponse('');
                       setGeneratedReply('');
+                      setReplyError(null);
+                      setReplyObjBackup(null);
+                      setReplyManques([]);
                     }}
                     className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 font-bold py-4 px-8 rounded-xl border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
                   >

@@ -35,6 +35,8 @@ export interface ReplyParams {
 
 export interface CommunicationBriefParams {
   brouillon: string;
+  /** Présent = mode « réponse » : analyse croisée avec le message reçu */
+  messageRecu?: string;
 }
 
 export interface LessonParams {
@@ -186,10 +188,11 @@ class SecureApiService {
     }>('reply', params);
   }
 
-  // Analyse d'un brouillon de communication (pré-remplissage du formulaire)
+  // Analyse d'un brouillon de communication (pré-remplissage du formulaire).
+  // destinataire est null en mode « réponse » (messageRecu fourni).
   async analyzeCommunicationBrief(params: CommunicationBriefParams) {
     return this.makeRequest<{
-      destinataire: string;
+      destinataire: string | null;
       ton: string;
       pointDeVue: 'premiere' | 'troisieme' | null;
       contenu: string;

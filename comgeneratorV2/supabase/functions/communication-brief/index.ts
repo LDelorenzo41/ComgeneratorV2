@@ -53,6 +53,8 @@ function parseAIJson(raw: string): Record<string, unknown> | null {
 
 interface BriefParams {
   brouillon: string;
+  /** Présent = mode « réponse » : analyse croisée avec le message reçu */
+  messageRecu?: string;
   aiModel?: string;
 }
 
@@ -83,7 +85,7 @@ const briefHandler = async (req: Request): Promise<Response> => {
     }
 
     const body: BriefParams = await req.json();
-    const { brouillon, aiModel } = body;
+    const { brouillon, messageRecu, aiModel } = body;
 
     if (!brouillon || typeof brouillon !== 'string' || !brouillon.trim()) {
       return jsonResponse(corsHeaders, 400, {
@@ -94,6 +96,14 @@ const briefHandler = async (req: Request): Promise<Response> => {
     if (brouillon.length > MAX_BROUILLON_LENGTH) {
       return jsonResponse(corsHeaders, 400, {
         error: `Le brouillon est trop long (maximum ${MAX_BROUILLON_LENGTH.toLocaleString('fr-FR')} caractères).`
+      });
+    }
+
+    // Mode « réponse » : le message reçu accompagne le brouillon d'objectifs
+    const isReplyMode = typeof messageRecu === 'string' && messageRecu.trim().length > 0;
+    if (isReplyMode && (messageRecu as string).length > MAX_BROUILLON_LENGTH) {
+      return jsonResponse(corsHeaders, 400, {
+        error: `Le message reçu est trop long (maximum ${MAX_BROUILLON_LENGTH.toLocaleString('fr-FR')} caractères).`
       });
     }
 
@@ -120,9 +130,54 @@ const briefHandler = async (req: Request): Promise<Response> => {
       return jsonResponse(corsHeaders, 500, { error: configError.message });
     }
 
-    console.log(`[communication-brief] Modèle IA utilisé: ${aiConfig.model}`);
+    console.log(`[communication-brief] Modèle IA utilisé: ${aiConfig.model} (mode ${isReplyMode ? 'réponse' : 'création'})`);
 
-    const prompt = `Tu es un assistant qui analyse le brouillon d'un enseignant afin de pré-remplir un formulaire de communication professionnelle. Tu n'écris PAS le message final.
+    // ========================================================================
+    // MODE RÉPONSE : analyse croisée message reçu × objectifs de l'enseignant
+    // ========================================================================
+    const replyPrompt = `Tu es un assistant qui aide un enseignant à préparer sa RÉPONSE à un message reçu (parent d'élève, collègue, direction…). Tu analyses le message reçu et le brouillon d'objectifs de l'enseignant afin de pré-remplir un formulaire. Tu n'écris PAS la réponse finale.
+
+**MESSAGE REÇU :**
+"""
+${messageRecu}
+"""
+
+**BROUILLON D'OBJECTIFS DE L'ENSEIGNANT (souvent dicté, en vrac) :**
+"""
+${brouillon}
+"""
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte avant ou après, avec EXACTEMENT ces trois clés :
+
+{
+  "ton": "...",
+  "contenu": "...",
+  "manques": ["..."]
+}
+
+**RÈGLES :**
+
+1. "ton" — une valeur EXACTE parmi : "Détendu" | "Neutre" | "Stricte"
+   Choisis selon la teneur du message reçu ET l'intention de l'enseignant :
+   - "Stricte" si l'enseignant veut recadrer, poser un cadre, répondre à une mise en cause.
+   - "Détendu" pour une réponse chaleureuse à un message positif ou convivial.
+   - Sinon "Neutre".
+
+2. "contenu" — une CHAÎNE DE CARACTÈRES unique (jamais un tableau) : les objectifs de réponse réorganisés en liste claire, sous forme de tirets séparés par des retours à la ligne (\n) À L'INTÉRIEUR de la chaîne :
+   - CONSERVE TOUS les faits du brouillon : décisions, dates, créneaux, conditions, points à rappeler.
+   - N'invente RIEN : n'ajoute aucun objectif que l'enseignant n'a pas exprimé.
+   - Supprime seulement les hésitations, répétitions et digressions.
+   - Exemple de format attendu : "- Accepter le rendez-vous, proposer jeudi 17h\n- Rappeler le cadre : le carnet doit être signé\n- Rassurer sur la moyenne du trimestre"
+
+3. "manques" — un tableau de 0 à 4 courtes phrases signalant :
+   a) les questions ou demandes du MESSAGE REÇU auxquelles les objectifs de l'enseignant ne répondent pas (c'est le plus important : relève chaque point resté sans réponse) ;
+   b) les informations pratiques absentes des objectifs (un rendez-vous accepté sans créneau proposé, un document promis sans échéance…).
+   Règles : chaque entrée est une phrase courte et actionnable (ex. "Le parent demande si la sortie est maintenue — vos objectifs n'en parlent pas"). Si les objectifs couvrent tout, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
+
+    // ========================================================================
+    // MODE CRÉATION : analyse du brouillon seul
+    // ========================================================================
+    const createPrompt = `Tu es un assistant qui analyse le brouillon d'un enseignant afin de pré-remplir un formulaire de communication professionnelle. Tu n'écris PAS le message final.
 
 **BROUILLON À ANALYSER :**
 """
@@ -172,6 +227,8 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
    - une demande est faite sans échéance.
    Règles : chaque entrée est une phrase courte et actionnable (ex. "Le créneau du rendez-vous n'est pas précisé"). Ne signale que les manques réellement gênants pour rédiger le message — si le brouillon est complet, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
 
+    const prompt = isReplyMode ? replyPrompt : createPrompt;
+
     // Marges larges : une réponse tronquée casse le JSON (gpt-5-mini consomme
     // en plus des tokens de raisonnement sur ce plafond)
     const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2500;
@@ -217,14 +274,17 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
         });
       }
 
-      // Validation stricte contre les listes du front — jamais de valeur libre
-      const destinataire = DESTINATAIRES.includes(parsed.destinataire as string)
-        ? parsed.destinataire as string
-        : DEFAULT_DESTINATAIRE;
+      // Validation stricte contre les listes du front — jamais de valeur libre.
+      // En mode réponse, destinataire et point de vue ne s'appliquent pas.
+      const destinataire = isReplyMode
+        ? null
+        : DESTINATAIRES.includes(parsed.destinataire as string)
+          ? parsed.destinataire as string
+          : DEFAULT_DESTINATAIRE;
       const ton = TONS.includes(parsed.ton as string)
         ? parsed.ton as string
         : DEFAULT_TON;
-      const pointDeVue = destinataire === "Rapport d'incident" &&
+      const pointDeVue = !isReplyMode && destinataire === "Rapport d'incident" &&
         (parsed.pointDeVue === 'premiere' || parsed.pointDeVue === 'troisieme')
         ? parsed.pointDeVue
         : null;
@@ -244,7 +304,12 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
 
       // Débit du coût réel (aucun débit si l'analyse a échoué plus haut)
       const cost = computeTokenCost(usage, prompt, content);
-      const remainingTokens = await consumeCredits(user.id, cost, 'communication_brief', aiConfig.model);
+      const remainingTokens = await consumeCredits(
+        user.id,
+        cost,
+        isReplyMode ? 'reply_brief' : 'communication_brief',
+        aiConfig.model
+      );
 
       console.log(`[communication-brief] Analyse OK (${contenu.length} caractères, ${manques.length} manque(s), ${cost} crédits)`);
 
