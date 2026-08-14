@@ -61,6 +61,12 @@ export interface SynthesisParams {
   maxChars: number;
   tone?: 'neutre' | 'encourageant' | 'analytique';
   outputType?: 'complet' | 'essentiel';
+  /**
+   * 'moyennes' : la capture contient les colonnes de moyennes, elles
+   * calibrent le niveau global (défaut).
+   * 'appreciations' : commentaires seuls, les nombres sont ignorés.
+   */
+  sourceScope?: 'moyennes' | 'appreciations';
 }
 
 // Interface - Génération de supports pédagogiques (exercices)

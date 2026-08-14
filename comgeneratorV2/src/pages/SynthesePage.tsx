@@ -50,6 +50,8 @@ export function SynthesePage() {
   const [tone, setTone] = React.useState<'neutre' | 'encourageant' | 'analytique'>('neutre');
   const [maxChars, setMaxChars] = React.useState<number>(300);
   const [outputType, setOutputType] = React.useState<'complet' | 'essentiel'>('complet');
+  // Portée de l'analyse : les moyennes calibrent le niveau, ou commentaires seuls
+  const [sourceScope, setSourceScope] = React.useState<'moyennes' | 'appreciations'>('moyennes');
   
   const [summary, setSummary] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -157,9 +159,9 @@ export function SynthesePage() {
       const result = await secureApi.generateSynthesis({
         extractedText: extracted,
         maxChars: maxChars,
-        // @ts-ignore - Ces paramètres seront utilisés après la mise à jour de l'Edge Function
         tone: tone,
-        outputType: outputType
+        outputType: outputType,
+        sourceScope: sourceScope
       });
 
       const content = result.content;
@@ -243,6 +245,7 @@ export function SynthesePage() {
     setTone('neutre');
     setMaxChars(300);
     setOutputType('complet');
+    setSourceScope('moyennes');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -618,6 +621,62 @@ export function SynthesePage() {
                       <span>275</span>
                       <span>500</span>
                     </div>
+                  </div>
+                </div>
+
+                {/* ✅ PORTÉE DE L'ANALYSE - BOUTONS RADIO */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    <Eye className="w-4 h-4 inline mr-2" />
+                    Sur quoi baser la synthèse ?
+                  </label>
+                  <div className="space-y-3">
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      sourceScope === 'moyennes'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="sourceScope"
+                        value="moyennes"
+                        checked={sourceScope === 'moyennes'}
+                        onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Tenir compte des moyennes</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Votre capture contient les colonnes de moyennes : le niveau global est calibré
+                          dessus, notamment l'écart avec la moyenne de classe. Aucun chiffre n'est cité
+                          dans le texte produit.
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
+                      sourceScope === 'appreciations'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input
+                        type="radio"
+                        name="sourceScope"
+                        value="appreciations"
+                        checked={sourceScope === 'appreciations'}
+                        onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
+                        disabled={!tokensAvailable}
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">Uniquement les appréciations</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Votre capture ne contient pas de moyennes, ou elles sont peu lisibles :
+                          seuls les commentaires des professeurs sont analysés.
+                        </p>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
