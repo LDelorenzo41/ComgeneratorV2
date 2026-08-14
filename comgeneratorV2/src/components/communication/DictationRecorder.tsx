@@ -19,10 +19,18 @@ const NOTICE_ACK_KEY = 'profassist_dictation_notice_ack';
 type Phase = 'idle' | 'notice' | 'recording' | 'transcribing';
 
 interface DictationRecorderProps {
-  /** Reçoit le texte transcrit (à insérer dans le champ cible) */
-  onTranscript: (text: string) => void;
+  /**
+   * Reçoit le texte transcrit. Peut être asynchrone : le composant reste en
+   * phase « traitement » tant que la promesse n'est pas résolue (utilisé pour
+   * enchaîner l'analyse du brouillon après la transcription).
+   */
+  onTranscript: (text: string) => void | Promise<void>;
   /** Désactive le déclenchement (ex. pendant une génération) */
   disabled?: boolean;
+  /** Libellé du bouton déclencheur (défaut : « Dicter ») */
+  buttonLabel?: string;
+  /** Libellé de la phase de traitement (défaut : « Transcription en cours… ») */
+  processingLabel?: string;
 }
 
 function pickMimeType(): string | null {
@@ -42,7 +50,12 @@ function formatSeconds(total: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function DictationRecorder({ onTranscript, disabled }: DictationRecorderProps) {
+export function DictationRecorder({
+  onTranscript,
+  disabled,
+  buttonLabel = 'Dicter',
+  processingLabel = 'Transcription en cours…',
+}: DictationRecorderProps) {
   const [phase, setPhase] = React.useState<Phase>('idle');
   const [seconds, setSeconds] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
@@ -92,18 +105,20 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
     }
 
     setPhase('transcribing');
-    setStatus('Transcription en cours…');
+    setStatus(processingLabel);
     try {
       const text = await transcribeAudio(blob, duration, mimeTypeRef.current);
-      onTranscript(text);
-      setStatus('Texte ajouté au champ de contenu.');
+      // Attend le traitement du parent (ex. analyse du brouillon) avant de
+      // rendre la main — l'état « traitement » couvre toute la chaîne
+      await Promise.resolve(onTranscript(text));
+      setStatus('Dictée traitée.');
       setPhase('idle');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la transcription.');
       setStatus('La transcription a échoué.');
       setPhase('idle');
     }
-  }, [cleanupMedia, onTranscript]);
+  }, [cleanupMedia, onTranscript, processingLabel]);
 
   const startRecording = React.useCallback(async () => {
     setError(null);
@@ -192,7 +207,7 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
         className="inline-flex items-center gap-2 text-sm font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed"
       >
         <Mic className="w-4 h-4" />
-        Dicter
+        {buttonLabel}
       </button>
     );
   }
@@ -208,11 +223,11 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
           type="button"
           onClick={handleMicClick}
           disabled={disabled}
-          title="Dicter le contenu au micro (100 crédits par minute entamée)"
+          title="Dictez au micro : le formulaire est ensuite analysé et pré-rempli automatiquement (100 crédits par minute entamée + coût de l'analyse)"
           className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Mic className="w-4 h-4" />
-          Dicter
+          {buttonLabel}
         </button>
       )}
 
@@ -229,8 +244,9 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
                 familiale…).
               </p>
               <p>
-                <strong>Coût :</strong> 100 crédits par minute entamée
-                (ex. : une dictée de 1 min 30 = 200 crédits). Durée maximale : 3 minutes.
+                <strong>Coût :</strong> 100 crédits par minute entamée, plus le coût de
+                l'analyse qui pré-remplit le formulaire (généralement quelques centaines
+                de crédits). Durée maximale : 3 minutes.
               </p>
             </div>
           </div>
@@ -286,12 +302,12 @@ export function DictationRecorder({ onTranscript, disabled }: DictationRecorderP
         </div>
       )}
 
-      {/* Transcription en cours */}
+      {/* Traitement en cours (transcription, puis éventuelle analyse) */}
       {phase === 'transcribing' && (
         <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center gap-3">
           <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" aria-hidden="true" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Transcription en cours…
+            {processingLabel}
           </span>
         </div>
       )}

@@ -560,13 +560,35 @@ export function CommunicationPage() {
                     Contenu à communiquer
                   </label>
                 </div>
-                {/* ✅ LOT 3 v0.1 : dictée vocale — le texte transcrit s'ajoute au champ */}
+                {/* ✅ LOT 3 : dictée → analyse → formulaire pré-rempli, en un geste.
+                    Si l'analyse échoue, la dictée n'est pas perdue : le texte brut
+                    est déposé dans le champ et reste analysable manuellement. */}
                 {FEATURES.DICTATION_ENABLED && (
                   <DictationRecorder
-                    disabled={loading}
-                    onTranscript={(text) =>
-                      setContenu(prev => (prev.trim() ? `${prev}\n\n${text}` : text))
-                    }
+                    disabled={loading || analyzingBrief}
+                    buttonLabel="Dicter et pré-remplir le formulaire"
+                    processingLabel="Transcription et analyse en cours…"
+                    onTranscript={async (text) => {
+                      setAnalyzingBrief(true);
+                      try {
+                        const analysis = await analyzeCommunicationBrief(text);
+                        setBriefBackup(text);
+                        setDestinataire(analysis.destinataire);
+                        setTon(analysis.ton);
+                        if (analysis.destinataire === "Rapport d'incident" && analysis.pointDeVue) {
+                          setPointDeVue(analysis.pointDeVue);
+                        }
+                        setContenu(analysis.contenu);
+                        setLiveMessage('Formulaire pré-rempli depuis votre dictée. Vérifiez les champs avant de générer.');
+                      } catch {
+                        // L'analyse a échoué : on conserve la dictée brute dans le champ
+                        setContenu(prev => (prev.trim() ? `${prev}\n\n${text}` : text));
+                        setError('L\'analyse du brouillon a échoué — votre dictée a été déposée dans le champ. Vous pouvez la modifier puis cliquer « Analyser et pré-remplir le formulaire ».');
+                        setLiveMessage('Dictée déposée dans le champ, analyse à relancer.');
+                      } finally {
+                        setAnalyzingBrief(false);
+                      }
+                    }}
                   />
                 )}
                 <Textarea
