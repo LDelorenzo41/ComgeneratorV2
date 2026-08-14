@@ -233,7 +233,9 @@ ${getDestinataireInstructions(destinataire)}
 ${getTonInstructions(ton)}
 
 3. **Structure à respecter :**
-   - **Objet/Titre :** Concis et informatif (si pertinent)
+   - **Objet/Titre :** ${isDocument
+     ? 'Concis et informatif (si pertinent)'
+     : `Commence OBLIGATOIREMENT ta réponse par une première ligne « Objet : ... » (concise et informative), suivie d'une ligne vide, puis le message`}
    - **Salutation :** Appropriée au destinataire et au contexte
    - **Introduction :** Contexte bref et raison du message
    - **Corps du message :** Développement clair et structuré des éléments

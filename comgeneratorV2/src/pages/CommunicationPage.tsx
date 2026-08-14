@@ -6,7 +6,8 @@ import { SignatureManager } from '../components/SignatureManager';
 import { useAuthStore } from '../lib/store';
 import useTokenBalance from '../hooks/useTokenBalance';
 import copyToClipboard from '../lib/copyToClipboard';
-import { generateCommunication } from '../lib/generateCommunication';
+import { generateCommunication, splitObjet } from '../lib/generateCommunication';
+import { reviseCommunication, REVISION_LABELS, type RevisionKind } from '../lib/reviseCommunication';
 import { generateReply } from '../lib/generateReply';
 import { supabase } from '../lib/supabase';
 import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDisclaimer';
@@ -37,6 +38,7 @@ import {
   ClipboardList,
   Eye,
   Download,
+  Mail,
   X
 } from 'lucide-react';
 
@@ -105,6 +107,11 @@ export function CommunicationPage() {
   // l'utilisateur change le sélecteur après génération)
   const [generatedDocType, setGeneratedDocType] = React.useState<DocType>('message');
   const [resultView, setResultView] = React.useState<'preview' | 'edit'>('edit');
+  // Objet extrait du message généré (messages uniquement), éditable
+  const [generatedObjet, setGeneratedObjet] = React.useState<string | null>(null);
+  // Retouches en un clic : type en cours + version précédente (annulation)
+  const [revisingKind, setRevisingKind] = React.useState<RevisionKind | null>(null);
+  const [previousVersion, setPreviousVersion] = React.useState<{ content: string; objet: string | null } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   
   // ✅ NOUVEAU: État pour le point de vue (rapport d'incident)
@@ -120,6 +127,9 @@ export function CommunicationPage() {
   const [analyzingReply, setAnalyzingReply] = React.useState(false);
   const [replyObjBackup, setReplyObjBackup] = React.useState<string | null>(null);
   const [replyManques, setReplyManques] = React.useState<string[]>([]);
+  // Retouches en un clic de la réponse générée
+  const [revisingReplyKind, setRevisingReplyKind] = React.useState<RevisionKind | null>(null);
+  const [previousReplyVersion, setPreviousReplyVersion] = React.useState<string | null>(null);
 
   // Fonction 2
   const [messageRecu, setMessageRecu] = React.useState('');
@@ -196,6 +206,8 @@ export function CommunicationPage() {
     setTon('Détendu');
     setContenu('');
     setGeneratedContent('');
+    setGeneratedObjet(null);
+    setPreviousVersion(null);
     setGeneratedDocType('message');
     setResultView('edit');
     setError(null);
@@ -273,6 +285,86 @@ export function CommunicationPage() {
       setBriefBackup(null);
       setLiveMessage('Brouillon d\'origine rétabli.');
     }
+  };
+
+  // ✅ Retouche en un clic du message généré (plus court, chaleureux, ferme).
+  // L'objet est réintégré au texte envoyé pour que la retouche puisse
+  // l'ajuster ; une seule version précédente est conservée (annulation).
+  const handleRevise = async (kind: RevisionKind) => {
+    if (!generatedContent || revisingKind !== null || loading) return;
+    if (tokenCount <= 0) {
+      setError('Crédits insuffisants pour retoucher le message.');
+      return;
+    }
+
+    setRevisingKind(kind);
+    setError(null);
+
+    try {
+      const fullText = generatedObjet
+        ? `Objet : ${generatedObjet}\n\n${generatedContent}`
+        : generatedContent;
+      const revised = await reviseCommunication(fullText, kind);
+      setPreviousVersion({ content: generatedContent, objet: generatedObjet });
+      const split = splitObjet(revised);
+      setGeneratedContent(split.content);
+      // Si la retouche a perdu la ligne Objet, l'objet précédent est conservé
+      setGeneratedObjet(split.objet ?? generatedObjet);
+      setLiveMessage(`Message retouché : ${REVISION_LABELS[kind].toLowerCase()}.`);
+    } catch (err) {
+      setError(toUserErrorMessage(err, 'Erreur lors de la retouche. Veuillez réessayer.'));
+    } finally {
+      setRevisingKind(null);
+    }
+  };
+
+  const handleUndoRevision = () => {
+    if (previousVersion) {
+      setGeneratedContent(previousVersion.content);
+      setGeneratedObjet(previousVersion.objet);
+      setPreviousVersion(null);
+      setLiveMessage('Version précédente rétablie.');
+    }
+  };
+
+  // ✅ Retouche de la réponse générée (section Répondre)
+  const handleReviseReply = async (kind: RevisionKind) => {
+    if (!generatedReply || revisingReplyKind !== null || loadingReply) return;
+    if (tokenCount <= 0) {
+      setReplyError('Crédits insuffisants pour retoucher la réponse.');
+      return;
+    }
+
+    setRevisingReplyKind(kind);
+    setReplyError(null);
+
+    try {
+      const revised = await reviseCommunication(generatedReply, kind);
+      setPreviousReplyVersion(generatedReply);
+      setGeneratedReply(revised);
+      setLiveMessage(`Réponse retouchée : ${REVISION_LABELS[kind].toLowerCase()}.`);
+    } catch (err) {
+      setReplyError(toUserErrorMessage(err, 'Erreur lors de la retouche. Veuillez réessayer.'));
+    } finally {
+      setRevisingReplyKind(null);
+    }
+  };
+
+  const handleUndoReplyRevision = () => {
+    if (previousReplyVersion !== null) {
+      setGeneratedReply(previousReplyVersion);
+      setPreviousReplyVersion(null);
+      setLiveMessage('Version précédente rétablie.');
+    }
+  };
+
+  // ✅ Ouvre le message dans le logiciel de messagerie (mailto). Selon le
+  // client mail, les très longs corps peuvent être tronqués — le bouton
+  // Copier reste le chemin garanti.
+  const handleOpenInMailer = (objet: string | null, body: string) => {
+    const href = `mailto:?subject=${encodeURIComponent(objet ?? '')}&body=${encodeURIComponent(body)}`;
+    window.location.href = href;
+    setLiveMessage('Ouverture de votre messagerie…');
   };
 
   // ✅ Export PDF des documents structurés (rapport, bilan de commission)
@@ -404,13 +496,15 @@ export function CommunicationPage() {
       }
 
       // ✅ MODIFICATION: Ajout de la signature dans les paramètres
-      const text = await generateCommunication({
+      const generated = await generateCommunication({
         destinataire: effectiveDestinataire,
         ton: effectiveTon,
         contenu: contenuAvecPointDeVue,
         signature: selectedSignature ? selectedSignature.content : null
       });
-      setGeneratedContent(text);
+      setGeneratedContent(generated.content);
+      setGeneratedObjet(docType === 'message' ? generated.objet : null);
+      setPreviousVersion(null);
       setGeneratedDocType(docType);
       // Les documents s'ouvrent en aperçu mis en forme, les messages en édition
       setResultView(docType === 'message' ? 'edit' : 'preview');
@@ -905,6 +999,33 @@ export function CommunicationPage() {
               </div>
 
               <div className="space-y-6">
+                {/* ✅ Objet extrait, éditable et copiable séparément (messages) */}
+                {generatedDocType === 'message' && generatedObjet !== null && (
+                  <div className="space-y-1">
+                    <label htmlFor="objet-genere" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Objet
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="objet-genere"
+                        type="text"
+                        value={generatedObjet}
+                        onChange={(e) => setGeneratedObjet(e.target.value)}
+                        className="flex-1 border-2 border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2.5 text-sm font-medium dark:bg-gray-700 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500 focus:outline-none transition-all duration-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(generatedObjet)}
+                        title="Copier l'objet"
+                        aria-label="Copier l'objet"
+                        className="px-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400 hover:border-green-300 transition-colors"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* ✅ Documents : bascule Aperçu mis en forme / Modifier */}
                 {generatedDocType !== 'message' && (
                   <div className="flex gap-2">
@@ -950,7 +1071,48 @@ export function CommunicationPage() {
                   />
                 )}
 
-                {/* ✅ Actions : Copier, PDF (documents), Nouvelle communication */}
+                {/* ✅ Retouches en un clic + Régénérer + annulation */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {generatedDocType === 'message' && (
+                    <>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Retoucher :</span>
+                      {(Object.keys(REVISION_LABELS) as RevisionKind[]).map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => handleRevise(kind)}
+                          disabled={revisingKind !== null || loading}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {revisingKind === kind && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          {REVISION_LABELS[kind]}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={loading || revisingKind !== null}
+                    title="Relance une génération complète avec les mêmes réglages"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Régénérer
+                  </button>
+                  {previousVersion && (
+                    <button
+                      type="button"
+                      onClick={handleUndoRevision}
+                      className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                      Version précédente
+                    </button>
+                  )}
+                </div>
+
+                {/* ✅ Actions : Copier, Messagerie (messages), PDF (documents), Nouvelle communication */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => handleCopy(generatedContent)}
@@ -962,6 +1124,20 @@ export function CommunicationPage() {
                       {generatedDocType === 'message' ? 'Copier le message' : 'Copier le document'}
                     </span>
                   </button>
+
+                  {generatedDocType === 'message' && (
+                    <button
+                      onClick={() => handleOpenInMailer(generatedObjet, generatedContent)}
+                      title="Ouvre votre logiciel de messagerie avec l'objet et le message pré-remplis (les messages très longs peuvent être tronqués selon le logiciel — le bouton Copier reste le chemin garanti)"
+                      className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                      <span className="relative flex items-center justify-center">
+                        <Mail className="w-5 h-5 mr-3" />
+                        Ouvrir dans ma messagerie
+                      </span>
+                    </button>
+                  )}
 
                   {generatedDocType !== 'message' && (
                     <button
@@ -1279,6 +1455,43 @@ export function CommunicationPage() {
                   className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
                 />
 
+                {/* ✅ Retouches en un clic + Régénérer + annulation */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Retoucher :</span>
+                  {(Object.keys(REVISION_LABELS) as RevisionKind[]).map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={() => handleReviseReply(kind)}
+                      disabled={revisingReplyKind !== null || loadingReply}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {revisingReplyKind === kind && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {REVISION_LABELS[kind]}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleGenerateReply}
+                    disabled={loadingReply || revisingReplyKind !== null}
+                    title="Relance une génération complète avec les mêmes réglages"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Régénérer
+                  </button>
+                  {previousReplyVersion !== null && (
+                    <button
+                      type="button"
+                      onClick={handleUndoReplyRevision}
+                      className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                    >
+                      <Undo2 className="w-4 h-4" />
+                      Version précédente
+                    </button>
+                  )}
+                </div>
+
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={() => handleCopy(generatedReply)}
@@ -1290,7 +1503,19 @@ export function CommunicationPage() {
                       Copier la réponse
                     </span>
                   </button>
-                  
+
+                  <button
+                    onClick={() => handleOpenInMailer(null, generatedReply)}
+                    title="Ouvre votre logiciel de messagerie avec la réponse pré-remplie (répondez de préférence depuis le fil de discussion d'origine)"
+                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                    <span className="relative flex items-center justify-center">
+                      <Mail className="w-5 h-5 mr-3" />
+                      Ouvrir dans ma messagerie
+                    </span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setMessageRecu('');
@@ -1299,6 +1524,7 @@ export function CommunicationPage() {
                       setReplyError(null);
                       setReplyObjBackup(null);
                       setReplyManques([]);
+                      setPreviousReplyVersion(null);
                     }}
                     className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 font-bold py-4 px-8 rounded-xl border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
                   >
