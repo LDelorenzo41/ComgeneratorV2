@@ -231,6 +231,7 @@ class SecureApiService {
     return this.makeRequest<{
       content: string;
       usage: any;
+      remainingTokens?: number;
       sources?: Array<{
         document_name: string;
         chunk_content: string;
