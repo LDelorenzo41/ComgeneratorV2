@@ -166,11 +166,14 @@ class SecureApiService {
   }
 
   // Génération d'appréciations
+  // remainingTokens : présent quand l'Edge Function a débité les crédits
+  // côté serveur ; absent avec une Edge Function non redéployée
   async generateAppreciation(params: GenerateAppreciationParams) {
     return this.makeRequest<{
       detailed: string;
       summary: string;
       usedTokens: number;
+      remainingTokens?: number;
     }>('generate', params);
   }
 
