@@ -171,10 +171,17 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
    - une demande est faite sans échéance.
    Règles : chaque entrée est une phrase courte et actionnable (ex. "Le créneau du rendez-vous n'est pas précisé"). Ne signale que les manques réellement gênants pour rédiger le message — si le brouillon est complet, renvoie un tableau vide []. N'invente jamais de manque artificiel.`;
 
-    const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 2500 : 1500;
+    // Marges larges : une réponse tronquée casse le JSON (gpt-5-mini consomme
+    // en plus des tokens de raisonnement sur ce plafond)
+    const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2500;
 
     try {
-      const { content, usage } = await callAI(aiConfig, prompt, tokenLimit, 'communication-brief', { temperature: 0.2 });
+      // jsonObject : mode JSON natif (OpenAI et Mistral) — réponse garantie
+      // syntaxiquement parseable, quel que soit le modèle choisi
+      const { content, usage } = await callAI(aiConfig, prompt, tokenLimit, 'communication-brief', {
+        temperature: 0.2,
+        jsonObject: true
+      });
 
       if (!content) {
         return jsonResponse(corsHeaders, 500, {
@@ -186,7 +193,9 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
       const contenu = parsed && typeof parsed.contenu === 'string' ? parsed.contenu.trim() : '';
 
       if (!parsed || !contenu) {
-        console.error('[communication-brief] JSON inexploitable:', content.slice(0, 300));
+        // Le début de la réponse brute est journalisé pour diagnostic
+        // (Dashboard → Edge Functions → communication-brief → Logs)
+        console.error(`[communication-brief] JSON inexploitable (${aiConfig.model}):`, content.slice(0, 500));
         return jsonResponse(corsHeaders, 500, {
           error: "L'analyse du brouillon a échoué. Veuillez réessayer."
         });

@@ -97,18 +97,22 @@ export interface AIResult {
  * Lance une AIApiError (avec le statut HTTP amont) en cas d'échec.
  * opts.temperature : optionnelle, 0.7 par défaut (comportement historique) —
  * les tâches d'extraction structurée utilisent une valeur basse.
+ * opts.jsonObject : force le mode JSON natif (response_format json_object,
+ * pris en charge par OpenAI et Mistral en Chat Completions) — la réponse est
+ * alors garantie syntaxiquement parseable. Le prompt DOIT mentionner « JSON ».
  */
 export async function callAI(
   aiConfig: AIConfig,
   prompt: string,
   tokenLimit = 2000,
   logTag = 'ai',
-  opts?: { temperature?: number }
+  opts?: { temperature?: number; jsonObject?: boolean }
 ): Promise<AIResult> {
   let requestBody: Record<string, unknown>;
 
   if (aiConfig.isResponsesAPI) {
-    // API Responses (GPT-5 mini)
+    // API Responses (GPT-5 mini) — le mode JSON y est géré par l'extraction
+    // robuste côté appelant (format non forcé pour ne pas risquer un 400)
     requestBody = {
       model: aiConfig.model,
       input: prompt,
@@ -126,6 +130,7 @@ export async function callAI(
       model: aiConfig.model,
       messages: [{ role: 'user', content: prompt }],
       ...(aiConfig.supportsTemperature && { temperature: opts?.temperature ?? 0.7 }),
+      ...(opts?.jsonObject && { response_format: { type: 'json_object' } }),
       [aiConfig.tokenParamName]: tokenLimit
     };
   }
