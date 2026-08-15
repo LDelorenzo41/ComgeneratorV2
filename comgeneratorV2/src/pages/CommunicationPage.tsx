@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom'; // ✅ AJOUT
 import { Select } from '../components/ui/Select';
+import { Button } from '../components/ui/Button';
 import Textarea from '../components/ui/Textarea';
 import { SignatureManager } from '../components/SignatureManager';
 import { useAuthStore } from '../lib/store';
@@ -931,31 +932,29 @@ export function CommunicationPage() {
                 </div>
               )}
 
-              <button
+              <Button
                 onClick={handleGenerate}
                 disabled={loading || tokenCount <= 0}
-                className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                variant="blue"
+                className="w-full"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                <span className="relative flex items-center justify-center">
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                      Génération en cours...
-                    </>
-                  ) : tokenCount <= 0 ? (
-                    <>
-                      <CreditCard className="w-5 h-5 mr-3" />
-                      Crédits épuisés
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5 mr-3" />
-                      Générer la communication
-                    </>
-                  )}
-                </span>
-              </button>
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                    Génération en cours...
+                  </>
+                ) : tokenCount <= 0 ? (
+                  <>
+                    <CreditCard className="w-5 h-5 mr-3" />
+                    Crédits épuisés
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5 mr-3" />
+                    Générer la communication
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
@@ -1102,54 +1101,46 @@ export function CommunicationPage() {
 
                 {/* ✅ Actions : Copier, Messagerie (messages), PDF (documents), Nouvelle communication */}
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button
+                  <Button
                     onClick={() => handleCopy(generatedContent)}
-                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    variant="green"
+                    className="flex-1"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                    <span className="relative flex items-center justify-center">
-                      <Copy className="w-5 h-5 mr-3" />
-                      {generatedDocType === 'message' ? 'Copier le message' : 'Copier le document'}
-                    </span>
-                  </button>
+                    <Copy className="w-5 h-5 mr-3" />
+                    {generatedDocType === 'message' ? 'Copier le message' : 'Copier le document'}
+                  </Button>
 
                   {generatedDocType === 'message' && (
-                    <button
+                    <Button
                       onClick={() => handleOpenInMailer(generatedObjet, generatedContent)}
                       title="Ouvre votre logiciel de messagerie avec l'objet et le message pré-remplis (les messages très longs peuvent être tronqués selon le logiciel — le bouton Copier reste le chemin garanti)"
-                      className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                      variant="blue"
+                      className="flex-1"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                      <span className="relative flex items-center justify-center">
-                        <Mail className="w-5 h-5 mr-3" />
-                        Ouvrir dans ma messagerie
-                      </span>
-                    </button>
+                      <Mail className="w-5 h-5 mr-3" />
+                      Ouvrir dans ma messagerie
+                    </Button>
                   )}
 
                   {generatedDocType !== 'message' && (
-                    <button
+                    <Button
                       onClick={handleExportPdf}
-                      className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                      variant="blue"
+                      className="flex-1"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                      <span className="relative flex items-center justify-center">
-                        <Download className="w-5 h-5 mr-3" />
-                        Télécharger en PDF
-                      </span>
-                    </button>
+                      <Download className="w-5 h-5 mr-3" />
+                      Télécharger en PDF
+                    </Button>
                   )}
 
-                  <button
+                  <Button
                     onClick={handleResetCommunication}
-                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-200 font-bold py-4 px-8 rounded-xl border-2 border-gray-300 dark:border-gray-600 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
+                    variant="softGray"
+                    className="flex-1"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                    <span className="relative flex items-center justify-center">
-                      <RefreshCw className="w-5 h-5 mr-3" />
-                      Nouvelle communication
-                    </span>
-                  </button>
+                    <RefreshCw className="w-5 h-5 mr-3" />
+                    Nouvelle communication
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1385,31 +1376,29 @@ export function CommunicationPage() {
                 </div>
               )}
 
-              <button
+              <Button
                 onClick={handleGenerateReply}
                 disabled={loadingReply || tokenCount <= 0}
-                className="w-full group relative overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                variant="purple"
+                className="w-full"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                <span className="relative flex items-center justify-center">
-                  {loadingReply ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                      Génération en cours...
-                    </>
-                  ) : tokenCount <= 0 ? (
-                    <>
-                      <CreditCard className="w-5 h-5 mr-3" />
-                      Crédits épuisés
-                    </>
-                  ) : (
-                    <>
-                      <Reply className="w-5 h-5 mr-3" />
-                      Générer la réponse
-                    </>
-                  )}
-                </span>
-              </button>
+                {loadingReply ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                    Génération en cours...
+                  </>
+                ) : tokenCount <= 0 ? (
+                  <>
+                    <CreditCard className="w-5 h-5 mr-3" />
+                    Crédits épuisés
+                  </>
+                ) : (
+                  <>
+                    <Reply className="w-5 h-5 mr-3" />
+                    Générer la réponse
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
@@ -1481,30 +1470,26 @@ export function CommunicationPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button
+                  <Button
                     onClick={() => handleCopy(generatedReply)}
-                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    variant="green"
+                    className="flex-1"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                    <span className="relative flex items-center justify-center">
-                      <Copy className="w-5 h-5 mr-3" />
-                      Copier la réponse
-                    </span>
-                  </button>
+                    <Copy className="w-5 h-5 mr-3" />
+                    Copier la réponse
+                  </Button>
 
-                  <button
+                  <Button
                     onClick={() => handleOpenInMailer(null, generatedReply)}
                     title="Ouvre votre logiciel de messagerie avec la réponse pré-remplie (répondez de préférence depuis le fil de discussion d'origine)"
-                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                    variant="blue"
+                    className="flex-1"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                    <span className="relative flex items-center justify-center">
-                      <Mail className="w-5 h-5 mr-3" />
-                      Ouvrir dans ma messagerie
-                    </span>
-                  </button>
+                    <Mail className="w-5 h-5 mr-3" />
+                    Ouvrir dans ma messagerie
+                  </Button>
 
-                  <button
+                  <Button
                     onClick={() => {
                       setMessageRecu('');
                       setObjectifsReponse('');
@@ -1514,14 +1499,12 @@ export function CommunicationPage() {
                       setReplyManques([]);
                       setPreviousReplyVersion(null);
                     }}
-                    className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 text-blue-700 dark:text-blue-300 font-bold py-4 px-8 rounded-xl border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300"
+                    variant="softBlue"
+                    className="flex-1"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-200 to-indigo-200 dark:from-blue-800 dark:to-indigo-800 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                    <span className="relative flex items-center justify-center">
-                      <RefreshCw className="w-5 h-5 mr-3" />
-                      Nouvelle demande
-                    </span>
-                  </button>
+                    <RefreshCw className="w-5 h-5 mr-3" />
+                    Nouvelle demande
+                  </Button>
                 </div>
               </div>
             </div>
