@@ -3,8 +3,10 @@ import { X, Gift, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import { tokenUpdateEvent, TOKEN_UPDATED } from './layout/Header';
+import { useToast } from './ui/Toast';
 
 export function SpecialOfferModal() {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [isVisible, setIsVisible] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -85,17 +87,7 @@ export function SpecialOfferModal() {
       // 3. Émettre l'événement de mise à jour des tokens
       tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
 
-      // 4. Afficher une notification de succès
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-[100] transition-all duration-300 transform translate-x-0';
-      successDiv.innerHTML = '🎁 30 000 tokens ajoutés à votre compte !';
-      document.body.appendChild(successDiv);
-      
-      setTimeout(() => {
-        successDiv.style.transform = 'translateX(100%)';
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 3000);
+      showToast('30 000 tokens ajoutés à votre compte !');
 
       // 5. Fermer la modale
       setIsVisible(false);

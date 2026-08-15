@@ -32,6 +32,7 @@ import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
 import { logGeneration } from '../lib/usageStats';
+import { useToast } from '../components/ui/Toast';
 import {
   BookOpen,
   Copy,
@@ -922,6 +923,7 @@ const MarkdownEditor: React.FC<{
 };
 
 export function LessonGeneratorPage() {
+  const { showToast } = useToast();
   const { user, loading: authLoading } = useAuthStore();
   const tokenCount = useTokenBalance();
   const [generatedContent, setGeneratedContent] = React.useState('');
@@ -1228,16 +1230,7 @@ export function LessonGeneratorPage() {
 
       if (error) throw error;
 
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-      successDiv.innerHTML = '✅ Séance ajoutée à votre banque !';
-      document.body.appendChild(successDiv);
-
-      setTimeout(() => {
-        successDiv.style.transform = 'translateX(100%)';
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 3000);
+      showToast('Séance ajoutée à votre banque !');
 
     } catch (err: any) {
       console.error('Erreur lors de l\'enregistrement dans la banque:', err);

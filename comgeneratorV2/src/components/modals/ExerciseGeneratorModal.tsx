@@ -30,6 +30,7 @@ import copyToClipboard from '../../lib/copyToClipboard';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../layout/Header';
 
 import { logGeneration } from '../../lib/usageStats';
+import { useToast } from '../ui/Toast';
 class MarkdownErrorBoundary extends React.Component<
   { children: React.ReactNode; fallbackContent: string },
   { hasError: boolean }
@@ -115,6 +116,7 @@ export function ExerciseGeneratorModal({
   lessonKey,
   onAttachSupportsToLesson,
 }: ExerciseGeneratorModalProps) {
+  const { showToast } = useToast();
   const [supportType, setSupportType] = useState('auto');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
@@ -143,17 +145,6 @@ export function ExerciseGeneratorModal({
   const isCurrentPinned =
     !!generatedContent && pinnedSupports.some((p) => p.content === generatedContent);
 
-  const showToast = (message: string) => {
-    const el = document.createElement('div');
-    el.className =
-      'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-[80] transition-all duration-300';
-    el.textContent = message;
-    document.body.appendChild(el);
-    setTimeout(() => {
-      el.style.opacity = '0';
-      setTimeout(() => el.remove(), 300);
-    }, 2500);
-  };
 
   const handleTogglePin = () => {
     if (!generatedContent) return;

@@ -13,6 +13,7 @@ import useTokenBalance from '../hooks/useTokenBalance';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import { Link } from 'react-router-dom';
 import { logGeneration } from '../lib/usageStats';
+import { useToast } from '../components/ui/Toast';
 import { 
   FileText, 
   Upload, 
@@ -36,6 +37,7 @@ import {
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export function SynthesePage() {
+  const { showToast } = useToast();
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const screenshotInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -298,16 +300,7 @@ export function SynthesePage() {
   };
 
   const handleCopySuccess = () => {
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-    successDiv.innerHTML = '✅ Synthèse copiée !';
-    document.body.appendChild(successDiv);
-    
-    setTimeout(() => {
-      successDiv.style.transform = 'translateX(100%)';
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
+    showToast('Synthèse copiée !');
   };
 
   const copyToClipboard = async () => {

@@ -3,6 +3,7 @@ import { X, Save, Tag, BookOpen, GraduationCap, FileText, Lock } from 'lucide-re
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import type { ChatbotAnswerCategory, ChatbotAnswerInsert } from '../../lib/types';
+import { useToast } from '../ui/Toast';
 
 interface SaveAnswerModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
   initialContent,
   onSaved,
 }) => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState(initialContent);
@@ -128,17 +130,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
       return;
     }
 
-    // Notification de succès
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300';
-    successDiv.innerHTML = '✅ Réponse enregistrée dans votre banque !';
-    document.body.appendChild(successDiv);
-    
-    setTimeout(() => {
-      successDiv.style.transform = 'translateX(100%)';
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2500);
+    showToast('Réponse enregistrée dans votre banque !');
 
     onSaved?.();
     onClose();

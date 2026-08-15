@@ -2,6 +2,7 @@ import React from 'react';
 import { Copy, Check, Lock, ShoppingCart } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
+import { useToast } from '../ui/Toast';
 
 interface AppreciationResultProps {
   detailed: string;
@@ -16,6 +17,7 @@ export function AppreciationResult({
   setDetailed,
   setSummary
 }: AppreciationResultProps) {
+  const { showToast } = useToast();
   const [copiedDetailed, setCopiedDetailed] = React.useState(false);
   const [copiedSummary, setCopiedSummary] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -130,17 +132,7 @@ export function AppreciationResult({
       
       if (error) throw error;
 
-      // ✅ AJOUT : Animation de succès
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-      successDiv.innerHTML = '✅ Appréciation ajoutée à votre banque !';
-      document.body.appendChild(successDiv);
-      
-      setTimeout(() => {
-        successDiv.style.transform = 'translateX(100%)';
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 3000);
+      showToast('Appréciation ajoutée à votre banque !');
 
     } catch (error) {
       console.error("Erreur lors de l'enregistrement de l'appréciation:", error);
