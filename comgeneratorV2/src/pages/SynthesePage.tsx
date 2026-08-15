@@ -441,7 +441,7 @@ export function SynthesePage() {
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
             <div className="mb-6">
               <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                   <Upload className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -481,7 +481,7 @@ export function SynthesePage() {
                 accept="application/pdf"
                 onChange={handleFileChange}
                 disabled={!tokensAvailable}
-                className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                className="border-2 border-gray-200 dark:border-gray-600 rounded-xl focus-ring focus-ring-border transition-all duration-200"
               />
             </div>
           </div>
@@ -492,7 +492,7 @@ export function SynthesePage() {
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                     <Camera className="w-5 h-5 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -597,7 +597,7 @@ export function SynthesePage() {
                     {' '}(<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">Cmd</kbd>
                     {' + '}<kbd className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs">V</kbd> sur Mac)
                   </p>
-                  <label className={`group cursor-pointer inline-flex items-center gap-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ${
+                  <label className={`group cursor-pointer inline-flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 ${
                     !tokensAvailable ? 'opacity-50 cursor-not-allowed transform-none' : ''
                   }`}>
                     <input
