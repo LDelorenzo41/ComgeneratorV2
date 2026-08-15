@@ -662,7 +662,7 @@ export function SynthesePage() {
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8">
               <div className="mb-6">
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                     <Settings className="w-5 h-5 text-white" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -754,9 +754,9 @@ export function SynthesePage() {
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
                     <Target className="w-4 h-4 inline mr-2" />
-                    Longueur maximale : <span className="text-orange-600 dark:text-orange-400 font-bold">{maxChars}</span> caractères
+                    Longueur maximale : <span className="accent-text font-bold">{maxChars}</span> caractères
                   </label>
-                  <div className="bg-gradient-to-r from-gray-50 to-orange-50 dark:from-gray-700 dark:to-orange-900/20 rounded-xl p-6 border-2 border-gray-200 dark:border-gray-600">
+                  <div className="accent-wash rounded-xl p-6 border-2 border-gray-200 dark:border-gray-600">
                     <input
                       type="range"
                       min="50"
@@ -766,7 +766,7 @@ export function SynthesePage() {
                       disabled={!tokensAvailable}
                       className="w-full h-2 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
-                        background: `linear-gradient(to right, rgb(249, 115, 22) 0%, rgb(249, 115, 22) ${((maxChars - 50) / (500 - 50)) * 100}%, rgb(229, 231, 235) ${((maxChars - 50) / (500 - 50)) * 100}%, rgb(229, 231, 235) 100%)`
+                        background: `linear-gradient(to right, var(--focus-accent) 0%, var(--focus-accent) ${((maxChars - 50) / (500 - 50)) * 100}%, var(--slider-track) ${((maxChars - 50) / (500 - 50)) * 100}%, var(--slider-track) 100%)`
                       }}
                     />
                     <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-2">
