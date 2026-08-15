@@ -1,6 +1,8 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { 
   ClipboardCopy, 
   Trash2, 
@@ -65,6 +67,8 @@ const tagToColor: Record<string, { bg: string; border: string; icon: React.React
 
 export function AppreciationBankPage() {
   const { user } = useAuthStore();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [appreciations, setAppreciations] = React.useState<Appreciation[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -98,9 +102,12 @@ export function AppreciationBankPage() {
   }, [user]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette appréciation ?')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Supprimer cette appréciation ?',
+      message: 'Elle sera définitivement retirée de votre banque. Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from('appreciations')
@@ -109,41 +116,21 @@ export function AppreciationBankPage() {
 
     if (error) {
       console.error("Erreur lors de la suppression:", error);
+      showToast('La suppression a échoué. Veuillez réessayer.', 'error');
       return;
     }
 
     setAppreciations((prev) => prev.filter((item) => item.id !== id));
-    
-    // Success feedback
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-    successDiv.innerHTML = '🗑️ Appréciation supprimée !';
-    document.body.appendChild(successDiv);
-    
-    setTimeout(() => {
-      successDiv.style.transform = 'translateX(100%)';
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
+    showToast('Appréciation supprimée.');
   };
 
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      
-      // Success feedback
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-      successDiv.innerHTML = '📋 Appréciation copiée !';
-      document.body.appendChild(successDiv);
-      
-      setTimeout(() => {
-        successDiv.style.transform = 'translateX(100%)';
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 2000);
+      showToast('Appréciation copiée !');
     } catch (err) {
       console.error("Erreur lors de la copie:", err);
+      showToast('La copie a échoué. Veuillez réessayer.', 'error');
     }
   };
 
