@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useModalBehavior } from '../../hooks/useModalBehavior';
 import { 
   X, 
   RefreshCw, 
@@ -36,6 +37,8 @@ export function NavigationUpdateModal() {
     setIsOpen(false);
   };
 
+  const dialogRef = useModalBehavior({ isOpen, onClose: handleClose });
+
   if (!isOpen) return null;
 
   return (
@@ -47,7 +50,13 @@ export function NavigationUpdateModal() {
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="navigation-update-title"
+        tabIndex={-1}
+        className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
         
         {/* Header avec gradient */}
         <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-8 text-white">
@@ -63,7 +72,7 @@ export function NavigationUpdateModal() {
               <RefreshCw className="w-8 h-8" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">
+              <h2 id="navigation-update-title" className="text-2xl font-bold">
                 ProfAssist évolue
               </h2>
               <p className="text-blue-100">

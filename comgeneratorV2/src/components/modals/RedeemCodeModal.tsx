@@ -2,6 +2,7 @@
 // Modal pour permettre aux utilisateurs d'entrer un code promo
 
 import React, { useState } from 'react';
+import { useModalBehavior } from '../../hooks/useModalBehavior';
 import {
   Gift,
   X,
@@ -76,11 +77,20 @@ export function RedeemCodeModal({ isOpen, onClose }: RedeemCodeModalProps) {
     setResult(null);
   };
 
+  const dialogRef = useModalBehavior({ isOpen, onClose: handleClose });
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Utiliser un code promotionnel"
+        tabIndex={-1}
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+      >
         
         {/* Header */}
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-white">
