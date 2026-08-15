@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /**
+   * Couleur des cases à cocher et boutons radio.
+   *
+   * Ces contrôles sont dessinés par le système d'exploitation, pas par la
+   * page. `text-blue-600` — présent sur la plupart d'entre eux — ne les
+   * colore pas : seule `accent-color` le fait, et elle n'était utilisée
+   * nulle part. Résultat, ils s'affichaient tous dans le bleu du système,
+   * y compris sur les pages vertes ou violettes.
+   *
+   * Ils lisent désormais le même accent que le focus. Les curseurs
+   * `type="range"` sont volontairement exclus : celui de Synthèse est en
+   * `appearance-none` avec un dégradé orange sur mesure.
+   */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--focus-accent, theme('colors.blue.500'));
+  }
+}
+
 @layer components {
   /**
    * ── Traitement du focus ────────────────────────────────────────────────
