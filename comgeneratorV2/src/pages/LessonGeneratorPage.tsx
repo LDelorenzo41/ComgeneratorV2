@@ -16,6 +16,7 @@ import 'katex/dist/katex.min.css';
 import jsPDF from 'jspdf';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
 import { secureApi } from '../lib/secureApi';
@@ -1628,31 +1629,29 @@ export function LessonGeneratorPage() {
               </div>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={loading || tokenCount === 0}
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              variant="blue"
+              className="w-full"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-              <span className="relative flex items-center justify-center">
-                {loading ? (
-                  <span className="flex items-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                    Génération en cours...
-                  </span>
-                ) : tokenCount === 0 ? (
-                  <span className="flex items-center">
-                    <CreditCard className="w-5 h-5 mr-3" />
-                    Crédits épuisés
-                  </span>
-                ) : (
-                  <span className="flex items-center">
-                    <Sparkles className="w-5 h-5 mr-3" />
-                    Générer la séance pédagogique
-                  </span>
-                )}
-              </span>
-            </button>
+              {loading ? (
+                <span className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                  Génération en cours...
+                </span>
+              ) : tokenCount === 0 ? (
+                <span className="flex items-center">
+                  <CreditCard className="w-5 h-5 mr-3" />
+                  Crédits épuisés
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-3" />
+                  Générer la séance pédagogique
+                </span>
+              )}
+            </Button>
           </form>
         </div>
 
