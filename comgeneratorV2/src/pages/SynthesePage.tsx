@@ -343,7 +343,7 @@ export function SynthesePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+    <div className="focus-accent-green min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       {/* Confirmation d'import : visible immédiatement, quelle que soit la
           position de défilement (les aperçus sont plus bas dans la page) */}
       <div className="sr-only" role="status" aria-live="polite">{importSuccess}</div>

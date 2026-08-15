@@ -581,7 +581,7 @@ export function CommunicationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+    <div className="focus-accent-blue min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       {/* ✅ AJOUT: Région aria-live pour annoncer les résultats aux lecteurs d'écran */}
       <div className="sr-only" role="status" aria-live="polite">{liveMessage}</div>
 
@@ -1148,9 +1148,9 @@ export function CommunicationPage() {
 
           {/* Fonction 2 - Répondre à une communication */}
           {/* ✅ AJOUT: Ref pour le scroll */}
-          <div 
+          <div
             ref={replySectionRef}
-            className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
+            className="focus-accent-purple bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
           >
             <div className="mb-8">
               <div className="flex items-center space-x-3 mb-4">
