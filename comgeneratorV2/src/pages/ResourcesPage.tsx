@@ -314,7 +314,7 @@ export function ResourcesPage() {
                                     disabled={disabled}
                                     className={`w-full text-left px-3 py-3 rounded-xl border-2 transition-all duration-200 ${
                                       checked 
-                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' 
+                                        ? 'accent-border accent-tint' 
                                         : 'border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >

@@ -219,7 +219,7 @@ export function AppreciationBankPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+    <div className="focus-accent-purple min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Header moderne */}
@@ -257,7 +257,7 @@ export function AppreciationBankPage() {
                 placeholder="Rechercher dans vos appréciations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus-ring focus:border-purple-500 transition-all duration-200"
               />
             </div>
 
@@ -265,7 +265,7 @@ export function AppreciationBankPage() {
             <select
               value={selectedTag}
               onChange={(e) => setSelectedTag(e.target.value as string | 'all')}
-              className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+              className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus-ring focus:border-purple-500 transition-all duration-200"
             >
               <option value="all">Tous les niveaux</option>
               {Object.entries(tagToTitle).map(([tag, title]) => (
@@ -277,7 +277,7 @@ export function AppreciationBankPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'date' | 'tag')}
-              className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+              className="px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus-ring focus:border-purple-500 transition-all duration-200"
             >
               <option value="date">Trier par date</option>
               <option value="tag">Trier par niveau</option>

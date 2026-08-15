@@ -204,7 +204,7 @@ export function LoginForm() {
               {...registerReset('email')}
               type="email"
               id="reset-email"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus-ring focus-ring-border dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               placeholder="votre.email@example.com"
             />
             {resetErrors.email && (
@@ -281,7 +281,7 @@ export function LoginForm() {
           <input
             {...register('email')}
             type="email"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus-ring focus-ring-border dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
           {errors.email && (
             <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
@@ -307,7 +307,7 @@ export function LoginForm() {
           <input
             {...register('password')}
             type="password"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus-ring focus-ring-border dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           />
           {errors.password && (
             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>

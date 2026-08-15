@@ -140,7 +140,7 @@ export function SettingsPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+    <div className="focus-accent-purple min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -223,7 +223,7 @@ export function SettingsPage() {
                   key={option.value}
                   className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     aiModelChoice === option.value
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      ? 'accent-border accent-tint'
                       : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-700'
                   }`}
                 >
@@ -233,7 +233,7 @@ export function SettingsPage() {
                     value={option.value}
                     checked={aiModelChoice === option.value}
                     onChange={() => handleAIModelChange(option.value)}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                    className="w-4 h-4 text-indigo-600 focus-ring"
                   />
                   <div className="ml-4 flex-1">
                     <div className="flex items-center">

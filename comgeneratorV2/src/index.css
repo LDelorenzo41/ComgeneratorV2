@@ -2,33 +2,82 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /**
+   * Couleur des cases à cocher et boutons radio.
+   *
+   * Ces contrôles sont dessinés par le système d'exploitation, pas par la
+   * page. `text-blue-600` — présent sur la plupart d'entre eux — ne les
+   * colore pas : seule `accent-color` le fait, et elle n'était utilisée
+   * nulle part. Résultat, ils s'affichaient tous dans le bleu du système,
+   * y compris sur les pages vertes ou violettes.
+   *
+   * Ils lisent désormais le même accent que le focus. Les curseurs
+   * `type="range"` sont volontairement exclus : celui de Synthèse est en
+   * `appearance-none` avec un dégradé orange sur mesure.
+   */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--focus-accent, theme('colors.blue.500'));
+  }
+}
+
 @layer components {
   /**
-   * Anneau de focus unique de l'application.
+   * ── Traitement du focus ────────────────────────────────────────────────
    *
-   * Aujourd'hui le code utilise 7 couleurs d'anneau différentes réparties sur
-   * 122 occurrences (blue-500 x82, green-500 x14, purple-500 x12,
-   * indigo-500 x11, red-500, gray-500, blue-400). Cette classe est la cible
-   * de convergence.
+   * Le focus est ce qui indique où l'on se trouve dans la page. Dans
+   * ProfAssist il s'exprime de deux façons, souvent combinées : un anneau
+   * autour de l'élément, et un changement de couleur de sa bordure.
    *
-   * Deux différences volontaires avec l'existant, à valider au moment de
-   * l'appliquer (lot 3) :
+   * La couleur ne peut pas être codée en dur : `Input`, `Select` et
+   * `Textarea` sont partagés entre des pages dont les accents diffèrent
+   * (indigo pour Scénario, vert pour Synthèse, bleu pour Séance…). Elle est
+   * donc lue dans la variable `--focus-accent`, qu'une page pose une seule
+   * fois sur son élément racine via une classe `.focus-accent-*`.
    *
-   * 1. `focus-visible` au lieu de `focus` — l'anneau apparaît à la navigation
-   *    au clavier, mais plus au clic à la souris. C'est le comportement
-   *    attendu en accessibilité ; c'est un changement visible.
-   * 2. `ring-offset` explicite en mode sombre — sans lui, Tailwind utilise du
-   *    blanc, ce qui dessine un liseré clair autour du bouton sur fond sombre.
-   *
-   * Cette classe n'est encore utilisée nulle part : elle n'a aucun effet tant
-   * qu'elle n'est pas appliquée.
+   * Sans variable déclarée, on retombe sur le bleu, accent majoritaire de
+   * l'application (80 des 119 déclarations).
    */
+
+  /* Anneau seul. Pas de `ring-offset` : 111 des 119 emplacements n'en ont
+     pas, en ajouter un décalerait l'anneau de 2 px partout. */
   .focus-ring {
-    @apply focus:outline-none
-           focus-visible:ring-2
-           focus-visible:ring-primary-500
-           focus-visible:ring-offset-2
-           focus-visible:ring-offset-white
-           dark:focus-visible:ring-offset-gray-900;
+    @apply focus:outline-none focus-visible:ring-2;
+    --tw-ring-color: var(--focus-accent, theme('colors.blue.500'));
   }
+
+  /* Bordure seule, pour les champs qui changent de bordure sans anneau.
+     Se combine avec `.focus-ring` quand les deux sont présents. */
+  .focus-ring-border:focus-visible {
+    border-color: var(--focus-accent, theme('colors.blue.500'));
+  }
+
+  /**
+   * ── État sélectionné ───────────────────────────────────────────────────
+   *
+   * Une option choisie se signale par un cadre coloré et un fond légèrement
+   * teinté. Ces couleurs étaient écrites en dur, page par page et parfois
+   * option par option : Synthèse cumulait à elle seule quatre couleurs
+   * différentes dans un même formulaire.
+   *
+   * Elles lisent maintenant `--focus-accent`, comme le focus et les cases à
+   * cocher. Une page n'a donc plus qu'une seule couleur d'interaction.
+   *
+   * La teinte est calculée à partir de l'accent plutôt que fixée : posée en
+   * translucide, elle se compose avec le fond de la carte et fonctionne donc
+   * en thème clair comme en thème sombre, sans variante `dark:`.
+   */
+  .accent-border { border-color: var(--focus-accent, theme('colors.blue.500')); }
+  .accent-solid { background-color: var(--focus-accent, theme('colors.blue.500')); }
+  .accent-tint {
+    background-color: color-mix(in srgb, var(--focus-accent, theme('colors.blue.500')) 10%, transparent);
+  }
+
+  /* Accent d'une page. À poser sur l'élément racine : tout ce que la page
+     contient s'y aligne, y compris les composants partagés. */
+  .focus-accent-blue   { --focus-accent: theme('colors.blue.500'); }
+  .focus-accent-indigo { --focus-accent: theme('colors.indigo.500'); }
+  .focus-accent-green  { --focus-accent: theme('colors.green.500'); }
+  .focus-accent-purple { --focus-accent: theme('colors.purple.500'); }
 }

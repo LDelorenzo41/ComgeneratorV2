@@ -343,7 +343,7 @@ export function SynthesePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
+    <div className="focus-accent-green min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20">
       {/* Confirmation d'import : visible immédiatement, quelle que soit la
           position de défilement (les aperçus sont plus bas dans la page) */}
       <div className="sr-only" role="status" aria-live="polite">{importSuccess}</div>
@@ -468,7 +468,7 @@ export function SynthesePage() {
               onDrop={handlePdfDrop}
               className={`rounded-2xl p-6 border-2 border-dashed transition-all duration-200 ${
                 isDraggingPdf
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                  ? 'accent-border accent-tint'
                   : 'border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20'
               }`}
             >
@@ -578,7 +578,7 @@ export function SynthesePage() {
                   onDrop={handleScreenshotDrop}
                   className={`rounded-2xl border-2 border-dashed p-8 text-center transition-all duration-200 ${
                     isDraggingScreenshot
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30'
+                      ? 'accent-border accent-tint'
                       : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40'
                   }`}
                 >
@@ -693,13 +693,13 @@ export function SynthesePage() {
                       disabled={!tokensAvailable}
                       className={`p-4 rounded-xl border-2 transition-all duration-200 ${
                         tone === 'neutre'
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          ? 'accent-border accent-tint'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div className="flex items-center justify-center mb-2">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          tone === 'neutre' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                          tone === 'neutre' ? 'accent-solid' : 'bg-gray-300 dark:bg-gray-600'
                         }`}>
                           <FileText className="w-5 h-5 text-white" />
                         </div>
@@ -713,13 +713,13 @@ export function SynthesePage() {
                       disabled={!tokensAvailable}
                       className={`p-4 rounded-xl border-2 transition-all duration-200 ${
                         tone === 'encourageant'
-                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                          ? 'accent-border accent-tint'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div className="flex items-center justify-center mb-2">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          tone === 'encourageant' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                          tone === 'encourageant' ? 'accent-solid' : 'bg-gray-300 dark:bg-gray-600'
                         }`}>
                           <Sparkles className="w-5 h-5 text-white" />
                         </div>
@@ -733,13 +733,13 @@ export function SynthesePage() {
                       disabled={!tokensAvailable}
                       className={`p-4 rounded-xl border-2 transition-all duration-200 ${
                         tone === 'analytique'
-                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                          ? 'accent-border accent-tint'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
                       <div className="flex items-center justify-center mb-2">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                          tone === 'analytique' ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'
+                          tone === 'analytique' ? 'accent-solid' : 'bg-gray-300 dark:bg-gray-600'
                         }`}>
                           <Target className="w-5 h-5 text-white" />
                         </div>
@@ -786,7 +786,7 @@ export function SynthesePage() {
                   <div className="space-y-3">
                     <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
                       sourceScope === 'moyennes'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'accent-border accent-tint'
                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
@@ -796,7 +796,7 @@ export function SynthesePage() {
                         checked={sourceScope === 'moyennes'}
                         onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Tenir compte des moyennes</p>
@@ -810,7 +810,7 @@ export function SynthesePage() {
 
                     <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
                       sourceScope === 'appreciations'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'accent-border accent-tint'
                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
@@ -820,7 +820,7 @@ export function SynthesePage() {
                         checked={sourceScope === 'appreciations'}
                         onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Uniquement les appréciations</p>
@@ -842,7 +842,7 @@ export function SynthesePage() {
                   <div className="space-y-3">
                     <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
                       outputType === 'complet'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'accent-border accent-tint'
                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
@@ -852,7 +852,7 @@ export function SynthesePage() {
                         checked={outputType === 'complet'}
                         onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse complète</p>
@@ -864,7 +864,7 @@ export function SynthesePage() {
 
                     <label className={`flex items-start p-4 rounded-xl border-2 transition-all duration-200 ${
                       outputType === 'essentiel'
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'accent-border accent-tint'
                         : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                     } ${!tokensAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input
@@ -874,7 +874,7 @@ export function SynthesePage() {
                         checked={outputType === 'essentiel'}
                         onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse essentielle</p>
