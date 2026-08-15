@@ -116,6 +116,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders =
     try {
       setDeletingId(doc.id);
       await deleteDocument(doc.id);
+      showToast(`« ${doc.title} » supprimé.`);
       onRefresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'La suppression a échoué.', 'error');
@@ -349,6 +350,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders =
     const handleMoveToFolder = async (folderId: string | null) => {
       try {
         await moveDocumentToFolder(doc.id, folderId);
+        const folderName = folderId
+          ? folders.find((f) => f.id === folderId)?.name ?? 'un dossier'
+          : 'Non classés';
+        showToast(`Document déplacé vers « ${folderName} ».`);
         onRefresh();
       } catch (error) {
         showToast(error instanceof Error ? error.message : 'Le déplacement a échoué.', 'error');

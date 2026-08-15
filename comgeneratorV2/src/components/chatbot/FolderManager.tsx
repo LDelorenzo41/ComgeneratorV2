@@ -3,6 +3,7 @@ import { FolderOpen, FolderPlus, Pencil, Trash2, Loader2, Check, X } from 'lucid
 import type { RagFolder, RagDocument } from '../../lib/rag.types';
 import { createFolder, renameFolder, deleteFolder } from '../../lib/ragApi';
 import { useConfirm } from '../ui/ConfirmDialog';
+import { useToast } from '../ui/Toast';
 
 interface FolderManagerProps {
   folders: RagFolder[];
@@ -12,6 +13,7 @@ interface FolderManagerProps {
 
 export const FolderManager: React.FC<FolderManagerProps> = ({ folders, documents, onRefresh }) => {
   const confirm = useConfirm();
+  const { showToast } = useToast();
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export const FolderManager: React.FC<FolderManagerProps> = ({ folders, documents
     setDeletingId(folder.id);
     try {
       await deleteFolder(folder.id);
+      showToast(`Dossier « ${folder.name} » supprimé.`);
       onRefresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
