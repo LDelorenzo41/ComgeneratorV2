@@ -49,6 +49,7 @@ import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
 
 import { logGeneration } from '../lib/usageStats';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 // ============================================================================
 // OPTIONS DE FORMULAIRE
 // ============================================================================
@@ -108,6 +109,7 @@ interface RagSource {
 
 export function ScenarioPedagogiquePage() {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { user, loading: authLoading } = useAuthStore();
   const tokenCount = useTokenBalance();
   
@@ -979,7 +981,7 @@ export function ScenarioPedagogiquePage() {
       
     } catch (error) {
       console.error('Erreur lors de l\'export PDF:', error);
-      alert('Erreur lors de l\'export PDF. Veuillez réessayer.');
+      showToast('L\'export PDF a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -991,19 +993,21 @@ export function ScenarioPedagogiquePage() {
 
   const handleSaveToBank = async () => {
     if (!user || !lastFormData) {
-      alert('Impossible de sauvegarder : données du formulaire manquantes');
+      showToast('Impossible de sauvegarder : données du formulaire manquantes.', 'error');
       return;
     }
 
     if (!hasBankAccess) {
-      const userConfirmed = confirm(
-        '⚠️ Accès banque requis\n\n' +
-        'Pour sauvegarder vos scénarios, vous devez disposer d\'un plan avec accès banque.\n\n' +
-        'Souhaitez-vous consulter nos plans ?'
-      );
+      const userConfirmed = await confirm({
+        title: 'Accès banque requis',
+        message: 'Pour sauvegarder vos scénarios, vous devez disposer d\'un plan avec accès banque.\n\nSouhaitez-vous consulter nos plans ?',
+        confirmLabel: 'Voir les plans',
+        destructive: false,
+      });
 
       if (userConfirmed) {
-        window.location.href = '/buy-tokens';
+        // Nouvel onglet : le scénario généré reste à l'écran
+        window.open('/buy-tokens', '_blank', 'noopener');
       }
       return;
     }
@@ -1032,7 +1036,7 @@ export function ScenarioPedagogiquePage() {
 
     } catch (err: any) {
       console.error('Erreur lors de l\'enregistrement:', err);
-      alert('Erreur lors de l\'enregistrement. Veuillez réessayer.');
+      showToast('L\'enregistrement a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -1541,7 +1545,7 @@ export function ScenarioPedagogiquePage() {
                     <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">Sauvegarde non disponible</h5>
                     <p className="text-orange-700 dark:text-orange-300 text-sm">
                       Votre plan actuel ne permet pas de sauvegarder les scénarios.
-                      <button onClick={() => window.location.href = '/buy-tokens'} className="underline hover:no-underline font-medium ml-1">
+                      <button onClick={() => window.open('/buy-tokens', '_blank', 'noopener')} className="underline hover:no-underline font-medium ml-1">
                         Upgrader vers un plan avec banque
                       </button>
                     </p>

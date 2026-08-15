@@ -174,8 +174,8 @@ export function ExerciseGeneratorModal({
   };
 
   const handleCopyPinned = async (content: string) => {
-    await copyToClipboard(content);
-    showToast('Support copié');
+    const ok = await copyToClipboard(content);
+    showToast(ok ? 'Support copié !' : 'La copie a échoué. Veuillez réessayer.', ok ? 'success' : 'error');
   };
 
   const handleAttach = async (items: { heading: string; content: string }[]) => {
@@ -276,7 +276,11 @@ export function ExerciseGeneratorModal({
 
   const handleCopy = async () => {
     if (!generatedContent) return;
-    await copyToClipboard(generatedContent);
+    const ok = await copyToClipboard(generatedContent);
+    if (!ok) {
+      showToast('La copie a échoué. Veuillez réessayer.', 'error');
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

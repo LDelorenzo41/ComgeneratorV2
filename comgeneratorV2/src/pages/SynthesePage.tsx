@@ -225,7 +225,7 @@ export function SynthesePage() {
     }
 
     if (!capturedImage) {
-      alert('Veuillez d\'abord faire une capture d\'écran de la partie souhaitée.');
+      showToast('Déposez d\'abord une capture d\'écran de la partie à analyser.', 'error');
       return;
     }
     
@@ -237,7 +237,7 @@ export function SynthesePage() {
       
       if (!extracted) {
         setLoading(false);
-        alert('Aucun texte détecté dans votre capture d\'écran.');
+        showToast('Aucun texte détecté dans votre capture. Réessayez avec une image plus nette.', 'error');
         return;
       }
 

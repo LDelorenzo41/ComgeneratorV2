@@ -2,11 +2,13 @@ import React from 'react';
 import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, Bot, ClipboardList, Layers, Mic, Wand2 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuthStore } from '../lib/store';
+import { useToast } from '../components/ui/Toast';
 
 // Initialisation de Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export function BuyTokensPage() {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [selectedOptions, setSelectedOptions] = React.useState<{
     professor: { withBank: boolean };
@@ -110,7 +112,7 @@ export function BuyTokensPage() {
 
   const handlePlanSelect = async (planId: 'professor' | 'principal') => {
     if (!user) {
-      alert('Vous devez être connecté pour acheter des tokens');
+      showToast('Vous devez être connecté pour acheter des crédits.', 'error');
       return;
     }
 
@@ -131,7 +133,7 @@ export function BuyTokensPage() {
     if (!priceId) {
       console.error('❌ Price ID not found for:', planId, withBank);
       console.error('❌ Mapping disponible:', Object.keys(priceIdMapping));
-      alert('Erreur de configuration du produit');
+      showToast('Erreur de configuration du produit. Contactez le support.', 'error');
       return;
     }
 
@@ -170,13 +172,13 @@ export function BuyTokensPage() {
           const { error } = await stripe.redirectToCheckout({ sessionId });
           if (error) {
             console.error('Erreur Stripe:', error);
-            alert('Erreur lors de la redirection vers le paiement');
+            showToast('La redirection vers le paiement a échoué. Veuillez réessayer.', 'error');
           }
         }
       }
     } catch (error) {
       console.error('Erreur lors de l\'achat:', error);
-      alert('Erreur lors de la création de la session de paiement. Veuillez réessayer.');
+      showToast('La création de la session de paiement a échoué. Veuillez réessayer.', 'error');
     } finally {
       setLoading(null);
     }

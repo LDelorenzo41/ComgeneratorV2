@@ -3,6 +3,7 @@ import { Copy, Check, Lock, ShoppingCart } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import { useToast } from '../ui/Toast';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface AppreciationResultProps {
   detailed: string;
@@ -18,6 +19,7 @@ export function AppreciationResult({
   setSummary
 }: AppreciationResultProps) {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [copiedDetailed, setCopiedDetailed] = React.useState(false);
   const [copiedSummary, setCopiedSummary] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -85,19 +87,21 @@ export function AppreciationResult({
   };
 
   // ✅ MODIFICATION : Vérification de l'accès banque avant ouverture du menu
-  const handleTagClick = () => {
+  const handleTagClick = async () => {
     if (!user) return;
 
     // Vérifier l'accès banque
     if (!hasBankAccess) {
-      const userConfirmed = confirm(
-        '⚠️ Accès banque requis\n\n' +
-        'Pour sauvegarder vos appréciations, vous devez disposer d\'un plan avec accès banque.\n\n' +
-        'Souhaitez-vous consulter nos plans ?'
-      );
-      
+      const userConfirmed = await confirm({
+        title: 'Accès banque requis',
+        message: 'Pour sauvegarder vos appréciations, vous devez disposer d\'un plan avec accès banque.\n\nSouhaitez-vous consulter nos plans ?',
+        confirmLabel: 'Voir les plans',
+        destructive: false,
+      });
+
       if (userConfirmed) {
-        window.location.href = '/buy-tokens';
+        // Nouvel onglet : l'appréciation générée reste à l'écran
+        window.open('/buy-tokens', '_blank', 'noopener');
       }
       return;
     }
@@ -116,7 +120,7 @@ export function AppreciationResult({
     
     // Double vérification de l'accès banque
     if (!hasBankAccess) {
-      alert('Erreur : Accès banque requis pour sauvegarder');
+      showToast('Accès banque requis pour sauvegarder.', 'error');
       setConfirmOpen(false);
       setSelectedTag(null);
       return;
@@ -136,7 +140,7 @@ export function AppreciationResult({
 
     } catch (error) {
       console.error("Erreur lors de l'enregistrement de l'appréciation:", error);
-      alert('Erreur lors de la sauvegarde de l\'appréciation. Veuillez réessayer.');
+      showToast('L\'enregistrement a échoué. Veuillez réessayer.', 'error');
     } finally {
       setConfirmOpen(false);
       setSelectedTag(null);
@@ -264,7 +268,7 @@ export function AppreciationResult({
               <p className="text-orange-700 dark:text-orange-300 text-sm">
                 Votre plan actuel ne permet pas de sauvegarder les appréciations. 
                 <button 
-                  onClick={() => window.location.href = '/buy-tokens'}
+                  onClick={() => window.open('/buy-tokens', '_blank', 'noopener')}
                   className="underline hover:no-underline font-medium ml-1"
                 >
                   Upgrader vers un plan avec banque
