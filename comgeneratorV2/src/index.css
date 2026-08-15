@@ -32,6 +32,26 @@
    */
   :root { --slider-track: theme('colors.gray.200'); }
   .dark { --slider-track: theme('colors.gray.600'); }
+
+  /**
+   * Étirement des zones de texte.
+   *
+   * Les champs longs — thème d'une séquence, point de départ, attendus,
+   * notes personnelles — tiennent sur trois ou quatre lignes visibles, ce
+   * qui rend la relecture d'un texte fourni inconfortable. Ils sont
+   * désormais étirables à la souris.
+   *
+   * Verticalement seulement : les navigateurs autorisent `both` par
+   * défaut, et un champ en pleine largeur étiré horizontalement déborde de
+   * sa carte. Cette règle corrige donc aussi les zones de texte qui
+   * n'avaient rien de déclaré.
+   *
+   * Une zone de texte qui ne doit pas bouger garde `resize-none` : la
+   * classe utilitaire l'emporte sur cette règle de type.
+   */
+  textarea {
+    resize: vertical;
+  }
 }
 
 @layer components {

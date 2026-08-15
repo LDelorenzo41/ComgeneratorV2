@@ -1223,7 +1223,7 @@ export function ScenarioPedagogiquePage() {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                 <BookOpen className="w-4 h-4 inline mr-2" />Thème précis et détaillé *
               </label>
-              <textarea {...register('theme')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: La Révolution française - De la crise de l'Ancien Régime à l'exécution de Louis XVI..." />
+              <textarea {...register('theme')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Ex: La Révolution française - De la crise de l'Ancien Régime à l'exécution de Louis XVI..." />
               {errors.theme && <p className="text-sm text-red-600 mt-1">⚠️ {errors.theme.message}</p>}
             </div>
 
@@ -1232,7 +1232,7 @@ export function ScenarioPedagogiquePage() {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                 <Layers className="w-4 h-4 inline mr-2" />Point de départ / Diagnostic initial *
               </label>
-              <textarea {...register('pointDepart')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: Les élèves ont déjà étudié... Classe hétérogène avec... Représentations initiales observées..." />
+              <textarea {...register('pointDepart')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Ex: Les élèves ont déjà étudié... Classe hétérogène avec... Représentations initiales observées..." />
               {errors.pointDepart && <p className="text-sm text-red-600 mt-1">⚠️ {errors.pointDepart.message}</p>}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Acquis antérieurs, profil de classe, représentations initiales, contraintes...</p>
             </div>
@@ -1242,7 +1242,7 @@ export function ScenarioPedagogiquePage() {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
                 <Target className="w-4 h-4 inline mr-2" />Attendus de fin de séquence *
               </label>
-              <textarea {...register('attendus')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none" placeholder="Ex: À la fin de la séquence, les élèves seront capables de..." />
+              <textarea {...register('attendus')} disabled={tokenCount === 0} rows={3} className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed" placeholder="Ex: À la fin de la séquence, les élèves seront capables de..." />
               {errors.attendus && <p className="text-sm text-red-600 mt-1">⚠️ {errors.attendus.message}</p>}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ce que les élèves doivent savoir et savoir faire à l'issue de la séquence</p>
             </div>
@@ -1581,25 +1581,25 @@ export function ScenarioPedagogiquePage() {
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
                             <textarea value={row.phaseObjectif} onChange={(e) => handleCellChange(index, 'phaseObjectif', e.target.value)} rows={4}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
+                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
                           ) : renderMarkdown(row.phaseObjectif)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
                             <textarea value={row.obstaclesDiff} onChange={(e) => handleCellChange(index, 'obstaclesDiff', e.target.value)} rows={4}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
+                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
                           ) : renderMarkdown(row.obstaclesDiff)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
                             <textarea value={row.activitesDispositifs} onChange={(e) => handleCellChange(index, 'activitesDispositifs', e.target.value)} rows={4}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
+                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
                           ) : renderMarkdown(row.activitesDispositifs)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 align-top">
                           {isEditing ? (
                             <textarea value={row.evaluationCriteres} onChange={(e) => handleCellChange(index, 'evaluationCriteres', e.target.value)} rows={4}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-none" />
+                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
                           ) : renderMarkdown(row.evaluationCriteres)}
                         </td>
                       </tr>
