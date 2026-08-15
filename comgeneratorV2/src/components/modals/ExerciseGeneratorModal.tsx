@@ -560,6 +560,8 @@ export function ExerciseGeneratorModal({
       <div
         ref={modalRef}
         style={modalStyle}
+        role="dialog"
+        aria-label="Générateur d'exercices"
         className={`z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl ${
           isMinimized ? '' : 'max-h-[90vh]'
         } overflow-hidden flex flex-col`}

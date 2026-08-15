@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModalBehavior } from '../../hooks/useModalBehavior';
 import { X, Lightbulb, Info } from 'lucide-react';
 
 interface CriteriaExamplesModalProps {
@@ -7,6 +8,9 @@ interface CriteriaExamplesModalProps {
 }
 
 export function CriteriaExamplesModal({ isOpen, onClose }: CriteriaExamplesModalProps) {
+  // Avant le retour anticipé : l'ordre des hooks doit rester constant.
+  const dialogRef = useModalBehavior({ isOpen, onClose });
+
   if (!isOpen) return null;
 
   const examples = [
@@ -167,7 +171,13 @@ export function CriteriaExamplesModal({ isOpen, onClose }: CriteriaExamplesModal
       <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" onClick={onClose} />
 
-        <div className="inline-block transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="criteria-examples-title"
+          tabIndex={-1}
+          className="inline-block transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl sm:align-middle">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-6 py-5">
             <div className="flex items-center justify-between">
@@ -175,7 +185,7 @@ export function CriteriaExamplesModal({ isOpen, onClose }: CriteriaExamplesModal
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                   <Lightbulb className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-white">
+                <h3 id="criteria-examples-title" className="text-2xl font-bold text-white">
                   Quelques exemples de critères
                 </h3>
               </div>

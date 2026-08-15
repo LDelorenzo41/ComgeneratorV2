@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import { tokenUpdateEvent, TOKEN_UPDATED } from './layout/Header';
 import { useToast } from './ui/Toast';
+import { useModalBehavior } from '../hooks/useModalBehavior';
 import { Button } from './ui/Button';
 
 export function SpecialOfferModal() {
@@ -105,6 +106,8 @@ export function SpecialOfferModal() {
     setIsVisible(false);
   };
 
+  const dialogRef = useModalBehavior({ isOpen: !checking && isVisible, onClose: handleClose });
+
   // Ne rien afficher si on vérifie encore ou si pas visible
   if (checking || !isVisible) return null;
 
@@ -118,7 +121,12 @@ export function SpecialOfferModal() {
 
       {/* Modale */}
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-        <div 
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="special-offer-title"
+          tabIndex={-1}
           className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full p-8 transform transition-all duration-300 animate-fadeIn"
           onClick={(e) => e.stopPropagation()}
         >
@@ -143,7 +151,7 @@ export function SpecialOfferModal() {
 
           {/* Contenu */}
           <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-2">
+            <h2 id="special-offer-title" className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-2">
               <span>🎁</span>
               <span>Cadeau spécial période des bulletins !</span>
             </h2>

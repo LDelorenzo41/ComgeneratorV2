@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useModalBehavior } from '../../hooks/useModalBehavior';
 import { X, Save, Tag, BookOpen, GraduationCap, FileText, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
@@ -140,6 +141,8 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
     window.location.href = '/buy-tokens';
   };
 
+  const dialogRef = useModalBehavior({ isOpen, onClose });
+
   if (!isOpen) return null;
 
   // Affichage pendant la vérification de l'accès
@@ -147,7 +150,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8 flex flex-col items-center">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Enregistrement en cours" tabIndex={-1} className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-8 flex flex-col items-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
           <p className="text-gray-600 dark:text-gray-300">Vérification de l'accès...</p>
         </div>
@@ -160,7 +163,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Accès à la banque requis" tabIndex={-1} className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
@@ -168,7 +171,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
                 <Lock className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h2 id="save-answer-title" className="text-xl font-bold text-gray-900 dark:text-white">
                   Accès banque requis
                 </h2>
               </div>
@@ -229,7 +232,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="save-answer-title" tabIndex={-1} className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
