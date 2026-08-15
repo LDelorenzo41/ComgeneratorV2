@@ -1,5 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../lib/store';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { supabase } from '../lib/supabase';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -124,6 +126,8 @@ const convertMarkdownTablesToHtml = (markdown: string): string => {
 
 export function LessonsBankPage() {
   const { user } = useAuthStore();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [lessons, setLessons] = React.useState<LessonBank[]>([]);
   const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -160,20 +164,10 @@ export function LessonsBankPage() {
   const handleCopy = async (content: string, topic: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      
-      // Success feedback
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-      successDiv.innerHTML = `📋 Séance "${topic}" copiée !`;
-      document.body.appendChild(successDiv);
-      
-      setTimeout(() => {
-        successDiv.style.transform = 'translateX(100%)';
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 2000);
+      showToast(`Séance « ${topic} » copiée !`);
     } catch (err) {
       console.error("Erreur lors de la copie:", err);
+      showToast('La copie a échoué. Veuillez réessayer.', 'error');
     }
   };
 
@@ -551,15 +545,11 @@ export function LessonsBankPage() {
         .substring(0, 50);
       pdf.save(`Seance-${safeFilename}.pdf`);
 
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
-      successDiv.innerHTML = 'PDF exporté !';
-      document.body.appendChild(successDiv);
-      setTimeout(() => { successDiv.remove(); }, 2000);
+      showToast('PDF exporté !');
 
     } catch (error) {
       console.error('Erreur export PDF:', error);
-      alert('Erreur lors de l\'export PDF.');
+      showToast('L\'export PDF a échoué. Veuillez réessayer.', 'error');
     } finally {
       setExportingId(null);
     }
@@ -568,9 +558,12 @@ export function LessonsBankPage() {
 
 
   const handleDelete = async (id: string, topic: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la séance "${topic}" ?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Supprimer cette séance ?',
+      message: `« ${topic} » sera définitivement retirée de votre banque. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from('lessons_bank')
@@ -579,22 +572,12 @@ export function LessonsBankPage() {
 
     if (error) {
       console.error("Erreur lors de la suppression:", error);
+      showToast('La suppression a échoué. Veuillez réessayer.', 'error');
       return;
     }
 
     setLessons((prev) => prev.filter((item) => item.id !== id));
-    
-    // Success feedback
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-    successDiv.innerHTML = '🗑️ Séance supprimée !';
-    document.body.appendChild(successDiv);
-    
-    setTimeout(() => {
-      successDiv.style.transform = 'translateX(100%)';
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
+    showToast('Séance supprimée.');
   };
 
   const handleOpenExerciseModal = (phaseHeadingText: string, lesson: LessonBank) => {

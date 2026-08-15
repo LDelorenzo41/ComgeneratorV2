@@ -5,6 +5,8 @@ import React from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import { useAuthStore } from '../lib/store';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { supabase } from '../lib/supabase';
 import {
   Map,
@@ -59,6 +61,8 @@ interface SeanceRow {
 
 export function ScenariosBankPage() {
   const { user, loading: authLoading } = useAuthStore();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   
   const [scenarios, setScenarios] = React.useState<ScenarioItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -258,7 +262,7 @@ export function ScenariosBankPage() {
       setTimeout(() => setCopiedRowKey(null), 2500);
     } catch (err) {
       console.error('Erreur lors de la copie:', err);
-      alert('Erreur lors de la copie. Veuillez réessayer.');
+      showToast('La copie a échoué. Veuillez réessayer.', 'error');
     }
   };
 
@@ -358,10 +362,12 @@ export function ScenariosBankPage() {
   // ============================================================================
 
   const handleDelete = async (id: string, theme: string) => {
-    const confirmed = window.confirm(
-      `⚠️ Supprimer ce scénario ?\n\n"${theme}"\n\nCette action est irréversible.`
-    );
-    
+    const confirmed = await confirm({
+      title: 'Supprimer ce scénario ?',
+      message: `« ${theme} » sera définitivement retiré de votre banque. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    });
+
     if (!confirmed) return;
     
     setDeletingId(id);
@@ -381,18 +387,11 @@ export function ScenariosBankPage() {
         setExpandedId(null);
       }
       
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
-      successDiv.innerHTML = '✅ Scénario supprimé';
-      document.body.appendChild(successDiv);
-      setTimeout(() => {
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 2000);
-      
+      showToast('Scénario supprimé.');
+
     } catch (err: any) {
       console.error('Erreur lors de la suppression:', err);
-      alert('Erreur lors de la suppression. Veuillez réessayer.');
+      showToast('La suppression a échoué. Veuillez réessayer.', 'error');
     } finally {
       setDeletingId(null);
     }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   Search,
   Filter,
@@ -63,6 +65,8 @@ const categoryConfig: Record<ChatbotAnswerCategory, {
 
 export function ChatbotAnswerBankPage() {
   const { user } = useAuthStore();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [answers, setAnswers] = useState<ChatbotAnswer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,9 +112,12 @@ export function ChatbotAnswerBankPage() {
 
   // Supprimer une réponse
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer "${title}" ?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Supprimer cette réponse ?',
+      message: `« ${title} » sera définitivement retirée de votre banque. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from('chatbot_answers')
@@ -119,37 +126,22 @@ export function ChatbotAnswerBankPage() {
 
     if (error) {
       console.error("Erreur lors de la suppression:", error);
+      showToast('La suppression a échoué. Veuillez réessayer.', 'error');
       return;
     }
 
     setAnswers((prev) => prev.filter((item) => item.id !== id));
-    
-    // Notification
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
-    successDiv.innerHTML = '🗑️ Réponse supprimée !';
-    document.body.appendChild(successDiv);
-    setTimeout(() => {
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
+    showToast('Réponse supprimée.');
   };
 
   // Copier une réponse
   const handleCopy = async (content: string, title: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
-      successDiv.innerHTML = `📋 "${title}" copiée !`;
-      document.body.appendChild(successDiv);
-      setTimeout(() => {
-        successDiv.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(successDiv), 300);
-      }, 2000);
+      showToast(`« ${title} » copiée !`);
     } catch (err) {
       console.error("Erreur lors de la copie:", err);
+      showToast('La copie a échoué. Veuillez réessayer.', 'error');
     }
   };
 
@@ -205,14 +197,7 @@ export function ChatbotAnswerBankPage() {
 
     cancelEdit();
 
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-xl shadow-lg z-50';
-    successDiv.innerHTML = '✏️ Réponse modifiée !';
-    document.body.appendChild(successDiv);
-    setTimeout(() => {
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
+    showToast('Réponse modifiée.');
   };
 
   // Toggle expand
