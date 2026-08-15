@@ -97,6 +97,10 @@
   .accent-text { color: var(--focus-accent-text, theme('colors.blue.600')); }
   .dark .accent-text { color: var(--focus-accent-text-dark, theme('colors.blue.400')); }
 
+  /* Aplat soutenu, pour un contrôle actif : piste d'interrupteur, pastille.
+     Teinte 600 dans les deux thèmes, contrairement à `accent-text`. */
+  .accent-strong { background-color: var(--focus-accent-strong, theme('colors.blue.600')); }
+
   /**
    * Fond d'encart : trace d'accent qui s'intensifie vers la droite.
    *
@@ -122,20 +126,24 @@
     --focus-accent: theme('colors.blue.500');
     --focus-accent-text: theme('colors.blue.600');
     --focus-accent-text-dark: theme('colors.blue.400');
+    --focus-accent-strong: theme('colors.blue.600');
   }
   .focus-accent-indigo {
     --focus-accent: theme('colors.indigo.500');
     --focus-accent-text: theme('colors.indigo.600');
     --focus-accent-text-dark: theme('colors.indigo.400');
+    --focus-accent-strong: theme('colors.indigo.600');
   }
   .focus-accent-green {
     --focus-accent: theme('colors.green.500');
     --focus-accent-text: theme('colors.green.600');
     --focus-accent-text-dark: theme('colors.green.400');
+    --focus-accent-strong: theme('colors.green.600');
   }
   .focus-accent-purple {
     --focus-accent: theme('colors.purple.500');
     --focus-accent-text: theme('colors.purple.600');
     --focus-accent-text-dark: theme('colors.purple.400');
+    --focus-accent-strong: theme('colors.purple.600');
   }
 }

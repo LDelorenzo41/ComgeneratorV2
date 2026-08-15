@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, X, Loader2 } from 'lucide-react';
 import ChatInterface from './ChatInterface';
+import { Toggle } from '../ui/Toggle';
 import { getDocuments } from '../../lib/ragApi';
 import type { RagDocument } from '../../lib/rag.types';
 
@@ -41,18 +42,11 @@ export const ChatbotFloatingSwitch: React.FC = () => {
           </p>
         </div>
       </div>
-      <button
-        onClick={handleToggle}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          isEnabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            isEnabled ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </button>
+      <Toggle
+        checked={isEnabled}
+        onChange={handleToggle}
+        label="Afficher le chatbot sur toutes les pages"
+      />
     </div>
   );
 };

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2, Cpu } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
+import { Toggle } from '../components/ui/Toggle';
 import { supabase } from '../lib/supabase';
 import { AIModelChoice, AI_MODEL_OPTIONS, getAIModelChoice, setAIModelChoice } from '../lib/aiModelConfig';
 
@@ -309,24 +310,13 @@ export function SettingsPage() {
                 {isLoadingPreferences ? (
                   <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
                 ) : (
-                  <button
-                    onClick={handleNewsletterToggle}
-                    disabled={isSavingPreferences}
-                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 ${
-                      newsletterSubscription 
-                        ? 'bg-purple-600' 
-                        : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
-                        newsletterSubscription ? 'translate-x-8' : 'translate-x-1'
-                      }`}
-                    />
-                    {isSavingPreferences && (
-                      <Loader2 className="absolute inset-0 m-auto w-4 h-4 text-white animate-spin" />
-                    )}
-                  </button>
+                  <Toggle
+                    checked={newsletterSubscription ?? false}
+                    onChange={handleNewsletterToggle}
+                    loading={isSavingPreferences}
+                    size="lg"
+                    label="Recevoir la newsletter ProfAssist"
+                  />
                 )}
               </div>
 
