@@ -251,7 +251,7 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
                 id="is-default-create"
                 checked={editForm.is_default}
                 onChange={(e) => setEditForm({ ...editForm, is_default: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus-ring border-gray-300 rounded"
               />
               <label htmlFor="is-default-create" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                 Définir comme signature par défaut
@@ -321,7 +321,7 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
                       id={`is-default-${signature.id}`}
                       checked={editForm.is_default}
                       onChange={(e) => setEditForm({ ...editForm, is_default: e.target.checked })}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-blue-600 focus-ring border-gray-300 rounded"
                     />
                     <label htmlFor={`is-default-${signature.id}`} className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                       Définir comme signature par défaut

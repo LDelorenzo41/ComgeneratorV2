@@ -745,7 +745,7 @@ export function CommunicationPage() {
                         value="troisieme"
                         checked={pointDeVue === 'troisieme'}
                         onChange={(e) => setPointDeVue(e.target.value as 'troisieme' | 'premiere')}
-                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 text-blue-600 focus-ring"
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">
                         <strong>Troisième personne</strong> (objectif : "L'élève a fait...")
@@ -758,7 +758,7 @@ export function CommunicationPage() {
                         value="premiere"
                         checked={pointDeVue === 'premiere'}
                         onChange={(e) => setPointDeVue(e.target.value as 'troisieme' | 'premiere')}
-                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 text-blue-600 focus-ring"
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">
                         <strong>Première personne</strong> (témoin : "J'ai constaté que...")

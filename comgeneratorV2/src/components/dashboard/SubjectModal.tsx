@@ -77,7 +77,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                   type="text"
                   id="name"
                   {...register('name')}
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus-ring focus-ring-border"
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -116,7 +116,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                       <input
                         {...register(`criteria.${index}.name`)}
                         placeholder="Nom du critère"
-                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus-ring focus-ring-border"
                       />
                       {errors.criteria?.[index]?.name && (
                         <p className="mt-1 text-sm text-red-600">{errors.criteria[index]?.name?.message}</p>
@@ -125,7 +125,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
                     <div className="w-32">
                       <select
                         {...register(`criteria.${index}.importance`, { valueAsNumber: true })}
-                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus-ring focus-ring-border"
                       >
                         <option value={1}>Normal</option>
                         <option value={2}>Important</option>

@@ -232,7 +232,7 @@ export function AdminCampaignsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="focus-accent-green min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -518,7 +518,7 @@ export function AdminCampaignsPage() {
                           has_max_redemptions: e.target.checked,
                           max_redemptions: e.target.checked ? 100 : null
                         })}
-                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus-ring"
                       />
                       <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         Limiter le nombre d'utilisations

@@ -80,7 +80,7 @@ export const FolderSelector: React.FC<FolderSelectorProps> = ({
                 checked={isSelected}
                 onChange={() => toggleFolder(folder.id)}
                 disabled={disabled}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-blue-600 focus-ring"
               />
               <FolderOpen className={`w-4 h-4 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`} />
               <span className="text-sm text-gray-700 dark:text-gray-300">{folder.name}</span>

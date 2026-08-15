@@ -796,7 +796,7 @@ export function SynthesePage() {
                         checked={sourceScope === 'moyennes'}
                         onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Tenir compte des moyennes</p>
@@ -820,7 +820,7 @@ export function SynthesePage() {
                         checked={sourceScope === 'appreciations'}
                         onChange={(e) => setSourceScope(e.target.value as 'moyennes' | 'appreciations')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Uniquement les appréciations</p>
@@ -852,7 +852,7 @@ export function SynthesePage() {
                         checked={outputType === 'complet'}
                         onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse complète</p>
@@ -874,7 +874,7 @@ export function SynthesePage() {
                         checked={outputType === 'essentiel'}
                         onChange={(e) => setOutputType(e.target.value as 'complet' | 'essentiel')}
                         disabled={!tokensAvailable}
-                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                        className="mt-1 mr-3 w-4 h-4 text-indigo-600 focus-ring"
                       />
                       <div>
                         <p className="font-semibold text-gray-900 dark:text-gray-100">Synthèse essentielle</p>

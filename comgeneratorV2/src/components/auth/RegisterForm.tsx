@@ -322,7 +322,7 @@ export function RegisterForm() {
             {...register('newsletter')}
             type="checkbox"
             id="newsletter"
-            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+            className="mt-1 h-4 w-4 text-blue-600 focus-ring border-gray-300 dark:border-gray-600 rounded"
           />
           <div className="flex-1">
             <label htmlFor="newsletter" className="text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
