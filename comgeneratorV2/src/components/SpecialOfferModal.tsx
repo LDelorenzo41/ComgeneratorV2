@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 import { tokenUpdateEvent, TOKEN_UPDATED } from './layout/Header';
 import { useToast } from './ui/Toast';
+import { Button } from './ui/Button';
 
 export function SpecialOfferModal() {
   const { showToast } = useToast();
@@ -159,26 +160,28 @@ export function SpecialOfferModal() {
             </div>
 
             {/* Bouton principal */}
-            <button
+            <Button
               onClick={handleAccept}
               disabled={loading}
-              className="w-full group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              variant="blue"
+              shape="pill"
+              lift="zoom"
+              padding="compact"
+              contentClassName="gap-2"
+              className="w-full"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-              <span className="relative flex items-center justify-center gap-2">
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Activation en cours...
-                  </>
-                ) : (
-                  <>
-                    <Gift className="w-5 h-5" />
-                    Accepter et obtenir mes 30 000 tokens gratuits
-                  </>
-                )}
-              </span>
-            </button>
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Activation en cours...
+                </>
+              ) : (
+                <>
+                  <Gift className="w-5 h-5" />
+                  Accepter et obtenir mes 30 000 tokens gratuits
+                </>
+              )}
+            </Button>
 
             {/* Bouton secondaire */}
             <button

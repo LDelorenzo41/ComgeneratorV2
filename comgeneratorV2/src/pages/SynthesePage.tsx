@@ -910,31 +910,29 @@ export function SynthesePage() {
                 )}
 
                 {/* ✅ BOUTON DE GÉNÉRATION */}
-                <button
-                  onClick={generateSynthese} 
+                <Button
+                  onClick={generateSynthese}
                   disabled={loading || !capturedImage || tokenCount === 0}
-                  className="w-full group relative overflow-hidden bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  variant="green"
+                  className="w-full"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-emerald-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <span className="relative flex items-center justify-center">
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                        Analyse en cours...
-                      </>
-                    ) : tokenCount === 0 ? (
-                      <>
-                        <AlertCircle className="w-5 h-5 mr-3" />
-                        Crédits épuisés
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-5 h-5 mr-3" />
-                        Générer la synthèse
-                      </>
-                    )}
-                  </span>
-                </button>
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                      Analyse en cours...
+                    </>
+                  ) : tokenCount === 0 ? (
+                    <>
+                      <AlertCircle className="w-5 h-5 mr-3" />
+                      Crédits épuisés
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5 mr-3" />
+                      Générer la synthèse
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
@@ -977,16 +975,14 @@ export function SynthesePage() {
                   </button>
                 </div>
                 
-                <button
+                <Button
                   onClick={resetForNewSynthesis}
-                  className="w-full group relative overflow-hidden bg-gradient-to-r from-gray-500 to-gray-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300"
+                  variant="gray"
+                  className="w-full"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-gray-600 to-gray-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <span className="relative flex items-center justify-center">
-                    <RotateCcw className="w-5 h-5 mr-3" />
-                    Faire une autre synthèse
-                  </span>
-                </button>
+                  <RotateCcw className="w-5 h-5 mr-3" />
+                  Faire une autre synthèse
+                </Button>
               </div>
             </div>
           )}

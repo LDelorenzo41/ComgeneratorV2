@@ -13,6 +13,7 @@ import { subjectUpdateEvent, SUBJECT_UPDATED } from './SubjectList';
 import { tokenUpdateEvent, TOKEN_UPDATED } from '../layout/Header';
 import { logGeneration } from '../../lib/usageStats';
 import useTokenBalance from '../../hooks/useTokenBalance'; // ✅ AJOUT
+import { Button } from '../ui/Button';
 import { 
   PenTool, 
   User, 
@@ -572,31 +573,29 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
 
             {/* Boutons d'action */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <button
+              <Button
                 type="submit"
                 disabled={loading || tokenCount === 0} // ✅ MODIFICATION : Désactivation si 0 tokens
-                className="flex-1 group relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                variant="blue"
+                className="flex-1"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                <span className="relative flex items-center justify-center">
-                  {loading ? (
-                    <>
-                      <Loader2 className="animate-spin w-5 h-5 mr-3" />
-                      Génération en cours...
-                    </>
-                  ) : tokenCount === 0 ? ( // ✅ MODIFICATION : Condition pour crédits épuisés
-                    <>
-                      <CreditCard className="w-5 h-5 mr-3" />
-                      Crédits épuisés
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5 mr-3" />
-                      Générer les appréciations
-                    </>
-                  )}
-                </span>
-              </button>
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin w-5 h-5 mr-3" />
+                    Génération en cours...
+                  </>
+                ) : tokenCount === 0 ? ( // ✅ MODIFICATION : Condition pour crédits épuisés
+                  <>
+                    <CreditCard className="w-5 h-5 mr-3" />
+                    Crédits épuisés
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5 mr-3" />
+                    Générer les appréciations
+                  </>
+                )}
+              </Button>
               
               {result && (
                 <button
