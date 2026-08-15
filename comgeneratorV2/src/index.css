@@ -53,6 +53,27 @@
     border-color: var(--focus-accent, theme('colors.blue.500'));
   }
 
+  /**
+   * ── État sélectionné ───────────────────────────────────────────────────
+   *
+   * Une option choisie se signale par un cadre coloré et un fond légèrement
+   * teinté. Ces couleurs étaient écrites en dur, page par page et parfois
+   * option par option : Synthèse cumulait à elle seule quatre couleurs
+   * différentes dans un même formulaire.
+   *
+   * Elles lisent maintenant `--focus-accent`, comme le focus et les cases à
+   * cocher. Une page n'a donc plus qu'une seule couleur d'interaction.
+   *
+   * La teinte est calculée à partir de l'accent plutôt que fixée : posée en
+   * translucide, elle se compose avec le fond de la carte et fonctionne donc
+   * en thème clair comme en thème sombre, sans variante `dark:`.
+   */
+  .accent-border { border-color: var(--focus-accent, theme('colors.blue.500')); }
+  .accent-solid { background-color: var(--focus-accent, theme('colors.blue.500')); }
+  .accent-tint {
+    background-color: color-mix(in srgb, var(--focus-accent, theme('colors.blue.500')) 10%, transparent);
+  }
+
   /* Accent d'une page. À poser sur l'élément racine : tout ce que la page
      contient s'y aligne, y compris les composants partagés. */
   .focus-accent-blue   { --focus-accent: theme('colors.blue.500'); }

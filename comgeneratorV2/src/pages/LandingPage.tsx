@@ -253,7 +253,7 @@ export function LandingPage() {
                   key={index}
                   className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
                     activeFeature === index
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-lg scale-105'
+                      ? 'accent-border accent-tint shadow-lg scale-105'
                       : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow-md'
                   }`}
                   onClick={() => setActiveFeature(index)}

@@ -1509,7 +1509,7 @@ export function LessonGeneratorPage() {
                   onDrop={handleDrop}
                   className={`rounded-xl p-6 border-2 border-dashed transition-colors duration-200 ${
                     isDragging
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                      ? 'accent-border accent-tint'
                       : 'border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-700 dark:to-blue-900/20'
                   }`}
                 >

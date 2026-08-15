@@ -46,7 +46,7 @@ export function ToneSelector({ value, onChange }: ToneSelectorProps) {
             onClick={() => onChange(tone.value)}
             className={`w-full flex items-center p-3 rounded-lg border ${
               value === tone.value
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                ? 'accent-border accent-tint'
                 : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}
           >

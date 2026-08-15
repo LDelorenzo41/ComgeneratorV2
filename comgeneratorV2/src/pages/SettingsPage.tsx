@@ -223,7 +223,7 @@ export function SettingsPage() {
                   key={option.value}
                   className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     aiModelChoice === option.value
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      ? 'accent-border accent-tint'
                       : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-700'
                   }`}
                 >

@@ -1312,7 +1312,7 @@ export function ScenarioPedagogiquePage() {
                     isExtracting || tokenCount === 0
                       ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-50'
                       : isDragging
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 cursor-copy'
+                        ? 'accent-border accent-tint cursor-copy'
                         : 'border-blue-300 hover:border-blue-500 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20 cursor-pointer'
                   }`}
                 >

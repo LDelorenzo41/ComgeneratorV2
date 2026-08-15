@@ -289,7 +289,7 @@ export const SaveAnswerModal: React.FC<SaveAnswerModalProps> = ({
                   onClick={() => setCategory(cat.value)}
                   className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-left text-sm font-medium transition-all ${
                     category === cat.value
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      ? 'accent-border accent-tint text-blue-700 dark:text-blue-300'
                       : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
                   }`}
                 >
