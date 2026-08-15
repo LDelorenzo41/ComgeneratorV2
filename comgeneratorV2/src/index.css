@@ -120,6 +120,29 @@
     );
   }
 
+  /**
+   * ── Champ de saisie ────────────────────────────────────────────────────
+   *
+   * L'application avait deux familles de champs qui se côtoyaient sur un
+   * même formulaire : les composants partagés `Input`, `Select` et
+   * `Textarea`, compacts et à peine arrondis, et les champs écrits
+   * directement dans les pages, plus généreux et nettement plus arrondis.
+   *
+   * La forme retenue est celle des champs de page — la plus répandue, et
+   * la seule cohérente avec le rayon des boutons.
+   *
+   * La couleur de bordure n'est pas incluse : elle varie selon l'état
+   * (repos, erreur) et reste donc au site d'appel.
+   */
+  /* `block` est indispensable : laissé en `inline-block`, un champ traîne
+     4 px de blanc sous lui — l'espace réservé à la ligne de base des
+     éléments en ligne. */
+  .field {
+    @apply block w-full px-4 py-3 rounded-xl border-2
+           bg-white dark:bg-gray-700
+           text-gray-900 dark:text-gray-100 dark:placeholder-gray-400;
+  }
+
   /* Accent d'une page. À poser sur l'élément racine : tout ce que la page
      contient s'y aligne, y compris les composants partagés. */
   .focus-accent-blue {
