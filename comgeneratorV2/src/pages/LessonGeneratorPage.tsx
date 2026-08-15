@@ -770,7 +770,7 @@ const MarkdownEditor: React.FC<{
         >
           <div className="flex flex-col h-full">
             <textarea
-              className="flex-1 w-full p-6 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-inset focus:ring-blue-500 font-mono resize-none outline-none"
+              className="flex-1 w-full p-6 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-inset focus:ring-blue-500 font-mono outline-none"
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               placeholder="Éditez votre contenu markdown ici..."
@@ -1413,7 +1413,7 @@ export function LessonGeneratorPage() {
     {...register('topic')}
     disabled={tokenCount === 0}
     rows={3}
-    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     placeholder="Ex: La description d'un lieu dans un récit  👉 Objectifs :  Comprendre l'importance de la description pour créer une atmosphère.  Identifier les procédés d'écriture (adjectifs qualificatifs, expansions du nom, verbes de perception, champs lexicaux).  S'exercer à écrire une description en suivant un plan."
   />
   {errors.topic && (

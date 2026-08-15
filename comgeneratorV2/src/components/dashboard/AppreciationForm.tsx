@@ -560,7 +560,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                 disabled={tokenCount === 0}
                 rows={4}
                 placeholder="Ajoutez des observations particulières, des points à mentionner..."
-                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
