@@ -17,9 +17,21 @@
    * `appearance-none` avec un dégradé orange sur mesure.
    */
   input[type='checkbox'],
-  input[type='radio'] {
+  input[type='radio'],
+  input[type='range'] {
     accent-color: var(--focus-accent, theme('colors.blue.500'));
   }
+
+  /**
+   * Partie non remplie d'un curseur.
+   *
+   * Elle est peinte dans un dégradé en ligne, où les variantes `dark:` de
+   * Tailwind ne s'appliquent pas. D'où cette variable, qui prend le relais.
+   * Sans elle, le rail restait en gris clair sur fond sombre : une barre
+   * blanche en travers de l'encart.
+   */
+  :root { --slider-track: theme('colors.gray.200'); }
+  .dark { --slider-track: theme('colors.gray.600'); }
 }
 
 @layer components {
@@ -74,10 +86,64 @@
     background-color: color-mix(in srgb, var(--focus-accent, theme('colors.blue.500')) 10%, transparent);
   }
 
+  /**
+   * Texte à l'accent.
+   *
+   * Une nuance plus foncée que `--focus-accent` : la teinte 500 convient à
+   * un aplat ou à un cadre, pas à du texte sur fond clair, où elle manque de
+   * contraste. On reprend la convention déjà en place dans l'application,
+   * 600 en thème clair et 400 en thème sombre.
+   */
+  .accent-text { color: var(--focus-accent-text, theme('colors.blue.600')); }
+  .dark .accent-text { color: var(--focus-accent-text-dark, theme('colors.blue.400')); }
+
+  /* Aplat soutenu, pour un contrôle actif : piste d'interrupteur, pastille.
+     Teinte 600 dans les deux thèmes, contrairement à `accent-text`. */
+  .accent-strong { background-color: var(--focus-accent-strong, theme('colors.blue.600')); }
+
+  /**
+   * Fond d'encart : trace d'accent qui s'intensifie vers la droite.
+   *
+   * Les deux extrémités sont translucides. C'est ce qui permet à la même
+   * règle de servir dans les deux thèmes : le dégradé se compose avec le
+   * fond de la carte, blanc en clair, gris foncé en sombre.
+   *
+   * Une première version partait d'un gris opaque vers un accent
+   * translucide ; la transition laissait voir le fond au milieu et délavait
+   * l'encart en thème sombre.
+   */
+  .accent-wash {
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--focus-accent, theme('colors.blue.500')) 14%, transparent)
+    );
+  }
+
   /* Accent d'une page. À poser sur l'élément racine : tout ce que la page
      contient s'y aligne, y compris les composants partagés. */
-  .focus-accent-blue   { --focus-accent: theme('colors.blue.500'); }
-  .focus-accent-indigo { --focus-accent: theme('colors.indigo.500'); }
-  .focus-accent-green  { --focus-accent: theme('colors.green.500'); }
-  .focus-accent-purple { --focus-accent: theme('colors.purple.500'); }
+  .focus-accent-blue {
+    --focus-accent: theme('colors.blue.500');
+    --focus-accent-text: theme('colors.blue.600');
+    --focus-accent-text-dark: theme('colors.blue.400');
+    --focus-accent-strong: theme('colors.blue.600');
+  }
+  .focus-accent-indigo {
+    --focus-accent: theme('colors.indigo.500');
+    --focus-accent-text: theme('colors.indigo.600');
+    --focus-accent-text-dark: theme('colors.indigo.400');
+    --focus-accent-strong: theme('colors.indigo.600');
+  }
+  .focus-accent-green {
+    --focus-accent: theme('colors.green.500');
+    --focus-accent-text: theme('colors.green.600');
+    --focus-accent-text-dark: theme('colors.green.400');
+    --focus-accent-strong: theme('colors.green.600');
+  }
+  .focus-accent-purple {
+    --focus-accent: theme('colors.purple.500');
+    --focus-accent-text: theme('colors.purple.600');
+    --focus-accent-text-dark: theme('colors.purple.400');
+    --focus-accent-strong: theme('colors.purple.600');
+  }
 }
