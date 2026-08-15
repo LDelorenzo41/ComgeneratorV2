@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FolderOpen, FolderPlus, Pencil, Trash2, Loader2, Check, X } from 'lucide-react';
 import type { RagFolder, RagDocument } from '../../lib/rag.types';
 import { createFolder, renameFolder, deleteFolder } from '../../lib/ragApi';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface FolderManagerProps {
   folders: RagFolder[];
@@ -10,6 +11,7 @@ interface FolderManagerProps {
 }
 
 export const FolderManager: React.FC<FolderManagerProps> = ({ folders, documents, onRefresh }) => {
+  const confirm = useConfirm();
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -55,9 +57,14 @@ export const FolderManager: React.FC<FolderManagerProps> = ({ folders, documents
   const handleDelete = async (folder: RagFolder) => {
     const docCount = getDocCountForFolder(folder.id);
     const message = docCount > 0
-      ? `Supprimer le dossier "${folder.name}" ? Les ${docCount} document(s) qu'il contient seront déplacés dans "Non classés".`
-      : `Supprimer le dossier "${folder.name}" ?`;
-    if (!confirm(message)) return;
+      ? `Les ${docCount} document(s) qu'il contient seront déplacés dans « Non classés ».`
+      : 'Ce dossier sera définitivement supprimé.';
+    const confirmed = await confirm({
+      title: `Supprimer le dossier « ${folder.name} » ?`,
+      message,
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     setDeletingId(folder.id);
     try {

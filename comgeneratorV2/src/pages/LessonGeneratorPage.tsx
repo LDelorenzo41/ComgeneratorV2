@@ -33,6 +33,7 @@ import { FolderSelector } from '../components/chatbot/FolderSelector';
 import { Link } from 'react-router-dom';
 import { logGeneration } from '../lib/usageStats';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   BookOpen,
   Copy,
@@ -221,6 +222,8 @@ const MarkdownEditor: React.FC<{
   tokensAvailable?: number;
   onOpenExerciseModal?: (phaseHeading: string) => void;
 }> = ({ content, onChange, onSaveToBank, isSaving = false, tokensAvailable = 0, onOpenExerciseModal }) => {
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [isEditing, setIsEditing] = React.useState(false);
   const [editContent, setEditContent] = React.useState(content);
   const [showFullScreen, setShowFullScreen] = React.useState(false);
@@ -278,16 +281,18 @@ const MarkdownEditor: React.FC<{
     setIsEditing(false);
   };
 
-  const handleSaveToBank = () => {
+  const handleSaveToBank = async () => {
     if (!hasBankAccess) {
-      const userConfirmed = confirm(
-        '⚠️ Accès banque requis\n\n' +
-        'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\n' +
-        'Souhaitez-vous consulter nos plans ?'
-      );
+      const userConfirmed = await confirm({
+        title: 'Accès banque requis',
+        message: 'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\nSouhaitez-vous consulter nos plans ?',
+        confirmLabel: 'Voir les plans',
+        destructive: false,
+      });
 
       if (userConfirmed) {
-        window.location.href = '/buy-tokens';
+        // Nouvel onglet : la séance générée reste à l'écran
+        window.open('/buy-tokens', '_blank', 'noopener');
       }
       return;
     }
@@ -668,7 +673,7 @@ const MarkdownEditor: React.FC<{
 
     } catch (error) {
       console.error('Erreur export PDF:', error);
-      alert('Erreur lors de l\'export PDF.');
+      showToast('L\'export PDF a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsExporting(false);
     }
@@ -812,7 +817,7 @@ const MarkdownEditor: React.FC<{
               <h5 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">Sauvegarde non disponible</h5>
               <p className="text-orange-700 dark:text-orange-300 text-sm">
                 Votre plan actuel ne permet pas de sauvegarder les séances.
-                <button onClick={() => window.location.href = '/buy-tokens'} className="underline hover:no-underline font-medium ml-1">
+                <button onClick={() => window.open('/buy-tokens', '_blank', 'noopener')} className="underline hover:no-underline font-medium ml-1">
                   Upgrader vers un plan avec banque
                 </button>
               </p>
@@ -924,6 +929,7 @@ const MarkdownEditor: React.FC<{
 
 export function LessonGeneratorPage() {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { user, loading: authLoading } = useAuthStore();
   const tokenCount = useTokenBalance();
   const [generatedContent, setGeneratedContent] = React.useState('');
@@ -1006,7 +1012,7 @@ export function LessonGeneratorPage() {
   // Traitement d'un fichier (partagé entre input et drag & drop)
   const processFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
-      alert('Le fichier est trop volumineux (max 10 MB).');
+      showToast('Fichier trop volumineux (10 Mo maximum).', 'error');
       return;
     }
 
@@ -1014,7 +1020,7 @@ export function LessonGeneratorPage() {
     const allowedExtensions = ['.pdf', '.docx', '.txt'];
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
-      alert('Format non supporté. Formats acceptés : PDF, DOCX, TXT.');
+      showToast('Format non supporté. Formats acceptés : PDF, DOCX, TXT.', 'error');
       return;
     }
 
@@ -1032,7 +1038,7 @@ export function LessonGeneratorPage() {
       }
     } catch (error: any) {
       console.error('Erreur lors du chargement du document:', error);
-      alert(error.message || 'Erreur lors du chargement du document. Veuillez réessayer.');
+      showToast(error.message || 'Le chargement du document a échoué. Veuillez réessayer.', 'error');
       setUploadedFile(null);
     } finally {
       setIsExtracting(false);
@@ -1195,20 +1201,22 @@ export function LessonGeneratorPage() {
   // ✅ FONCTION handleSaveToBank avec vérification d'accès
   const handleSaveToBank = async (contentToSave: string) => {
     if (!user || !lastFormData) {
-      alert('Impossible de sauvegarder : données du formulaire manquantes');
+      showToast('Impossible de sauvegarder : données du formulaire manquantes.', 'error');
       return;
     }
 
     // Vérification accès banque
     if (!hasBankAccess) {
-      const userConfirmed = confirm(
-        '⚠️ Accès banque requis\n\n' +
-        'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\n' +
-        'Souhaitez-vous consulter nos plans ?'
-      );
+      const userConfirmed = await confirm({
+        title: 'Accès banque requis',
+        message: 'Pour sauvegarder vos séances, vous devez disposer d\'un plan avec accès banque.\n\nSouhaitez-vous consulter nos plans ?',
+        confirmLabel: 'Voir les plans',
+        destructive: false,
+      });
 
       if (userConfirmed) {
-        window.location.href = '/buy-tokens';
+        // Nouvel onglet : la séance générée reste à l'écran
+        window.open('/buy-tokens', '_blank', 'noopener');
       }
       return;
     }
@@ -1234,7 +1242,7 @@ export function LessonGeneratorPage() {
 
     } catch (err: any) {
       console.error('Erreur lors de l\'enregistrement dans la banque:', err);
-      alert('Erreur lors de l\'enregistrement dans la banque. Veuillez réessayer.');
+      showToast('L\'enregistrement dans la banque a échoué. Veuillez réessayer.', 'error');
     } finally {
       setSavingToBank(false);
     }

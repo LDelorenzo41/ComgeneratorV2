@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import { rssService, type RSSArticle } from '../lib/rssService';
 import { ExternalLink, RefreshCw, AlertCircle, Newspaper, Check, ChevronDown, X, Sparkles, Rss, Filter, Calendar, Globe, TrendingUp } from 'lucide-react';
 import type { RssFeed, UserRssPreference } from '../lib/types';
+import { useToast } from '../components/ui/Toast';
 
 export function ResourcesPage() {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [articles, setArticles] = React.useState<RSSArticle[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -110,7 +112,7 @@ export function ResourcesPage() {
 
       if (deleteAllError) {
         console.error('Erreur suppression préférences:', deleteAllError);
-        alert('Erreur lors de la suppression des anciennes préférences.');
+        showToast('La suppression des anciennes préférences a échoué.', 'error');
         return;
       }
 
@@ -127,7 +129,7 @@ export function ResourcesPage() {
 
         if (insertError) {
           console.error('Erreur insertion préférences:', insertError);
-          alert('Erreur lors de la sauvegarde des nouvelles préférences.');
+          showToast('L\'enregistrement des préférences a échoué.', 'error');
           return;
         }
       }
@@ -137,7 +139,7 @@ export function ResourcesPage() {
       
     } catch (error) {
       console.error('Erreur générale sauvegarde:', error);
-      alert('Une erreur inattendue est survenue lors de la sauvegarde.');
+      showToast('Une erreur inattendue est survenue lors de l\'enregistrement.', 'error');
     }
   };
 

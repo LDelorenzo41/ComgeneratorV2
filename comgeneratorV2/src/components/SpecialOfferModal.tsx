@@ -94,7 +94,7 @@ export function SpecialOfferModal() {
 
     } catch (error) {
       console.error('Erreur lors de l\'acceptation de l\'offre:', error);
-      alert('Une erreur est survenue. Veuillez réessayer.');
+      showToast('Une erreur est survenue. Veuillez réessayer.', 'error');
     } finally {
       setLoading(false);
     }

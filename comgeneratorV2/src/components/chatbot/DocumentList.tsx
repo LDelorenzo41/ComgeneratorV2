@@ -8,6 +8,8 @@ import {
 import type { RagDocument, RagFolder, DocumentType } from '../../lib/rag.types';
 import { formatFileSize, getStatusLabel, getStatusColor, DOCUMENT_TYPES, LEVEL_LABELS } from '../../lib/rag.types';
 import { deleteDocument, checkIsAdmin, reanalyzeDocument, moveDocumentToFolder } from '../../lib/ragApi';
+import { useToast } from '../ui/Toast';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface DocumentListProps {
   documents: RagDocument[];
@@ -24,6 +26,8 @@ interface SubjectGroup {
 }
 
 export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders = [], onRefresh, isLoading = false }) => {
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -94,22 +98,27 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders =
 
   const handleDelete = async (doc: RagDocument) => {
     if (doc.scope === 'global' && !isAdmin) {
-      alert('Les documents PROFASSIST ne peuvent pas être supprimés.');
+      showToast('Les documents PROFASSIST ne peuvent pas être supprimés.', 'error');
       return;
     }
 
-    const confirmMessage = doc.scope === 'global'
-      ? `⚠️ ATTENTION: Supprimer le document officiel "${doc.title}" ?\n\nCe document est accessible à TOUS les utilisateurs.`
-      : `Supprimer "${doc.title}" ?`;
-
-    if (!confirm(confirmMessage)) return;
+    const confirmed = await confirm({
+      title: doc.scope === 'global'
+        ? `Supprimer le document officiel « ${doc.title} » ?`
+        : `Supprimer « ${doc.title}» ?`.replace('  ', ' '),
+      message: doc.scope === 'global'
+        ? 'Attention : ce document est accessible à TOUS les utilisateurs. Sa suppression est irréversible.'
+        : 'Ce document sera définitivement retiré de votre corpus. Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     try {
       setDeletingId(doc.id);
       await deleteDocument(doc.id);
       onRefresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Erreur lors de la suppression');
+      showToast(error instanceof Error ? error.message : 'La suppression a échoué.', 'error');
     } finally {
       setDeletingId(null);
     }
@@ -121,10 +130,10 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders =
     try {
       setReanalyzingId(doc.id);
       await reanalyzeDocument(doc.id);
-      alert('✅ Analyse IA mise à jour');
+      showToast('Analyse IA mise à jour.');
       onRefresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Erreur lors de la ré-analyse');
+      showToast(error instanceof Error ? error.message : 'La ré-analyse a échoué.', 'error');
     } finally {
       setReanalyzingId(null);
     }
@@ -342,7 +351,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({ documents, folders =
         await moveDocumentToFolder(doc.id, folderId);
         onRefresh();
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Erreur lors du déplacement');
+        showToast(error instanceof Error ? error.message : 'Le déplacement a échoué.', 'error');
       }
     };
 

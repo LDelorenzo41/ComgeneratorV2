@@ -574,10 +574,9 @@ export function CommunicationPage() {
   };
 
   const handleCopy = async (text: string) => {
-    await copyToClipboard(text);
+    const ok = await copyToClipboard(text);
     // Toast unifié : accessible et positionné correctement sur mobile
-    // (remplace le toast fabriqué en document.createElement)
-    showToast('Message copié !');
+    showToast(ok ? 'Message copié !' : 'La copie a échoué. Veuillez réessayer.', ok ? 'success' : 'error');
   };
 
   return (

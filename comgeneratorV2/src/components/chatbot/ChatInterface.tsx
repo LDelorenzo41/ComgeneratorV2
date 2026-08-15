@@ -8,6 +8,7 @@ import { sendChatMessage } from '../../lib/ragApi';
 import type { ChatUIMessage, RagDocument, RagFolder, CorpusSelection, SearchFilters } from '../../lib/rag.types';
 import { DEFAULT_CORPUS_SELECTION, AVAILABLE_LEVELS, AVAILABLE_SUBJECTS } from '../../lib/rag.types';
 import { FolderSelector } from './FolderSelector';
+import { useConfirm } from '../ui/ConfirmDialog';
 
 interface ChatInterfaceProps {
   documents: RagDocument[];
@@ -70,6 +71,7 @@ const FilterTag: React.FC<{
 );
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedDocuments, isAdmin = false, folders = [] }) => {
+  const confirm = useConfirm();
   const [messages, setMessages] = useState<ChatUIMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -215,9 +217,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ documents, onNeedD
     }
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (messages.length === 0) return;
-    if (confirm('Effacer la conversation ?')) {
+    const confirmed = await confirm({
+      title: 'Effacer la conversation ?',
+      message: 'Les messages affichés seront retirés. Cette action est irréversible.',
+      confirmLabel: 'Effacer',
+    });
+    if (confirmed) {
       setMessages([]);
       setConversationId(null);
     }
