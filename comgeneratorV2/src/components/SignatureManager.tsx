@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../lib/store';
 import { supabase } from '../lib/supabase';
+import { useToast } from './ui/Toast';
+import { useConfirm } from './ui/ConfirmDialog';
 import { Plus, Edit, Trash2, Save, X, Star } from 'lucide-react';
 
 interface Signature {
@@ -16,6 +18,8 @@ interface SignatureManagerProps {
 
 export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
   const { user } = useAuthStore();
+  const { showToast } = useToast();
+  const confirm = useConfirm();
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -74,8 +78,10 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
       setEditForm({ name: '', content: '', is_default: false });
       setIsCreating(false);
       await fetchSignatures();
+      showToast('Signature créée.');
     } catch (error) {
       console.error('Erreur lors de la création:', error);
+      showToast('La création a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -110,16 +116,23 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
       setIsEditing(null);
       setEditForm({ name: '', content: '', is_default: false });
       await fetchSignatures();
+      showToast('Signature enregistrée.');
     } catch (error) {
       console.error('Erreur lors de la modification:', error);
+      showToast('L\'enregistrement a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   // Suppression d'une signature
-  const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette signature ?')) return;
+  const handleDelete = async (id: string, name: string) => {
+    const confirmed = await confirm({
+      title: 'Supprimer cette signature ?',
+      message: `« ${name} » sera définitivement supprimée. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    });
+    if (!confirmed) return;
 
     setIsLoading(true);
     try {
@@ -130,8 +143,10 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
 
       if (error) throw error;
       await fetchSignatures();
+      showToast('Signature supprimée.');
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
+      showToast('La suppression a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -157,8 +172,10 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
 
       if (error) throw error;
       await fetchSignatures();
+      showToast('Signature définie par défaut.');
     } catch (error) {
       console.error('Erreur lors de la définition par défaut:', error);
+      showToast('L\'opération a échoué. Veuillez réessayer.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -363,7 +380,7 @@ export function SignatureManager({ onSignatureChange }: SignatureManagerProps) {
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(signature.id)}
+                        onClick={() => handleDelete(signature.id, signature.name)}
                         className="p-1 text-gray-400 hover:text-red-600 transition-colors"
                         title="Supprimer"
                         disabled={isLoading}

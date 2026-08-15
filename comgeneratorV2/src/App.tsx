@@ -53,6 +53,10 @@ import { FeedbackSynthesisPage } from './pages/FeedbackSynthesisPage';
 import { CookieConsentProvider } from './contexts/CookieConsentContext';
 import { CookieBanner } from './components/CookieBanner';
 
+// Retours utilisateur unifiés (notifications et confirmations)
+import { ToastProvider } from './components/ui/Toast';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
+
 // Import de la modale cadeau
 import { SpecialOfferModal } from './components/SpecialOfferModal';
 
@@ -144,6 +148,8 @@ function App() {
 
   return (
     <CookieConsentProvider>
+      <ToastProvider>
+      <ConfirmProvider>
       <BrowserRouter>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
           <Header />
@@ -311,6 +317,8 @@ function App() {
         {/* Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
         {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
       </BrowserRouter>
+      </ConfirmProvider>
+      </ToastProvider>
     </CookieConsentProvider>
   );
 }

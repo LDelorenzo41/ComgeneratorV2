@@ -14,6 +14,7 @@ import { AICommunicationDisclaimer } from '../components/ui/AICommunicationDiscl
 import { DictationRecorder } from '../components/communication/DictationRecorder';
 import { analyzeCommunicationBrief, analyzeReplyBrief, type BriefAnalysis } from '../lib/analyzeBrief';
 import { exportDocumentToPdf } from '../lib/documentPdfExport';
+import { useToast } from '../components/ui/Toast';
 import EnhancedMarkdownRenderer from '../components/ui/EnhancedMarkdownRenderer';
 import { FEATURES } from '../lib/features';
 
@@ -69,6 +70,7 @@ interface Signature {
 export function CommunicationPage() {
   const { user } = useAuthStore();
   const tokenBalance = useTokenBalance();
+  const { showToast } = useToast();
 
   // ✅ AJOUT : Hooks pour la gestion du focus via URL
   const [searchParams] = useSearchParams();
@@ -571,24 +573,11 @@ export function CommunicationPage() {
     }
   };
 
-  const handleCopySuccess = () => {
-    // Success feedback moderne
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 transition-all duration-300 transform translate-x-0';
-    successDiv.innerHTML = '✅ Message copié !';
-    document.body.appendChild(successDiv);
-
-    setTimeout(() => {
-      successDiv.style.transform = 'translateX(100%)';
-      successDiv.style.opacity = '0';
-      setTimeout(() => document.body.removeChild(successDiv), 300);
-    }, 2000);
-  };
-
   const handleCopy = async (text: string) => {
     await copyToClipboard(text);
-    setLiveMessage('Message copié dans le presse-papiers.');
-    handleCopySuccess();
+    // Toast unifié : accessible et positionné correctement sur mobile
+    // (remplace le toast fabriqué en document.createElement)
+    showToast('Message copié !');
   };
 
   return (
