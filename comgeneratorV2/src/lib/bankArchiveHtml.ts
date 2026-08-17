@@ -305,8 +305,9 @@ export function renderBankArchiveHtml(payload: BankExport): string {
   <footer>
     <p>
       Document autonome : il s'ouvre dans n'importe quel navigateur, sans connexion
-      et sans logiciel particulier. Utilisez Ctrl+F pour chercher, et la fonction
-      « Imprimer » de votre navigateur pour l'enregistrer en PDF.
+      et sans logiciel particulier. Pour chercher dans la page, utilisez Ctrl+F
+      (Cmd+F sur Mac) ; pour l'enregistrer en PDF, la fonction « Imprimer » de
+      votre navigateur.
     </p>
     <p>
       Ce fichier contient également vos données sous forme réutilisable, afin de

@@ -443,9 +443,9 @@ export function SettingsPage() {
             </p>
             <p className="text-gray-700 dark:text-gray-300 text-sm mb-6">
               Il s'ouvre d'un double-clic dans n'importe quel navigateur, sans connexion et sans
-              logiciel particulier : vous y relisez votre travail, vous le cherchez avec Ctrl+F et
-              vous l'enregistrez en PDF via la fonction « Imprimer ». Il reste également
-              réimportable dans ProfAssist.
+              logiciel particulier : vous y relisez votre travail, vous le cherchez avec Ctrl+F
+              (Cmd+F sur Mac) et vous l'enregistrez en PDF via la fonction « Imprimer ». Il reste
+              également réimportable dans ProfAssist.
             </p>
 
             <button
