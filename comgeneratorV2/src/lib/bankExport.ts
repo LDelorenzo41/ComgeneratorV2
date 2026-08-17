@@ -8,6 +8,7 @@
 // aucun effet sur les données.
 
 import { supabase } from './supabase';
+import { renderBankArchiveHtml } from './bankArchiveHtml';
 
 export const BANK_EXPORT_FORMAT = 'profassist-bank-export';
 
@@ -170,13 +171,21 @@ export function describeBankExport(payload: BankExport): string {
 }
 
 export function bankExportFilename(payload: BankExport): string {
-  return `profassist-banque-${payload.exportedAt.slice(0, 10)}.profassist`;
+  return `ma-banque-profassist-${payload.exportedAt.slice(0, 10)}.html`;
 }
 
-/** Déclenche le téléchargement de l'archive et retourne le nom du fichier. */
+/**
+ * Déclenche le téléchargement de l'archive et retourne le nom du fichier.
+ *
+ * Le format retenu est une page HTML autonome : elle s'ouvre d'un double-clic
+ * dans n'importe quel navigateur, alors qu'une extension propriétaire ou un
+ * .json n'est associé à aucune application et laisserait l'utilisateur devant
+ * un fichier qu'il ne peut pas consulter. Les données brutes restent
+ * embarquées dans le document pour permettre une réimportation ultérieure.
+ */
 export function downloadBankExport(payload: BankExport): string {
   const filename = bankExportFilename(payload);
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const blob = new Blob([renderBankArchiveHtml(payload)], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');

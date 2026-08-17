@@ -435,12 +435,17 @@ export function SettingsPage() {
               </div>
             )}
 
-            <p className="text-gray-700 dark:text-gray-300 text-sm mb-6">
+            <p className="text-gray-700 dark:text-gray-300 text-sm mb-4">
               Téléchargez l'ensemble de vos contenus sauvegardés — appréciations, séances,
-              scénarios, réponses du chatbot, matières, critères et signatures — dans un fichier
+              scénarios, réponses conservées, matières, critères et signatures — dans un document
               unique. Ce fichier vous appartient : conservez-le où vous le souhaitez, il constitue
-              votre sauvegarde personnelle et vous permet de retrouver votre travail en toute
-              circonstance.
+              votre sauvegarde personnelle.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 text-sm mb-6">
+              Il s'ouvre d'un double-clic dans n'importe quel navigateur, sans connexion et sans
+              logiciel particulier : vous y relisez votre travail, vous le cherchez avec Ctrl+F et
+              vous l'enregistrez en PDF via la fonction « Imprimer ». Il reste également
+              réimportable dans ProfAssist.
             </p>
 
             <button
