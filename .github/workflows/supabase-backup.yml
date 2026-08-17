@@ -74,6 +74,10 @@ jobs:
           echo "✅ Secrets présents."
 
       - name: Relever les effectifs par table (contrôle d'intégrité)
+        # Contrôle de confort : son échec ne doit jamais empêcher la
+        # sauvegarde elle-même. L'intégrité du dump est vérifiée
+        # indépendamment à l'étape suivante.
+        continue-on-error: true
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
