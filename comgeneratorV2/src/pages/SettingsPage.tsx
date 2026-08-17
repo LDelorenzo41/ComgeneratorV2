@@ -1,10 +1,11 @@
 // src/pages/SettingsPage.tsx
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2, Cpu } from 'lucide-react';
+import { Settings, User, Shield, AlertTriangle, Trash2, Mail, Bell, Loader2, Cpu, Download } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
 import { Toggle } from '../components/ui/Toggle';
 import { supabase } from '../lib/supabase';
 import { AIModelChoice, AI_MODEL_OPTIONS, getAIModelChoice, setAIModelChoice } from '../lib/aiModelConfig';
+import { buildBankExport, downloadBankExport, describeBankExport, totalBankItems } from '../lib/bankExport';
 
 export function SettingsPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -22,6 +23,10 @@ export function SettingsPage() {
   // États pour le choix du modèle IA
   const [aiModelChoice, setAiModelChoiceState] = useState<AIModelChoice>("default");
   const [aiModelMessage, setAiModelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // États pour l'export de la Banque
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Charger les préférences au montage
   useEffect(() => {
@@ -51,6 +56,40 @@ export function SettingsPage() {
     // Charger le choix du modèle IA depuis localStorage
     setAiModelChoiceState(getAIModelChoice());
   }, [user]);
+
+  // Télécharger une archive complète de la Banque (lecture seule)
+  const handleExportBank = async () => {
+    if (isExporting) return;
+
+    setIsExporting(true);
+    setExportMessage(null);
+
+    try {
+      const archive = await buildBankExport();
+
+      if (totalBankItems(archive) === 0) {
+        setExportMessage({
+          type: 'error',
+          text: "Votre Banque est encore vide : il n'y a rien à exporter pour le moment."
+        });
+        return;
+      }
+
+      const filename = downloadBankExport(archive);
+      setExportMessage({
+        type: 'success',
+        text: `${filename} téléchargé — ${describeBankExport(archive)}.`
+      });
+    } catch (err: any) {
+      console.error('Erreur export Banque:', err);
+      setExportMessage({
+        type: 'error',
+        text: err?.message || "L'export a échoué. Vérifiez votre connexion et réessayez."
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Sauvegarder les préférences newsletter
   const handleNewsletterToggle = async () => {
@@ -366,6 +405,70 @@ export function SettingsPage() {
                 </a>
               </p>
             </div>
+          </div>
+
+          {/* Ma Banque - Export du patrimoine pédagogique */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center mr-4">
+                <Download className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Ma Banque</h3>
+                <p className="text-gray-600 dark:text-gray-300">Emportez une copie complète de votre travail</p>
+              </div>
+            </div>
+
+            {/* Message de feedback */}
+            {exportMessage && (
+              <div className={`mb-6 p-4 rounded-lg flex items-center ${
+                exportMessage.type === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+              }`}>
+                <span className={exportMessage.type === 'success'
+                  ? 'text-green-800 dark:text-green-300'
+                  : 'text-red-800 dark:text-red-300'
+                }>
+                  {exportMessage.text}
+                </span>
+              </div>
+            )}
+
+            <p className="text-gray-700 dark:text-gray-300 text-sm mb-4">
+              Téléchargez l'ensemble de vos contenus sauvegardés — appréciations, séances,
+              scénarios, réponses conservées, matières, critères et signatures — dans un document
+              unique. Ce fichier vous appartient : conservez-le où vous le souhaitez, il constitue
+              votre sauvegarde personnelle.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 text-sm mb-6">
+              Il s'ouvre d'un double-clic dans n'importe quel navigateur, sans connexion et sans
+              logiciel particulier : vous y relisez votre travail, vous le cherchez avec Ctrl+F
+              (Cmd+F sur Mac) et vous l'enregistrez en PDF via la fonction « Imprimer ». Il reste
+              également réimportable dans ProfAssist.
+            </p>
+
+            <button
+              onClick={handleExportBank}
+              disabled={isExporting}
+              className="inline-flex items-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors focus-ring"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Préparation de votre archive…
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5 mr-2" />
+                  Exporter ma Banque
+                </>
+              )}
+            </button>
+
+            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              L'export est une simple lecture : il ne modifie et ne supprime aucune de vos données.
+            </p>
           </div>
 
           {/* Zone dangereuse - Suppression de compte */}

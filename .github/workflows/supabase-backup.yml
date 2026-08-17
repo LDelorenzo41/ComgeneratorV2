@@ -1,0 +1,173 @@
+name: Sauvegarde Supabase
+
+# =====================================================
+# Sauvegarde quotidienne chiffrée de la base ProfAssist.
+#
+# Pourquoi : le plan gratuit Supabase n'offre aucun point de
+# restauration. Les données utilisateurs (banques d'appréciations,
+# de séances, de scénarios, profils) tiennent dans quelques Mo :
+# un dump quotidien conservé 90 jours coûte 0 € et couvre le
+# besoin réel sans passer au plan Pro.
+#
+# Le dump contient des données personnelles (noms d'élèves dans
+# les appréciations, e-mails). Il est donc TOUJOURS chiffré avant
+# d'être stocké : le workflow échoue si la phrase secrète manque.
+#
+# ── Prérequis : 2 secrets de dépôt ───────────────────────────
+# (Settings > Secrets and variables > Actions > New secret)
+#
+#   SUPABASE_DB_URL
+#     Chaîne de connexion « Session pooler » (port 5432).
+#     Dashboard Supabase > Project Settings > Database >
+#     Connection string > onglet « Session pooler ».
+#     Forme : postgresql://postgres.<ref>:<MOTDEPASSE>@aws-0-<region>.pooler.supabase.com:5432/postgres
+#
+#     ⚠️ Ne pas utiliser le « Transaction pooler » (port 6543) :
+#     pg_dump y échoue. Ne pas utiliser la connexion directe
+#     (db.<ref>.supabase.co) : elle est en IPv6, inaccessible
+#     depuis les runners GitHub.
+#
+#   BACKUP_PASSPHRASE
+#     Phrase secrète longue et aléatoire servant à chiffrer le
+#     dump (AES256). À CONSERVER HORS DE GITHUB (gestionnaire de
+#     mots de passe) : sans elle, les sauvegardes sont illisibles.
+#
+# ── Restaurer une sauvegarde ─────────────────────────────────
+#   1. Actions > ce workflow > run choisi > télécharger l'artifact
+#   2. gpg --decrypt --output dump.sql.gz profassist-*.sql.gz.gpg
+#   3. gunzip dump.sql.gz
+#   4. psql "<connexion du projet cible>" -f dump.sql
+# =====================================================
+
+on:
+  schedule:
+    # 03:43 UTC — décalé du keep-alive (04:17) pour ne pas
+    # concentrer les deux workflows sur le même créneau.
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Vérifier la présence des secrets
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Le secret SUPABASE_DB_URL est manquant (chaîne Session pooler, port 5432)."
+            exit 1
+          fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::Le secret BACKUP_PASSPHRASE est manquant. Le dump contient des données personnelles et ne doit jamais être stocké en clair."
+            exit 1
+          fi
+          case "$SUPABASE_DB_URL" in
+            *:6543/*)
+              echo "::error::SUPABASE_DB_URL pointe vers le Transaction pooler (port 6543), incompatible avec pg_dump. Utiliser le Session pooler (port 5432)."
+              exit 1
+              ;;
+          esac
+          echo "✅ Secrets présents."
+
+      - name: Relever les effectifs par table (contrôle d'intégrité)
+        # Contrôle de confort : son échec ne doit jamais empêcher la
+        # sauvegarde elle-même. L'intégrité du dump est vérifiée
+        # indépendamment à l'étape suivante.
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # Ces compteurs sont écrits dans le journal du run : ils permettent
+          # de repérer une sauvegarde anormale (chute brutale d'un effectif)
+          # sans avoir à déchiffrer quoi que ce soit. Aucune donnée
+          # personnelle n'apparaît ici, uniquement des nombres.
+          docker run --rm postgres:15-alpine \
+            psql "$SUPABASE_DB_URL" -At -F' : ' -c "
+              select 'profiles',        count(*) from profiles
+              union all select 'appreciations',   count(*) from appreciations
+              union all select 'lessons_bank',    count(*) from lessons_bank
+              union all select 'scenarios_bank',  count(*) from scenarios_bank
+              union all select 'chatbot_answers', count(*) from chatbot_answers
+              union all select 'subjects',        count(*) from subjects
+              union all select 'signatures',      count(*) from signatures
+              union all select 'transactions',    count(*) from transactions;
+            " | tee counts.txt
+
+          if [ ! -s counts.txt ]; then
+            echo "::error::Aucun effectif retourné : la connexion à la base a probablement échoué."
+            exit 1
+          fi
+
+      - name: Produire le dump du schéma public
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backup
+
+          # postgres:15-alpine : pg_dump doit être au moins de la version du
+          # serveur (Supabase est en PostgreSQL 15.8). Épingler l'image évite
+          # les ruptures silencieuses liées aux versions préinstallées du runner.
+          #
+          # --no-owner / --no-privileges : le dump doit pouvoir être restauré
+          # dans un projet Supabase neuf, dont les rôles diffèrent.
+          # Pas de --clean : un dump sans DROP ne peut pas détruire une base
+          # existante s'il est appliqué par erreur.
+          docker run --rm postgres:15-alpine \
+            pg_dump "$SUPABASE_DB_URL" \
+              --schema=public \
+              --no-owner \
+              --no-privileges \
+              --format=plain \
+            > backup/profassist-public.sql
+
+          TAILLE=$(stat -c%s backup/profassist-public.sql)
+          echo "Taille du dump : $TAILLE octets"
+
+          # Un dump valide contient au minimum les tables de banque.
+          # Ce garde-fou évite qu'un fichier vide ou tronqué soit archivé
+          # comme s'il s'agissait d'une sauvegarde saine.
+          if [ "$TAILLE" -lt 10000 ]; then
+            echo "::error::Dump anormalement petit ($TAILLE octets) : sauvegarde considérée comme invalide."
+            exit 1
+          fi
+          for TABLE in appreciations lessons_bank scenarios_bank profiles; do
+            if ! grep -q "CREATE TABLE public.$TABLE" backup/profassist-public.sql; then
+              echo "::error::Table $TABLE absente du dump : sauvegarde incomplète."
+              exit 1
+            fi
+          done
+
+          echo "✅ Dump complet et cohérent."
+
+      - name: Compresser et chiffrer
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          HORODATAGE=$(date -u +%Y%m%d)
+          echo "HORODATAGE=$HORODATAGE" >> "$GITHUB_ENV"
+
+          gzip -9 backup/profassist-public.sql
+
+          # Chiffrement symétrique AES256 : l'artifact reste illisible même
+          # pour quelqu'un ayant accès au dépôt.
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+              --passphrase "$BACKUP_PASSPHRASE" \
+              --output "backup/profassist-$HORODATAGE.sql.gz.gpg" \
+              backup/profassist-public.sql.gz
+
+          rm -f backup/profassist-public.sql.gz
+
+          ls -lh backup/
+          echo "✅ Sauvegarde chiffrée."
+
+      - name: Archiver la sauvegarde
+        uses: actions/upload-artifact@v4
+        with:
+          name: profassist-backup-${{ env.HORODATAGE }}
+          path: backup/*.gpg
+          retention-days: 90
+          if-no-files-found: error
