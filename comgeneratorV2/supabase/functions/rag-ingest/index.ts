@@ -1007,6 +1007,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error('Non authentifié');
     }
 
+    // Le corpus documentaire est réservé à l'administration. Le contrôle est
+    // placé avant la lecture du corps de requête, afin de couvrir aussi bien
+    // l'ingestion classique que le mode « reanalyze ». Un contrôle plus bas
+    // n'existait que pour le périmètre global (scope='global').
+    const isAdminGlobal = await isAdminUser(supabaseAdmin, user.id, adminSecretHeader);
+    if (!isAdminGlobal) {
+      return new Response(
+        JSON.stringify({ error: "L'assistant documentaire n'est plus disponible." }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Lecture du body une seule fois
     const body = await req.json().catch(() => null);
     if (!body) {

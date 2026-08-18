@@ -13,6 +13,7 @@ import { DocumentList } from '../components/chatbot/DocumentList';
 import { FolderManager } from '../components/chatbot/FolderManager';
 import { ChatInterface } from '../components/chatbot/ChatInterface';
 import { getDocuments, getRagStats, getBetaUsageStats, checkIsAdmin, getFolders, BetaUsageStats, RagStats } from '../lib/ragApi';
+import { isChatbotVisible } from '../lib/features';
 import type { RagDocument, RagFolder } from '../lib/rag.types';
 import { ChatbotFloatingSwitch } from '../components/chatbot/ChatbotFloatingButton';
 
@@ -468,6 +469,11 @@ export const ChatbotPage: React.FC = () => {
   });
   const [isLoadingBeta, setIsLoadingBeta] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Autorisation d'accès à la page, distincte de `isAdmin` (qui pilote des
+  // options internes et doit rester un booléen). Trois états : null tant que
+  // la vérification est en cours, afin de ne jamais afficher « accès refusé »
+  // à l'administrateur pendant le premier rendu.
+  const [accesAutorise, setAccesAutorise] = useState<boolean | null>(null);
   const [folders, setFolders] = useState<RagFolder[]>([]);
   const [isAboutExpanded, setIsAboutExpanded] = useState(false);
 
@@ -522,7 +528,10 @@ export const ChatbotPage: React.FC = () => {
     loadStats();
     loadBetaStats();
     loadFolders();
-    checkIsAdmin().then(setIsAdmin);
+    checkIsAdmin().then((admin) => {
+      setIsAdmin(admin);
+      setAccesAutorise(isChatbotVisible(admin));
+    });
   }, [loadDocuments, loadStats, loadBetaStats, loadFolders]);
 
   const handleUploadComplete = useCallback(() => {
@@ -537,6 +546,37 @@ export const ChatbotPage: React.FC = () => {
   const userDocs = documents.filter(d => d.scope === 'user' && d.status === 'ready');
 
   if (!user) return null;
+
+  // Vérification en cours : ne rien afficher plutôt qu'un refus prématuré.
+  if (accesAutorise === null) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!accesAutorise) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Fonctionnalité retirée
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            L'assistant documentaire, proposé en version bêta, n'est plus disponible.
+            Vos autres outils et vos banques personnelles restent inchangés.
+          </p>
+          <Link
+            to="/mon-espace"
+            className="inline-block mt-6 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Retour à mon espace
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

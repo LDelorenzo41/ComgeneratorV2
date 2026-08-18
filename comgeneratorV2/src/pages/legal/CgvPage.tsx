@@ -7,7 +7,7 @@ export function CgvPage() {
   return (
     <LegalLayout 
       title="Conditions générales de vente" 
-      lastUpdated="6 janvier 2026"
+      lastUpdated="17 août 2026"
     >
       <div className="space-y-8">
         
@@ -112,28 +112,9 @@ export function CgvPage() {
   <p className="text-sm text-gray-700">Scénario</p>
   <p className="text-lg font-semibold text-gray-900">8k-10k+</p>
 </div>
-<div className="text-center">
-  <div className="bg-indigo-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-2">
-    <span className="text-indigo-600 font-bold">🤖</span>
-  </div>
-  <p className="text-sm text-gray-700">Chatbot</p>
-  <p className="text-lg font-semibold text-gray-900">2k-4k</p>
-</div>
 
                 </div>
               </div>
-            </div>
-
-            {/* Note upload gratuit */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-              <h3 className="font-semibold text-green-800 mb-3">
-                📤 Upload de documents : Gratuit et illimité
-              </h3>
-              <p className="text-green-700">
-                L'upload de documents pour alimenter votre chatbot personnel est <strong>entièrement gratuit</strong>. 
-                Seules les questions posées au chatbot consomment des tokens. Vous pouvez uploader autant de documents 
-                que vous le souhaitez (PDF, DOCX, TXT - max 10 Mo par fichier).
-              </p>
             </div>
 
             {/* Offres commerciales */}
@@ -157,7 +138,7 @@ export function CgvPage() {
                   <div className="bg-amber-50 rounded-lg p-4">
                     <h4 className="font-semibold text-gray-900 mb-2">+ Option Banque (+1,00 €)</h4>
                     <p className="text-sm text-gray-700">
-                      Accès aux banques personnelles (appréciations, séances, scénarios, réponses chatbot)
+                      Accès aux banques personnelles (appréciations, séances, scénarios)
                     </p>
                     <p className="text-lg font-semibold text-blue-600 mt-2">Total : 4,50 €</p>
                   </div>
@@ -189,7 +170,7 @@ export function CgvPage() {
                   <div className="bg-amber-50 rounded-lg p-4">
                     <h4 className="font-semibold text-gray-900 mb-2">+ Option Banque (+1,00 €)</h4>
                     <p className="text-sm text-gray-700">
-                      Accès aux banques personnelles (appréciations, séances, scénarios, réponses chatbot)
+                      Accès aux banques personnelles (appréciations, séances, scénarios)
                     </p>
                     <p className="text-lg font-semibold text-blue-600 mt-2">Total : 7,00 €</p>
                   </div>
@@ -395,8 +376,7 @@ export function CgvPage() {
                     <li>• Génération de contenu pour vos classes</li>
                     <li>• Conservation illimitée des tokens</li>
                     <li>• Utilisation progressive selon vos besoins</li>
-                    <li>• Questions au chatbot sur vos documents</li>
-                    <li>• Création de scénarios pédagogiques</li>
+                                        <li>• Création de scénarios pédagogiques</li>
                   </ul>
                 </div>
                 <div className="bg-white rounded-lg p-4">
@@ -406,8 +386,7 @@ export function CgvPage() {
                     <li>• Partage de compte avec des collègues</li>
                     <li>• Usage commercial en dehors du cadre éducatif</li>
                     <li>• Tentatives de contournement du système</li>
-                    <li>• Automation abusive du chatbot</li>
-                  </ul>
+                                      </ul>
                 </div>
               </div>
             </div>
@@ -447,7 +426,7 @@ export function CgvPage() {
                 <li>• Protection des données personnelles selon notre politique</li>
                 <li>• Support technique durant toute la durée de vie des tokens</li>
                 <li>• Amélioration continue de nos algorithmes</li>
-                <li>• Stockage sécurisé de vos documents chatbot</li>
+                <li>• Stockage sécurisé des documents que vous avez importés</li>
               </ul>
             </div>
             
@@ -458,8 +437,7 @@ export function CgvPage() {
               </p>
               <ul className="text-amber-700 space-y-2">
                 <li>• Contenu généré par l'intelligence artificielle (vérification requise par l'utilisateur)</li>
-                <li>• Réponses du chatbot basées sur vos documents (exactitude non garantie)</li>
-                <li>• Interruptions techniques dues à des tiers (OpenAI, hébergeurs)</li>
+                                <li>• Interruptions techniques dues à des tiers (OpenAI, hébergeurs)</li>
                 <li>• Usage des tokens contraire à nos CGU</li>
                 <li>• Dommages indirects ou perte d'exploitation</li>
               </ul>
@@ -478,7 +456,7 @@ export function CgvPage() {
                 <li>• Défaillance d'OpenAI ou des services tiers</li>
                 <li>• Mauvaise utilisation par l'utilisateur</li>
                 <li>• Décisions pédagogiques prises sur la base du contenu généré</li>
-                <li>• Erreurs dans les documents que vous avez uploadés</li>
+                <li>• Erreurs dans les documents que vous avez importés</li>
               </ul>
             </div>
           </div>
@@ -639,8 +617,7 @@ export function CgvPage() {
                 <li>• <strong>Tokens non crédités :</strong> Patientez 5 min ou contactez-nous</li>
                 <li>• <strong>Facture :</strong> Automatique par email après paiement</li>
                 <li>• <strong>Consommation :</strong> Visible dans votre dashboard</li>
-                <li>• <strong>Upload documents :</strong> Gratuit et illimité</li>
-              </ul>
+                              </ul>
             </div>
           </div>
           

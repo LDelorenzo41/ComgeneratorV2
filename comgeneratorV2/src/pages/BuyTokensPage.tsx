@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, Bot, ClipboardList, Layers, Mic, Wand2 } from 'lucide-react';
+import { Sparkles, Check, Star, Crown, Zap, Database, Shield, Clock, Calculator, MessageCircle, PenTool, FileText, BookOpen, TrendingUp, ClipboardList, Layers, Mic, Wand2 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useAuthStore } from '../lib/store';
 import { useToast } from '../components/ui/Toast';
@@ -26,7 +26,6 @@ export function BuyTokensPage() {
     'Communications professionnelles',
     'Création de séances pédagogiques',
     'Création de scénarios pédagogiques',
-    'Chatbot personnel avec vos documents',
     'Support par email',
     'Accès mobile et desktop'
   ];
@@ -35,7 +34,6 @@ export function BuyTokensPage() {
     'Banque d\'appréciations avec tags',
     'Banque de séances archivées',
     'Banque de scénarios pédagogiques',
-    'Banque de réponses chatbot',
     'Recherche dans vos contenus',
     'Réutilisation de vos modèles'
   ];
@@ -56,7 +54,6 @@ export function BuyTokensPage() {
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
           '🗺️ 30 scénarios pédagogiques',
-          '🤖 75-150 questions chatbot',
           '🔄 Mix équilibré selon vos besoins'
         ],
         withoutBank: [
@@ -65,7 +62,6 @@ export function BuyTokensPage() {
           '📄 80 synthèses + 52 appréciations',
           '📚 45 séances + 47 appréciations',
           '🗺️ 30 scénarios pédagogiques',
-          '🤖 75-150 questions chatbot',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -86,7 +82,6 @@ export function BuyTokensPage() {
           '📄 150 synthèses + 110 appréciations',
           '📚 85 séances + 100 appréciations',
           '🗺️ 60 scénarios pédagogiques',
-          '🤖 150-300 questions chatbot',
           '🔥 Usage intensif toute l\'année'
         ],
         withoutBank: [
@@ -95,7 +90,6 @@ export function BuyTokensPage() {
           '📄 150 synthèses + 110 appréciations', 
           '📚 85 séances + 100 appréciations',
           '🗺️ 60 scénarios pédagogiques',
-          '🤖 150-300 questions chatbot',
           '⚠️ Pas de sauvegarde/réutilisation'
         ]
       },
@@ -253,11 +247,6 @@ export function BuyTokensPage() {
                 <ClipboardList className="w-5 h-5 text-amber-600 mb-1" />
                 <span className="font-medium text-gray-900 dark:text-white">Scénario</span>
                 <span className="text-gray-600 dark:text-gray-400">6k - 14k</span>
-              </div>
-              <div className="flex flex-col items-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl">
-                <Bot className="w-5 h-5 text-indigo-600 mb-1" />
-                <span className="font-medium text-gray-900 dark:text-white">Chatbot</span>
-                <span className="text-gray-600 dark:text-gray-400">2k - 4k</span>
               </div>
             </div>
 

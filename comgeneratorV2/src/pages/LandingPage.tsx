@@ -21,7 +21,6 @@ import {
   ChevronDown,
   Play,
   Gift,
-  Bot,
   Map,
   Settings,
   Cpu
@@ -73,13 +72,6 @@ export function LandingPage() {
       description: "Actualités éducatives",
       icon: TrendingUp,
       color: "bg-red-500",
-      comingSoon: false
-    },
-    {
-      title: "Chatbot personnel",
-      description: "Interrogez vos documents avec l'IA",
-      icon: Bot,
-      color: "bg-indigo-500",
       comingSoon: false
     },
     // ✅ AJOUT : Nouveau module Scénarios pédagogiques (à venir)
@@ -180,7 +172,7 @@ export function LandingPage() {
             <p className="mt-6 max-w-3xl mx-auto text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
               Une suite complète d'outils intelligents pour automatiser vos tâches administratives : 
               appréciations personnalisées, synthèses de bulletins, communications professionnelles, 
-              création de séances pédagogiques et chatbot personnel pour interroger vos documents.
+              création de séances et scénarios pédagogiques.
             </p>
             
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -410,28 +402,8 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
-                    {activeFeature === 6 && (
-                      <div className="text-left">
-                        <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Upload de vos documents (PDF, DOCX, TXT)</span>
-                        </div>
-                        <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Technologie RAG pour des réponses précises</span>
-                        </div>
-                        <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">2 modes : Corpus seul ou Corpus + IA</span>
-                        </div>
-                        <div className="flex items-center">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Documents privés et sécurisés</span>
-                        </div>
-                      </div>
-                    )}
                     {/* ✅ AJOUT : Contenu spécifique pour les Scénarios pédagogiques */}
-                    {activeFeature === 7 && (
+                    {activeFeature === 6 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
@@ -460,55 +432,6 @@ export function LandingPage() {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ✅ Section mise en avant du Chatbot */}
-      <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-purple-600 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            <div className="flex-1 text-center lg:text-left">
-              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
-                <Bot className="w-4 h-4 mr-2" />
-                Nouveau • Version Bêta
-              </div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Votre chatbot personnel pour interroger vos documents
-              </h2>
-              <p className="text-lg text-blue-100 mb-8 max-w-2xl">
-                Uploadez vos cours, programmes, fiches pédagogiques... et posez vos questions ! 
-                Grâce à la technologie RAG (Retrieval-Augmented Generation), le chatbot trouve 
-                les informations pertinentes dans VOS documents.
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                <div className="flex items-center text-white">
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>Documents privés</span>
-                </div>
-                <div className="flex items-center text-white">
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>Réponses sourcées</span>
-                </div>
-                <div className="flex items-center text-white">
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>Upload gratuit</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-shrink-0">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20">
-                <div className="w-32 h-32 bg-gradient-to-br from-white/30 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Bot className="w-16 h-16 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="text-white font-semibold mb-2">Exemple de question :</p>
-                  <p className="text-blue-100 text-sm italic">
-                    "Quels sont les objectifs du cycle 3 en EPS ?"
-                  </p>
                 </div>
               </div>
             </div>

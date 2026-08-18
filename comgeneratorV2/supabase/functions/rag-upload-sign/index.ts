@@ -111,6 +111,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Le dépôt de documents est réservé à l'administration. Le contrôle
+    // existant plus bas ne couvrait que le périmètre global (scope='global') :
+    // celui-ci ferme aussi le dépôt dans l'espace personnel.
+    const isAdminUpload = await isAdminUser(supabaseAdmin, user.id, adminSecretHeader);
+    if (!isAdminUpload) {
+      return new Response(
+        JSON.stringify({ error: "L'assistant documentaire n'est plus disponible." }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { fileName, mimeType, fileSize, scope: requestedScope } = await req.json();
 
     if (!fileName || !mimeType) {

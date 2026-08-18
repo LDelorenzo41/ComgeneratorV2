@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { Bot, X, Loader2 } from 'lucide-react';
 import ChatInterface from './ChatInterface';
 import { Toggle } from '../ui/Toggle';
-import { getDocuments } from '../../lib/ragApi';
+import { getDocuments, checkIsAdmin } from '../../lib/ragApi';
+import { isChatbotVisible } from '../../lib/features';
 import type { RagDocument } from '../../lib/rag.types';
 
 const STORAGE_KEY = 'chatbot_floating_enabled';
@@ -134,6 +135,21 @@ export const ChatbotFloatingButton: React.FC = () => {
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isChatbotPage, setIsChatbotPage] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Le chatbot est réservé à l'administration (cf. src/lib/features.ts).
+  // La vérification est asynchrone : on part de `false`, si bien que le
+  // bouton n'apparaît jamais, même brièvement, pour un utilisateur ordinaire.
+  // Ce contrôle est indispensable ici : la préférence d'affichage est
+  // persistée en localStorage, donc un utilisateur l'ayant activée autrefois
+  // reverrait le bouton sans lui.
+  useEffect(() => {
+    let annule = false;
+    checkIsAdmin().then((isAdmin) => {
+      if (!annule) setIsVisible(isChatbotVisible(isAdmin));
+    });
+    return () => { annule = true; };
+  }, []);
 
   // Écouter les changements de route
   useEffect(() => {
@@ -158,7 +174,7 @@ export const ChatbotFloatingButton: React.FC = () => {
 
   return createPortal(
     <>
-      {isEnabled && !isChatbotPage && (
+      {isVisible && isEnabled && !isChatbotPage && (
         <>
           <button
   onClick={() => setIsModalOpen(true)}

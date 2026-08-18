@@ -24,7 +24,8 @@ import { secureApi } from '../lib/secureApi';
 import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
 import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
-import { getFolders } from '../lib/ragApi';
+import { getFolders, checkIsAdmin } from '../lib/ragApi';
+import { isChatbotVisible } from '../lib/features';
 import { PHASE_HEADING_PATTERN, extractTextFromChildren, extractPhaseContent, normalizeLatexDelimiters } from '../lib/phaseExtractor';
 import { ExerciseGeneratorModal } from '../components/modals/ExerciseGeneratorModal';
 import { FullScreenViewModal } from '../components/modals/FullScreenViewModal';
@@ -942,10 +943,13 @@ export function LessonGeneratorPage() {
   const [selectedDuration, setSelectedDuration] = React.useState<string>('60');
   const [lastFormData, setLastFormData] = React.useState<LessonFormData | null>(null);
 
-  // États pour le RAG (corpus personnel)
+  // États pour le RAG (corpus personnel), réservé à l'administration.
+  // isAdmin part à false : l'option reste masquée tant que la vérification
+  // n'a pas répondu, jamais l'inverse.
   const [useRag, setUseRag] = React.useState(false);
   const [folders, setFolders] = React.useState<RagFolder[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = React.useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   // États pour le document uploadé
   const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
@@ -962,9 +966,10 @@ export function LessonGeneratorPage() {
   const [selectedPhaseHeading, setSelectedPhaseHeading] = React.useState('');
   const [selectedPhaseContent, setSelectedPhaseContent] = React.useState('');
 
-  // Charger les dossiers
+  // Charger les dossiers et résoudre le statut administrateur
   React.useEffect(() => {
     getFolders().then(setFolders).catch(console.error);
+    checkIsAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
   }, []);
 
   // États pour vérifier l'accès banque
@@ -1376,7 +1381,7 @@ export function LessonGeneratorPage() {
                   <strong>Précisez votre thème :</strong> Détaillez les objectifs, compétences visées et attendus pour un résultat plus pertinent.
               </li>
               <li>
-                  <strong>Document de référence :</strong> Joignez un PDF, DOCX ou TXT pour enrichir la génération (contenu limité à ~4 000 caractères). Pour un document plus long, ingérez-le dans votre corpus personnel via <strong>Mon chatbot → Documents</strong>, puis activez l'option "Corpus personnel" ci-dessous.
+                  <strong>Document de référence :</strong> Joignez un PDF, DOCX ou TXT pour enrichir la génération (contenu limité à ~4 000 caractères).
               </li>
               <li>
                   <strong>Générer un support :</strong> Une fois la séance générée, un bouton <strong>"Générer un support"</strong> apparaît à côté de chaque phase. Il permet de créer exercices, QCM, fiches élèves, etc. (coût : 1 000 tokens). <span className="inline-flex items-center px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded font-semibold align-middle">Bêta</span>
@@ -1568,7 +1573,11 @@ export function LessonGeneratorPage() {
             </div>
             {/* FIN NOUVELLE SECTION */}
 
-            {/* Options avancées - Corpus personnel */}
+            {/* Options avancées - Corpus personnel.
+                Réservé à l'administration (cf. src/lib/features.ts) : masqué,
+                `useRag` conserve sa valeur par défaut `false`, la clé est donc
+                omise de la requête et la génération emprunte son chemin normal. */}
+            {isChatbotVisible(isAdmin) && (
             <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
 
@@ -1607,6 +1616,7 @@ export function LessonGeneratorPage() {
                 )}
               </div>
             </div>
+            )}
 
             {error && (
               <div className="bg-gradient-to-r from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">

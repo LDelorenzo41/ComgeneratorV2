@@ -13,7 +13,6 @@ import {
   BookOpen,
   ClipboardList,
   Send,
-  Bot,
   Newspaper,
   Gift,
   ExternalLink,
@@ -275,8 +274,10 @@ export function MonEspacePage() {
     { label: 'Synthèse de bulletin', link: '/synthese', icon: FileText, color: 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40' },
     { label: 'Créer une séance', link: '/generate-lesson', icon: BookOpen, color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40' },
     ...(FEATURES.SCENARIO_ENABLED ? [{ label: 'Créer un scénario', link: '/scenario-pedagogique', icon: ClipboardList, color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/40' }] : []),
-    { label: 'Écrire aux familles', link: '/communication?mode=create', icon: Send, color: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40' },
-    ...(FEATURES.CHATBOT_ENABLED ? [{ label: 'Interroger mon chatbot', link: '/chatbot', icon: Bot, color: 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/40' }] : [])
+    { label: 'Écrire aux familles', link: '/communication?mode=create', icon: Send, color: 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/40' }
+    // Le chatbot est réservé à l'administration (cf. src/lib/features.ts) : il
+    // n'apparaît plus dans les actions rapides. L'accès administrateur passe
+    // par le menu Ressources.
   ];
 
   const estimatedHoursSaved = stats
