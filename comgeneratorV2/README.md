@@ -77,20 +77,26 @@ graph TD
 
 3. **Configuration environnement**
    
-   Créer un fichier `.env` :
+   Créer un fichier `.env` — **uniquement des valeurs publiques** :
    ```env
-   # Supabase
+   # Supabase (clés publiques, destinées au navigateur)
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-   
-   # OpenAI
-   VITE_OPENAI_API_KEY=your_openai_api_key
-   
-   # Stripe
+
+   # Stripe (clé publiable, destinée au navigateur)
    VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
-   STRIPE_SECRET_KEY=your_stripe_secret_key
+
+   # Comptes administrateurs, en secours de profiles.is_admin (facultatif)
+   VITE_ADMIN_EMAILS=admin@exemple.fr
    ```
+
+   > ⚠️ **Aucun secret ne doit porter le préfixe `VITE_`.** Vite remplace ces
+   > variables par leur valeur au moment de la compilation : elles se retrouvent
+   > donc en clair dans le JavaScript public. Les clés `OPENAI_API_KEY`,
+   > `MISTRAL_API_KEY`, `COHERE_API_KEY`, `STRIPE_SECRET_KEY`,
+   > `SUPABASE_SERVICE_ROLE_KEY` et `RESEND_API_KEY` sont lues **exclusivement
+   > par les Edge Functions** et se configurent comme secrets du projet Supabase
+   > (`supabase secrets set`), jamais dans ce fichier.
 
 4. **Initialiser la base de données**
    ```bash
