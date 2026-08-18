@@ -19,6 +19,7 @@ import {
   Database,
   Eye,
   ChevronDown,
+  ClipboardList,
   Play,
   Gift,
   Map,
@@ -58,6 +59,13 @@ export function LandingPage() {
       description: "Création et archivage de cours structurés",
       icon: BookOpen,
       color: "bg-orange-500",
+      comingSoon: false
+    },
+    {
+      title: "Supports pédagogiques",
+      description: "Exercices, QCM et fiches élèves à partir d'une phase de séance",
+      icon: ClipboardList,
+      color: "bg-indigo-500",
       comingSoon: false
     },
     {
@@ -356,21 +364,37 @@ export function LandingPage() {
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                           <span className="text-sm">Rendu Markdown</span>
                         </div>
-                        <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Archivage automatique</span>
-                        </div>
-                        <div className="flex items-center mb-2">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Génération d'exercices, QCM, fiches élèves par phase</span>
-                        </div>
                         <div className="flex items-center">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                          <span className="text-sm">Export PDF et Word des supports générés</span>
+                          <span className="text-sm">Archivage automatique</span>
                         </div>
                       </div>
                     )}
                     {activeFeature === 4 && (
+                      <div className="text-left">
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">9 types : QCM, texte à trous, dictée, grille d'évaluation…</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Généré à partir d'une phase précise de votre séance</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Version élève : en-tête Nom/Classe, corrigé retiré</span>
+                        </div>
+                        <div className="flex items-center mb-2">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Peut inclure diagrammes et graphiques</span>
+                        </div>
+                        <div className="flex items-center">
+                          <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                          <span className="text-sm">Ajout du support à la séance en un clic</span>
+                        </div>
+                      </div>
+                    )}
+                    {activeFeature === 5 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
@@ -386,7 +410,7 @@ export function LandingPage() {
                         </div>
                       </div>
                     )}
-                    {activeFeature === 5 && (
+                    {activeFeature === 6 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
@@ -403,7 +427,7 @@ export function LandingPage() {
                       </div>
                     )}
                     {/* ✅ AJOUT : Contenu spécifique pour les Scénarios pédagogiques */}
-                    {activeFeature === 6 && (
+                    {activeFeature === 7 && (
                       <div className="text-left">
                         <div className="flex items-center mb-2">
                           <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
@@ -508,16 +532,16 @@ export function LandingPage() {
               <p className="text-lg text-purple-100 mb-8 max-w-2xl">
                 Générez des séances pédagogiques structurées, puis créez instantanément
                 des exercices, QCM, textes à trous, fiches élèves ou grilles d'évaluation
-                pour chaque phase. Exportez en PDF ou Word, prêts à imprimer.
+                pour chaque phase. Exportez en PDF, avec une version élève sans le corrigé.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>8 types de supports</span>
+                  <span>9 types de supports</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>Export PDF et Word</span>
+                  <span>Export PDF et version élève</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
