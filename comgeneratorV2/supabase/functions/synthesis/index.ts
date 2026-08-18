@@ -334,8 +334,10 @@ const synthesisHandler = async (req) => {
 
     const aiData = await response.json();
     
-    // ✅ Log pour debug
-    console.log('[synthesis] Réponse API brute:', JSON.stringify(aiData, null, 2));
+    // Structure de la réponse uniquement, jamais son contenu : une synthèse de
+    // bulletin reprend les résultats et les appréciations nominatives d'un
+    // élève, qui n'ont rien à faire dans les journaux du projet.
+    console.log('[synthesis] Réponse reçue — clés:', Object.keys(aiData ?? {}).join(', '));
 
     // ✅ Extraire le contenu selon le type d'API
     let content = null;
@@ -365,7 +367,8 @@ const synthesisHandler = async (req) => {
     }
     
     if (!content) {
-      console.error('[synthesis] Format de réponse non reconnu:', JSON.stringify(aiData, null, 2));
+      // Structure seulement : la charge utile reprend le bulletin de l'élève.
+      console.error('[synthesis] Aucun contenu extrait — clés:', Object.keys(aiData ?? {}).join(', '));
       return new Response(JSON.stringify({
         error: 'Réponse invalide de l\'API. Veuillez réessayer.'
       }), {

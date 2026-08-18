@@ -619,8 +619,11 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
 
     const aiData = await response.json();
 
-    // ✅ Log pour débugger le format de réponse
-    console.log('Réponse API brute:', JSON.stringify(aiData, null, 2));
+    // Le format de réponse diffère selon l'API (Chat Completions ou Responses).
+    // On journalise sa STRUCTURE, jamais son contenu : la réponse contient des
+    // appréciations nominatives d'élèves, qui n'ont rien à faire dans les
+    // journaux du projet.
+    console.log('[generate] Réponse reçue — clés:', Object.keys(aiData ?? {}).join(', '));
 
     // ✅ Extraire le contenu selon le type d'API
     let content = null;
@@ -656,7 +659,8 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
     }
 
     if (!content) {
-      console.error('Format de réponse non reconnu:', JSON.stringify(aiData, null, 2));
+      // Structure seulement : la charge utile peut contenir des données d'élèves.
+      console.error('[generate] Aucun contenu extrait — clés:', Object.keys(aiData ?? {}).join(', '));
       return new Response(JSON.stringify({
         error: 'Réponse invalide de l\'API. Veuillez réessayer.'
       }), {
@@ -669,7 +673,14 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
     const parsed = parseAIResponse(content);
     
     if (!parsed) {
-      console.error('Format de réponse non reconnu:', content.substring(0, 500));
+      // Le contenu est une appréciation nominative : on ne journalise que les
+      // indices utiles au diagnostic du parseur, jamais le texte lui-même.
+      console.error(
+        '[generate] Réponse non parsable — longueur:', content.length,
+        '| "Version synthétique":', /Version\s+synthétique/i.test(content),
+        '| "Synthétique/Résumé":', /(?:Synthétique|Résumé|Summary)/i.test(content),
+        '| séparateur ---:', /\n[\s\*\-]{3,}\n/.test(content)
+      );
       return new Response(JSON.stringify({
         error: 'Format de réponse invalide. Veuillez réessayer.'
       }), {
