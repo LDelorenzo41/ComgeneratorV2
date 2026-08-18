@@ -27,7 +27,7 @@ export const BANK_SECTIONS = [
   { key: 'appreciations', label: 'appréciations' },
   { key: 'lessons_bank', label: 'séances' },
   { key: 'scenarios_bank', label: 'scénarios' },
-  { key: 'chatbot_answers', label: 'réponses du chatbot' },
+  { key: 'chatbot_answers', label: 'réponses conservées' },
   { key: 'subjects', label: 'matières' },
   { key: 'criteria', label: "critères d'évaluation" },
   { key: 'signatures', label: 'signatures' },

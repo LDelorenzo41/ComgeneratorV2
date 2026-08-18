@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import useTokenBalance from '../../hooks/useTokenBalance';
-import { FEATURES } from '../../lib/features';
+import { FEATURES, isChatbotVisible } from '../../lib/features';
 import { checkIsAdmin } from '../../lib/ragApi';
 import { RedeemCodeModal } from '../modals/RedeemCodeModal';
 import { useHasSubmittedFeedback } from '../../hooks/useHasSubmittedFeedback';
@@ -326,43 +326,32 @@ Scénarios pédagogiques
                           <TrendingUp className="w-4 h-4 mr-2" />
                           Flux RSS
                         </Link>
-                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
-                        
-                        {/* Mon Chatbot */}
-                        {FEATURES.CHATBOT_ENABLED ? (
-                          <Link 
-                            to="/chatbot" 
-                            className={menuItemClass}
-                            onClick={() => setIsRessourcesOpen(false)}
-                          >
-                            <Bot className="w-4 h-4 mr-2" />
-                            Mon chatbot
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
-                          </Link>
-                        ) : (
-                          <span className={menuItemDisabledClass}>
-                            <Bot className="w-4 h-4 mr-2" />
-                            Mon chatbot
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
-                          </span>
-                        )}
+                        {/* Chatbot et banque de réponses : réservés à l'administration.
+                            Le séparateur est inclus dans la condition pour ne pas
+                            laisser un trait orphelin en bas du menu. */}
+                        {isChatbotVisible(isAdmin) && (
+                          <>
+                            <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
 
-                        {/* Ma banque de réponses */}
-                        {FEATURES.CHATBOT_ENABLED ? (
-                          <Link 
-                            to="/chatbot-answers" 
-                            className={menuItemClass}
-                            onClick={() => setIsRessourcesOpen(false)}
-                          >
-                            <Database className="w-4 h-4 mr-2" />
-                            Ma banque de réponses
-                          </Link>
-                        ) : (
-                          <span className={menuItemDisabledClass}>
-                            <Database className="w-4 h-4 mr-2" />
-                            Ma banque de réponses
-                            <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
-                          </span>
+                            <Link
+                              to="/chatbot"
+                              className={menuItemClass}
+                              onClick={() => setIsRessourcesOpen(false)}
+                            >
+                              <Bot className="w-4 h-4 mr-2" />
+                              Mon chatbot
+                              <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                            </Link>
+
+                            <Link
+                              to="/chatbot-answers"
+                              className={menuItemClass}
+                              onClick={() => setIsRessourcesOpen(false)}
+                            >
+                              <Database className="w-4 h-4 mr-2" />
+                              Ma banque de réponses
+                            </Link>
+                          </>
                         )}
                       </div>
                     </div>
@@ -743,43 +732,31 @@ Scénarios pédagogiques
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Flux RSS
                 </Link>
-                <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
-                
-                {/* Mon Chatbot - Mobile */}
-                {FEATURES.CHATBOT_ENABLED ? (
-                  <Link 
-                    to="/chatbot" 
-                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Bot className="w-4 h-4 mr-2" />
-                    Mon chatbot
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
-                  </Link>
-                ) : (
-                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
-                    <Bot className="w-4 h-4 mr-2" />
-                    Mon chatbot
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
-                  </span>
-                )}
+                {/* Chatbot et banque de réponses : réservés à l'administration.
+                    Séparateur inclus dans la condition (cf. menu desktop). */}
+                {isChatbotVisible(isAdmin) && (
+                  <>
+                    <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
 
-                {/* Ma banque de réponses - Mobile */}
-                {FEATURES.CHATBOT_ENABLED ? (
-                  <Link 
-                    to="/chatbot-answers" 
-                    className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Database className="w-4 h-4 mr-2" />
-                    Ma banque de réponses
-                  </Link>
-                ) : (
-                  <span className="flex items-center px-3 py-1 text-base text-gray-400 dark:text-gray-500 cursor-not-allowed">
-                    <Database className="w-4 h-4 mr-2" />
-                    Ma banque de réponses
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded">à venir</span>
-                  </span>
+                    <Link
+                      to="/chatbot"
+                      className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Bot className="w-4 h-4 mr-2" />
+                      Mon chatbot
+                      <span className="ml-2 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded">Bêta</span>
+                    </Link>
+
+                    <Link
+                      to="/chatbot-answers"
+                      className="flex items-center px-3 py-1 text-base text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Database className="w-4 h-4 mr-2" />
+                      Ma banque de réponses
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

@@ -177,6 +177,39 @@ function createServiceClient() {
   );
 }
 
+/**
+ * Statut administrateur. Reprend à l'identique la logique éprouvée de
+ * rag-ingest et rag-upload-sign : secret d'en-tête, liste d'identifiants,
+ * puis colonne profiles.is_admin. Refus par défaut.
+ */
+async function isAdminUser(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  adminSecretHeader: string | null
+): Promise<boolean> {
+  const adminSecret = Deno.env.get('ADMIN_SECRET');
+  if (adminSecret && adminSecretHeader === adminSecret) return true;
+
+  const adminUserIds = Deno.env.get('ADMIN_USER_IDS');
+  if (adminUserIds) {
+    const adminList = adminUserIds.split(',').map((id) => id.trim());
+    if (adminList.includes(userId)) return true;
+  }
+
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('user_id', userId)
+      .single();
+    if (profile?.is_admin === true) return true;
+  } catch {
+    // Colonne absente ou lecture impossible : on refuse.
+  }
+
+  return false;
+}
+
 // ============================================================================
 // NEW V6.2: DISCIPLINE DETECTION (PURE FUNCTION - NO LLM)
 // ============================================================================
@@ -1869,6 +1902,18 @@ async function chatHandler(req: Request): Promise<Response> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
+    }
+
+    // L'assistant documentaire est réservé à l'administration : masquer
+    // l'interface ne ferme pas l'endpoint, qui resterait sinon appelable par
+    // n'importe quel compte — et il n'a ni contrôle de solde ni limitation de
+    // fréquence avant d'engager cinq appels chez les fournisseurs d'IA.
+    const isAdmin = await isAdminUser(serviceClient, user.id, req.headers.get('x-admin-secret'));
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ error: "L'assistant documentaire n'est plus disponible." }),
+        { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
     const body = await req.json() as ChatRequest;

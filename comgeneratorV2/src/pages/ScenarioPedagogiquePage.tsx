@@ -17,7 +17,8 @@ import { TOKEN_UPDATED, tokenUpdateEvent } from '../components/layout/Header';
 import useTokenBalance from '../hooks/useTokenBalance';
 import { supabase } from '../lib/supabase';
 import { extractTextFromFile, formatFileSize } from '../lib/documentExtractor';
-import { getFolders } from '../lib/ragApi';
+import { getFolders, checkIsAdmin } from '../lib/ragApi';
+import { isChatbotVisible } from '../lib/features';
 import type { RagFolder } from '../lib/rag.types';
 import { FolderSelector } from '../components/chatbot/FolderSelector';
 import {
@@ -125,6 +126,9 @@ export function ScenarioPedagogiquePage() {
   const [useRag, setUseRag] = React.useState(false);
   const [folders, setFolders] = React.useState<RagFolder[]>([]);
   const [selectedFolderIds, setSelectedFolderIds] = React.useState<string[]>([]);
+  // Corpus documentaire réservé à l'administration : false par défaut, donc
+  // l'option reste masquée tant que la vérification n'a pas répondu.
+  const [isAdmin, setIsAdmin] = React.useState(false);
   const [isEditing, setIsEditing] = React.useState(false);
   const [editableRows, setEditableRows] = React.useState<SeanceRow[]>([]);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -180,9 +184,10 @@ export function ScenarioPedagogiquePage() {
     checkBankAccess();
   }, [user]);
 
-  // Charger les dossiers personnels
+  // Charger les dossiers personnels et résoudre le statut administrateur
   React.useEffect(() => {
     getFolders().then(setFolders).catch(console.error);
+    checkIsAdmin().then(setIsAdmin).catch(() => setIsAdmin(false));
   }, []);
 
   // Vérification si l'utilisateur a déjà utilisé le code SCENARIO2026
@@ -1369,7 +1374,11 @@ export function ScenarioPedagogiquePage() {
               </div>
             </div>
 
-            {/* Options avancées - Toggle RAG */}
+            {/* Options avancées - Toggle RAG.
+                Réservé à l'administration (cf. src/lib/features.ts) : masqué,
+                `useRag` conserve son défaut `false` (schéma zod ligne ~85), la
+                génération emprunte donc son chemin normal sans corpus. */}
+            {isChatbotVisible(isAdmin) && (
             <div className="border-t-2 border-gray-200 dark:border-gray-600 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Options avancées</h3>
 
@@ -1411,6 +1420,7 @@ export function ScenarioPedagogiquePage() {
                 )}
               </div>
             </div>
+            )}
 
             {/* ================================================================
                 AVERTISSEMENT CONSOMMATION DE TOKENS
