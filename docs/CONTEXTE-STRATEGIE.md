@@ -235,20 +235,51 @@ inférieur à 10 €.
 
 ## 7. Dette technique et risques identifiés
 
-### À corriger avant d'accepter des clés API d'utilisateurs (lot 0)
+### Lot 0 — assainissement sécurité (état au 18 août 2026)
 
-| Gravité | Constat | Localisation |
-|---|---|---|
-| Haute | Réponses IA complètes (noms d'élèves) écrites dans les logs | `generate:623`, `synthesis:338` |
-| Haute | Policy UPDATE de `profiles` sans restriction de colonne → auto-promotion admin possible, donc création de codes promo | snapshot RLS `20260302` |
-| Haute | `rag-chat` : ni contrôle de solde ni rate-limit avant 5 appels fournisseur | `rag-chat/index.ts` |
-| Moyenne | `deleted_users_blacklist` lisible par `anon` : e-mails de comptes supprimés exposés | policies |
-| Moyenne | CORS `*` codé en dur dans 7+ fonctions alors que le helper `ALLOWED_ORIGINS` existe | plusieurs Edge Functions |
-| Moyenne | `create-checkout-session` : `userId` pris du body sans vérification du JWT | `create-checkout-session:45-63` |
+| Constat | État |
+|---|---|
+| Réponses IA complètes (noms d'élèves) écrites dans les logs — `generate`, `synthesis` | **✅ réglé** — seules la structure et les longueurs sont journalisées ; fonctions redéployées |
+| Policy UPDATE de `profiles` sans restriction de colonne → auto-promotion admin, donc création de codes promo | **✅ réglé** — trigger `trg_block_client_privilege_change` appliqué en production |
+| `deleted_users_blacklist` lisible par `anon` : e-mails de comptes supprimés exposés | **✅ réglé** — `anon` révoqué, lecture réservée à `authenticated` ; inscription vérifiée après application |
+| Fichiers `.backup` exposant le motif « clé API dans le navigateur », README documentant `VITE_OPENAI_API_KEY`, 15 Mo de binaire CLI commité | **✅ réglé** |
+| Dépendances `openai` et `gpt3-tokenizer` jamais importées | **✅ retirées**, verrou régénéré dans le même commit |
+| `rag-chat` : ni contrôle de solde ni rate-limit avant 5 appels fournisseur | **sans objet** — la fonction est réservée à l'administration depuis le 17/08 |
+| CORS `*` codé en dur dans 16 fonctions alors que le helper `ALLOWED_ORIGINS` existe | **reporté** — voir ci-dessous |
+| `create-checkout-session` et `verify-payment` : `userId` pris du corps de requête sans vérification du JWT | **reporté** — voir ci-dessous, le correctif naïf casse les paiements |
 
-*Correctif recommandé pour l'auto-promotion : un **trigger additif** calqué sur
-`trg_block_client_token_increase` (motif éprouvé, réversible d'un `DROP TRIGGER`),
-plutôt qu'une réécriture de policy risquant de bloquer les mises à jour légitimes.*
+#### Les deux points restants — clos sans action, après réexamen
+
+Ils étaient d'abord inscrits comme dette de sécurité à traiter. Le réexamen du
+18 août, mené en remontant la chaîne jusqu'au **gain réel d'un attaquant**,
+conclut qu'aucune intervention n'est justifiée. Consigné ici pour éviter qu'une
+session future les rouvre en croyant à une dette non traitée.
+
+**Tunnel de paiement — `userId` non vérifié : aucun chemin vers des crédits
+gratuits.** `create-checkout-session` n'écrit jamais dans `profiles` (zéro
+occurrence) : elle ne fait que créer une session Stripe. Les crédits ne sont
+accordés que par le webhook Stripe, à signature vérifiée cryptographiquement, ou
+par `verify-payment`, qui exige `payment_status === 'paid'` **et**
+`session.metadata.userId === userId` (403 sinon) ; les deux sont idempotents.
+Le seul abus possible consiste donc à payer de sa poche pour créditer le compte
+d'un tiers — un cadeau, pas une attaque.
+
+Corriger imposerait une intervention en trois temps sur le tunnel de paiement,
+la zone la plus sensible de l'application, pour un défaut sans exploitation
+possible, sur une fonctionnalité retirée le 1er mars 2027. **Le risque du
+correctif dépasse celui du défaut.**
+
+*Formulation à ne pas reprendre telle quelle : « userId pris du corps de requête
+sans vérification du JWT » est exact mais alarmiste hors contexte. C'est un
+défaut de propreté architecturale, pas une faille.*
+
+**CORS `*` — non exploitable en l'état.** Les fonctions exigent un jeton de
+session conservé en `localStorage`, qu'un site tiers ne peut pas lire : il ne
+peut donc pas forger d'appel authentifié, et les appels non authentifiés sont
+rejetés. Par ailleurs le helper renvoie `'*'` tant que `ALLOWED_ORIGINS` n'est
+pas défini : la conversion serait un no-op strict, pour seize redéploiements de
+fonctions. À reconsidérer seulement si une fonction venait à accepter des
+requêtes sans jeton de session.
 
 ### Incohérences produit
 

@@ -87,3 +87,36 @@ npm run dev
   pooler, port 5432) et `BACKUP_PASSPHRASE`.
 - **`.github/workflows/supabase-keepalive.yml`** — ping quotidien empêchant la mise
   en pause du projet Supabase (plan gratuit).
+
+## Déploiement — trois circuits distincts, à ne pas confondre
+
+Rien ne se déploie tout seul, et une modification peut très bien être fusionnée
+sans être en production. Vérifier lequel des trois circuits est concerné :
+
+| Ce qui change | Comment ça arrive en production |
+|---|---|
+| `src/**` (frontend) | Netlify reconstruit automatiquement à la fusion sur `main` |
+| `supabase/functions/**` | **Rien d'automatique.** L'exploitant lance `npx supabase functions deploy <nom>` |
+| `supabase/migrations/**` | **Rien d'automatique.** L'exploitant colle le SQL dans l'éditeur du dashboard |
+
+- **Toujours déployer les Edge Functions par le CLI, jamais depuis le dashboard.**
+  Plusieurs fonctions importent `../_shared/*.ts` ; le CLI embarque ces imports
+  relatifs, l'éditeur du dashboard ne les affiche même pas et un déploiement par
+  ce biais casserait la fonction.
+- Après toute modification d'une Edge Function ou d'une migration, **dire
+  explicitement à l'exploitant ce qu'il doit déployer ou appliquer**, et par quel
+  circuit. Sans cela le travail reste sans effet.
+
+## Git — les PR sont fusionnées en *squash*
+
+Conséquence à connaître, sous peine de diagnostics erronés :
+
+- Les commits d'origine restent sur la branche avec des SHA différents de ceux
+  créés sur `main`. GitHub les compte comme « en avance » alors que leur contenu
+  est déjà fusionné. **Le compteur de commits ment ; seul `git diff origin/main`
+  fait foi.**
+- **Réaligner la branche sur `main` après chaque fusion** (`git checkout -B <branche>
+  origin/main`, puis réappliquer le travail en cours). Sans cela, les commits
+  fantômes s'accumulent et provoquent des conflits artificiels sur des lignes que
+  la branche avait elle-même introduites.
+- Branche de travail : `claude/profassist-architecture-audit-lexa00`.
