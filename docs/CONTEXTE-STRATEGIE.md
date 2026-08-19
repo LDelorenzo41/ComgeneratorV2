@@ -248,30 +248,38 @@ inférieur à 10 €.
 | CORS `*` codé en dur dans 16 fonctions alors que le helper `ALLOWED_ORIGINS` existe | **reporté** — voir ci-dessous |
 | `create-checkout-session` et `verify-payment` : `userId` pris du corps de requête sans vérification du JWT | **reporté** — voir ci-dessous, le correctif naïf casse les paiements |
 
-#### Les deux points reportés, et pourquoi
+#### Les deux points restants — clos sans action, après réexamen
 
-**Vérification du JWT sur le tunnel de paiement — piège confirmé par l'analyse.**
-`BuyTokensPage.tsx:144` et `PaymentSuccessPage.tsx:62` n'envoient **pas** de jeton
-de session : seulement `VITE_SUPABASE_ANON_KEY`. Ajouter `requireUser` côté
-serveur renverrait donc un 401 sur **100 % des achats**. Le correctif impose
-trois temps, dans cet ordre : (1) faire envoyer `session.access_token` par le
-front — le motif existe déjà dans `secureApi.ts:111-129` ; (2) déployer et
-laisser les bundles en cache et les onglets ouverts se renouveler ; (3) durcir
-le serveur, avec une phase de tolérance acceptant les deux formes. Et remplacer
-alors `body.userId` par `user.id`, sans quoi la vérification serait cosmétique.
+Ils étaient d'abord inscrits comme dette de sécurité à traiter. Le réexamen du
+18 août, mené en remontant la chaîne jusqu'au **gain réel d'un attaquant**,
+conclut qu'aucune intervention n'est justifiée. Consigné ici pour éviter qu'une
+session future les rouvre en croyant à une dette non traitée.
 
-**CORS — exploitabilité réelle plus faible qu'il n'y paraît.** Les fonctions
-exigent un jeton de session conservé en `localStorage`, qu'un site tiers ne peut
-pas lire : il ne peut donc pas forger d'appel authentifié. Par ailleurs le helper
-renvoie `'*'` tant que `ALLOWED_ORIGINS` n'est pas défini, si bien que la
-conversion est un no-op strict — le gain n'arrive qu'au moment de définir le
-secret. Enfin 5 des 16 fonctions portent des en-têtes que le helper ne gère pas
-encore (`x-admin-secret` ×2, `stripe-signature`, `Allow-Methods` ×2). À traiter
-en étendant d'abord le helper.
+**Tunnel de paiement — `userId` non vérifié : aucun chemin vers des crédits
+gratuits.** `create-checkout-session` n'écrit jamais dans `profiles` (zéro
+occurrence) : elle ne fait que créer une session Stripe. Les crédits ne sont
+accordés que par le webhook Stripe, à signature vérifiée cryptographiquement, ou
+par `verify-payment`, qui exige `payment_status === 'paid'` **et**
+`session.metadata.userId === userId` (403 sinon) ; les deux sont idempotents.
+Le seul abus possible consiste donc à payer de sa poche pour créditer le compte
+d'un tiers — un cadeau, pas une attaque.
 
-*Correctif recommandé pour l'auto-promotion : un **trigger additif** calqué sur
-`trg_block_client_token_increase` (motif éprouvé, réversible d'un `DROP TRIGGER`),
-plutôt qu'une réécriture de policy risquant de bloquer les mises à jour légitimes.*
+Corriger imposerait une intervention en trois temps sur le tunnel de paiement,
+la zone la plus sensible de l'application, pour un défaut sans exploitation
+possible, sur une fonctionnalité retirée le 1er mars 2027. **Le risque du
+correctif dépasse celui du défaut.**
+
+*Formulation à ne pas reprendre telle quelle : « userId pris du corps de requête
+sans vérification du JWT » est exact mais alarmiste hors contexte. C'est un
+défaut de propreté architecturale, pas une faille.*
+
+**CORS `*` — non exploitable en l'état.** Les fonctions exigent un jeton de
+session conservé en `localStorage`, qu'un site tiers ne peut pas lire : il ne
+peut donc pas forger d'appel authentifié, et les appels non authentifiés sont
+rejetés. Par ailleurs le helper renvoie `'*'` tant que `ALLOWED_ORIGINS` n'est
+pas défini : la conversion serait un no-op strict, pour seize redéploiements de
+fonctions. À reconsidérer seulement si une fonction venait à accepter des
+requêtes sans jeton de session.
 
 ### Incohérences produit
 
