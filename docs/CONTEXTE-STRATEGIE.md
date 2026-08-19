@@ -235,16 +235,39 @@ inférieur à 10 €.
 
 ## 7. Dette technique et risques identifiés
 
-### À corriger avant d'accepter des clés API d'utilisateurs (lot 0)
+### Lot 0 — assainissement sécurité (état au 18 août 2026)
 
-| Gravité | Constat | Localisation |
-|---|---|---|
-| Haute | Réponses IA complètes (noms d'élèves) écrites dans les logs | `generate:623`, `synthesis:338` |
-| Haute | Policy UPDATE de `profiles` sans restriction de colonne → auto-promotion admin possible, donc création de codes promo | snapshot RLS `20260302` |
-| Haute | `rag-chat` : ni contrôle de solde ni rate-limit avant 5 appels fournisseur | `rag-chat/index.ts` |
-| Moyenne | `deleted_users_blacklist` lisible par `anon` : e-mails de comptes supprimés exposés | policies |
-| Moyenne | CORS `*` codé en dur dans 7+ fonctions alors que le helper `ALLOWED_ORIGINS` existe | plusieurs Edge Functions |
-| Moyenne | `create-checkout-session` : `userId` pris du body sans vérification du JWT | `create-checkout-session:45-63` |
+| Constat | État |
+|---|---|
+| Réponses IA complètes (noms d'élèves) écrites dans les logs — `generate`, `synthesis` | **✅ réglé** — seules la structure et les longueurs sont journalisées ; fonctions redéployées |
+| Policy UPDATE de `profiles` sans restriction de colonne → auto-promotion admin, donc création de codes promo | **✅ réglé** — trigger `trg_block_client_privilege_change` appliqué en production |
+| `deleted_users_blacklist` lisible par `anon` : e-mails de comptes supprimés exposés | **✅ réglé** — `anon` révoqué, lecture réservée à `authenticated` ; inscription vérifiée après application |
+| Fichiers `.backup` exposant le motif « clé API dans le navigateur », README documentant `VITE_OPENAI_API_KEY`, 15 Mo de binaire CLI commité | **✅ réglé** |
+| Dépendances `openai` et `gpt3-tokenizer` jamais importées | **✅ retirées**, verrou régénéré dans le même commit |
+| `rag-chat` : ni contrôle de solde ni rate-limit avant 5 appels fournisseur | **sans objet** — la fonction est réservée à l'administration depuis le 17/08 |
+| CORS `*` codé en dur dans 16 fonctions alors que le helper `ALLOWED_ORIGINS` existe | **reporté** — voir ci-dessous |
+| `create-checkout-session` et `verify-payment` : `userId` pris du corps de requête sans vérification du JWT | **reporté** — voir ci-dessous, le correctif naïf casse les paiements |
+
+#### Les deux points reportés, et pourquoi
+
+**Vérification du JWT sur le tunnel de paiement — piège confirmé par l'analyse.**
+`BuyTokensPage.tsx:144` et `PaymentSuccessPage.tsx:62` n'envoient **pas** de jeton
+de session : seulement `VITE_SUPABASE_ANON_KEY`. Ajouter `requireUser` côté
+serveur renverrait donc un 401 sur **100 % des achats**. Le correctif impose
+trois temps, dans cet ordre : (1) faire envoyer `session.access_token` par le
+front — le motif existe déjà dans `secureApi.ts:111-129` ; (2) déployer et
+laisser les bundles en cache et les onglets ouverts se renouveler ; (3) durcir
+le serveur, avec une phase de tolérance acceptant les deux formes. Et remplacer
+alors `body.userId` par `user.id`, sans quoi la vérification serait cosmétique.
+
+**CORS — exploitabilité réelle plus faible qu'il n'y paraît.** Les fonctions
+exigent un jeton de session conservé en `localStorage`, qu'un site tiers ne peut
+pas lire : il ne peut donc pas forger d'appel authentifié. Par ailleurs le helper
+renvoie `'*'` tant que `ALLOWED_ORIGINS` n'est pas défini, si bien que la
+conversion est un no-op strict — le gain n'arrive qu'au moment de définir le
+secret. Enfin 5 des 16 fonctions portent des en-têtes que le helper ne gère pas
+encore (`x-admin-secret` ×2, `stripe-signature`, `Allow-Methods` ×2). À traiter
+en étendant d'abord le helper.
 
 *Correctif recommandé pour l'auto-promotion : un **trigger additif** calqué sur
 `trg_block_client_token_increase` (motif éprouvé, réversible d'un `DROP TRIGGER`),
