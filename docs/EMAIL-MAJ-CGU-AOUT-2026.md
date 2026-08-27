@@ -135,39 +135,55 @@ dans la construction :
   la rentrée posée (les boîtes académiques débordent la semaine du 1er).
 - **C. Objet** — A ou B ci-dessus.
 
-## Envoi retenu : directement via Resend (décision du 27/08/2026)
+## Envoi retenu : API Resend en transactionnel (compte payant, décision du 27/08/2026)
 
-Ne pas passer par `send-newsletter` : son mode réel filtre en dur sur
-`newsletter_subscription = true` et ajoute un pied de page (« vous avez accepté
-de recevoir des informations ») qui serait faux ici. Le HTML embarque déjà le
-bon pied de page. Points opérationnels de l'envoi manuel :
+Deux règles avant la procédure :
 
-- **Destinataires** : export depuis l'éditeur SQL du dashboard Supabase —
-  `select email from auth.users order by created_at;` — fichier à supprimer
-  après l'envoi (données personnelles).
-- **Mode d'envoi : transactionnel (API `/emails`, éventuellement par lots),
-  jamais un Broadcast/Audience Resend.** Les Broadcasts imposent leur propre
+- **Jamais un Broadcast/Audience Resend.** Les Broadcasts imposent leur propre
   lien de désinscription et alimentent une liste de suppression : un
   utilisateur qui s'y désinscrirait ne recevrait plus l'annonce obligatoire de
   janvier 2027 (trajectoire, arrêt des ventes). Une information de service ne
   se désinscrit pas ; la seule désinscription proposée reste celle de la
   newsletter, dans les Paramètres.
-- **Palier gratuit Resend : ~100 e-mails/jour (3 000/mois), sauf évolution de
-  leur grille.** Pour ~670 destinataires : étaler sur environ 7 jours (l'ordre
-  `created_at` rend les lots reproductibles), ou payer un seul mois de palier
-  supérieur — pas d'abonnement qui traîne.
-- **Cadence** : rester sous ~2 requêtes/seconde (la limite que respecte déjà
-  `send-newsletter` avec ses 550 ms entre envois).
-- **Expéditeur** : `ProfAssist <contact-profassist@teachtech.fr>` (domaine déjà
-  vérifié dans Resend). Surveiller la boîte de réception : le message invite à
-  répondre (documents du chatbot, questions sur les données).
+- **Ne pas passer par `send-newsletter`** : son mode réel filtre en dur sur
+  `newsletter_subscription = true` et ajoute un pied de page (« vous avez
+  accepté de recevoir des informations ») qui serait faux ici.
 
-## Checklist avant envoi
+L'envoi passe par **`scripts/send-legal-notice.mjs`** (Node ≥ 18, aucune
+dépendance) : un destinataire par requête — jamais plusieurs adresses dans le
+même champ `to`, elles se verraient entre elles —, cadence 550 ms sous la
+limite Resend de 2 req/s, version texte jointe au HTML pour la délivrabilité,
+nouvelle tentative avec backoff sur 429/5xx, journal `sent-legal-notice.log`
+pour reprendre sans doublon après une interruption. L'objet et l'expéditeur
+sont des constantes en tête du script.
 
-1. Valider les points A/B/C et relire le HTML (`docs/email-maj-cgu-aout-2026.html`).
-2. Envoi test à soi-même via Resend, vérification des liens (`/legal/cgu`,
-   `/legal/cgv`, `/legal/politique`, `/settings`) et du rendu clair/sombre dans
-   un vrai client mail.
-3. Envoi réel par lots (voir ci-dessus), puis surveiller les réponses
-   (demandes liées aux documents du chatbot) et le taux de plaintes dans
-   Resend.
+### Procédure pas à pas
+
+1. **Valider le contenu** : points A/B/C ci-dessus, relire
+   `docs/email-maj-cgu-aout-2026.html` (l'objet du script doit correspondre au
+   choix C).
+2. **Exporter les destinataires** — dashboard Supabase → SQL Editor :
+   `select email from auth.users where email is not null order by created_at;`
+   → « Download CSV » → enregistrer sous `emails.csv` à la racine du dépôt
+   (le `.gitignore` racine l'exclut de git).
+3. **Créer une clé API** — dashboard Resend → API Keys → clé « sending only ».
+   Ne pas la committer ; la passer en variable d'environnement.
+4. **Répétition générale** (ne rien envoyer, vérifier le compte d'adresses) :
+   `node scripts/send-legal-notice.mjs emails.csv`
+5. **Test sur soi** :
+   `RESEND_API_KEY=re_xxx node scripts/send-legal-notice.mjs emails.csv --test votre@adresse`
+   Vérifier le rendu ordinateur + téléphone, clair/sombre, et chaque lien
+   (`/legal/cgu`, `/legal/cgv`, `/legal/politique`, `/settings` — le bouton
+   doit mener à la connexion puis aux Paramètres).
+6. **Envoi réel** (~6 minutes pour ~670) :
+   `RESEND_API_KEY=re_xxx node scripts/send-legal-notice.mjs emails.csv --go`
+   En cas d'interruption ou d'échecs, relancer la même commande : les adresses
+   déjà servies sont ignorées.
+7. **Après l'envoi** : dashboard Resend → Emails (délivrés, rebonds,
+   plaintes) ; surveiller la boîte `contact-profassist@teachtech.fr` les jours
+   suivants (documents du chatbot, questions sur les données) ; supprimer
+   `emails.csv` et `sent-legal-notice.log`, et révoquer la clé API si elle a
+   été créée pour l'occasion.
+
+Créneau recommandé : un mardi–jeudi matin de la première quinzaine de
+septembre, hors semaine du 1ᵉʳ.

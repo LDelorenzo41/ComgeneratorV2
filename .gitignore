@@ -1,0 +1,4 @@
+# Données personnelles liées aux envois d'e-mails — ne jamais committer
+emails.csv
+*.emails.csv
+sent-legal-notice.log
