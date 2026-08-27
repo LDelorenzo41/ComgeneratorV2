@@ -130,8 +130,13 @@ dans la construction :
   RGPD, proportionné (3 utilisateurs externes depuis le lancement d'après
   `features.ts`). Alternative si vous préférez purger : annoncer une
   suppression à date, au moins 30 jours après l'envoi.
-- **B. Date d'envoi** — recommandé : première quinzaine de septembre, une fois
-  la rentrée posée (les boîtes académiques débordent la semaine du 1er).
+- **B. Date d'envoi** — recommandé : les derniers jours d'août, pendant la
+  fenêtre de préparation (les enseignants préparent leurs séances, les boîtes
+  sont encore calmes, et les fonctionnalités citées — dictée, supports,
+  séances — sont au pic de leur pertinence). Éviter absolument la semaine du
+  31 août au 4 septembre (prérentrée puis rentrée : boîtes saturées, zéro
+  disponibilité) ; repli possible à partir du 7–8 septembre, en sachant que
+  l'attention ne reviendra vraiment qu'en octobre.
 - **C. Objet** — A ou B ci-dessus.
 
 ## Envoi retenu : API Resend en transactionnel (compte payant, décision du 27/08/2026)
@@ -203,5 +208,6 @@ sont des constantes en tête du script.
    `envoi-notice-aout-2026` du dashboard Resend (celle de l'Edge Function
    n'est pas concernée).
 
-Créneau recommandé : un mardi–jeudi matin de la première quinzaine de
-septembre, hors semaine du 1ᵉʳ.
+Créneau recommandé : un matin des derniers jours d'août (fenêtre de
+préparation des enseignants), en évitant la semaine du 31 août au
+4 septembre — prérentrée et rentrée saturent les boîtes.
