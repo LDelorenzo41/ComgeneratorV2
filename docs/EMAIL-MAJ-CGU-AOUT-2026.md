@@ -68,8 +68,7 @@ est sur profassist.net.
 
 **Vos préférences e-mail.** Sans action de votre part, vous ne recevrez que les
 informations relatives au service, comme celle-ci. Pour être informé des
-prochaines évolutions et recevoir des conseils pédagogiques, vous pouvez
-activer la newsletter dans vos Paramètres.
+prochaines évolutions, vous pouvez activer la newsletter dans vos Paramètres.
 
 Bonne rentrée à vous,
 
@@ -148,6 +147,10 @@ Deux règles avant la procédure :
 - **Ne pas passer par `send-newsletter`** : son mode réel filtre en dur sur
   `newsletter_subscription = true` et ajoute un pied de page (« vous avez
   accepté de recevoir des informations ») qui serait faux ici.
+- **Aucune Audience Resend à créer ni à toucher.** L'API transactionnelle
+  n'utilise pas les Audiences : l'envoi ne crée aucun contact et ne modifie en
+  rien l'audience existante de l'autre application. Seul le quota mensuel du
+  compte est partagé entre les deux usages.
 
 L'envoi passe par **`scripts/send-legal-notice.mjs`** (Node ≥ 18, aucune
 dépendance) : un destinataire par requête — jamais plusieurs adresses dans le
@@ -164,10 +167,24 @@ sont des constantes en tête du script.
    choix C).
 2. **Exporter les destinataires** — dashboard Supabase → SQL Editor :
    `select email from auth.users where email is not null order by created_at;`
-   → « Download CSV » → enregistrer sous `emails.csv` à la racine du dépôt
-   (le `.gitignore` racine l'exclut de git).
-3. **Créer une clé API** — dashboard Resend → API Keys → clé « sending only ».
-   Ne pas la committer ; la passer en variable d'environnement.
+   ⚠️ L'éditeur n'affiche que 100 lignes par défaut et « Download CSV »
+   n'exporte que ce qui est affiché : passer le sélecteur de lignes en bas du
+   panneau de résultats de « 100 rows » à « No limit » (ou 1000) avant de
+   télécharger, et vérifier que le fichier compte bien ~670 lignes. Si le
+   sélecteur manque, variante insensible à la limite — tout dans une seule
+   cellule à copier-coller dans `emails.csv` (une adresse par ligne) :
+   `select string_agg(email, E'\n' order by created_at) from auth.users where email is not null;`
+   Enregistrer sous `emails.csv` à la racine du dépôt (le `.gitignore` racine
+   l'exclut de git).
+3. **Créer une nouvelle clé API** — dashboard Resend → API Keys →
+   « Create API Key », permission « Sending access », nom
+   `envoi-notice-aout-2026`. Il en faut une nouvelle car la clé existante
+   n'est pas relisible : Resend ne l'affiche qu'à sa création, et elle est
+   rangée dans les secrets Supabase de `send-newsletter`, illisibles aussi.
+   Les clés coexistent sans se gêner — l'Edge Function garde la sienne et
+   continue de fonctionner. La nouvelle ne se range nulle part : elle se passe
+   directement dans la commande du terminal (`RESEND_API_KEY=re_xxx …`), ne se
+   committe jamais, et se supprime du dashboard une fois l'envoi terminé.
 4. **Répétition générale** (ne rien envoyer, vérifier le compte d'adresses) :
    `node scripts/send-legal-notice.mjs emails.csv`
 5. **Test sur soi** :
@@ -182,8 +199,9 @@ sont des constantes en tête du script.
 7. **Après l'envoi** : dashboard Resend → Emails (délivrés, rebonds,
    plaintes) ; surveiller la boîte `contact-profassist@teachtech.fr` les jours
    suivants (documents du chatbot, questions sur les données) ; supprimer
-   `emails.csv` et `sent-legal-notice.log`, et révoquer la clé API si elle a
-   été créée pour l'occasion.
+   `emails.csv` et `sent-legal-notice.log`, et supprimer la clé
+   `envoi-notice-aout-2026` du dashboard Resend (celle de l'Edge Function
+   n'est pas concernée).
 
 Créneau recommandé : un mardi–jeudi matin de la première quinzaine de
 septembre, hors semaine du 1ᵉʳ.
