@@ -25,8 +25,11 @@ import { fileURLToPath } from 'node:url';
 const SUBJECT = 'Rentrée 2026 — ce qui change dans ProfAssist (conditions et données personnelles)';
 const FROM = 'ProfAssist <contact-profassist@teachtech.fr>';
 const REPLY_TO = 'contact-profassist@teachtech.fr';
-const HTML_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'email-maj-cgu-aout-2026.html');
-const SENT_LOG = 'sent-legal-notice.log';
+// HTML et journal ancrés à la racine du dépôt (le dossier au-dessus de scripts/),
+// pour que l'envoi et la reprise fonctionnent quel que soit le dossier de lancement.
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const HTML_PATH = join(REPO_ROOT, 'docs', 'email-maj-cgu-aout-2026.html');
+const SENT_LOG = join(REPO_ROOT, 'sent-legal-notice.log');
 const DELAY_MS = 550; // cadence sous la limite Resend de 2 requêtes/seconde
 
 // ── Lecture des arguments ────────────────────────────────────────────────────
