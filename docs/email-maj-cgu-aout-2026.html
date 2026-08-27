@@ -1,8 +1,9 @@
 <!-- E-mail « mise à jour des conditions » — août 2026.
-     Prêt à coller dans le champ HTML de l'envoi. Styles entièrement en ligne
-     (contrainte des clients mail). Le pied de page « information de service »
-     est inclus : ne PAS laisser send-newsletter ajouter son pied de page
-     newsletter par-dessus (voir docs/EMAIL-MAJ-CGU-AOUT-2026.md, checklist). -->
+     Envoi prévu directement via l'API Resend (transactionnel, pas un
+     Broadcast) — voir docs/EMAIL-MAJ-CGU-AOUT-2026.md. Styles entièrement en
+     ligne (contrainte des clients mail). Le pied de page « information de
+     service » est inclus ; ne pas utiliser send-newsletter, qui ajouterait un
+     pied de page newsletter inexact. -->
 <div style="background-color:#f3f4f6;padding:24px 12px;">
   <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;padding:32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#1f2937;font-size:15px;line-height:1.6;">
 
@@ -35,7 +36,10 @@
     <p style="margin:0 0 16px;">Ces mises &agrave; jour accompagnent l&rsquo;&eacute;volution de l&rsquo;outil&nbsp;: un huiti&egrave;me outil, les supports p&eacute;dagogiques (exercices, QCM, fiches &eacute;l&egrave;ves g&eacute;n&eacute;r&eacute;s depuis vos s&eacute;ances), a notamment rejoint ProfAssist cet &eacute;t&eacute;. Le d&eacute;tail est sur <a href="https://profassist.net" style="color:#1d4ed8;text-decoration:underline;">profassist.net</a>.</p>
 
     <h2 style="font-size:16px;font-weight:700;color:#111827;margin:26px 0 8px;">Vos pr&eacute;f&eacute;rences e-mail</h2>
-    <p style="margin:0 0 16px;">Sans action de votre part, vous ne recevrez que les informations relatives au service, comme celle-ci. Pour &ecirc;tre inform&eacute; des prochaines &eacute;volutions et recevoir des conseils p&eacute;dagogiques, vous pouvez activer la newsletter dans vos <a href="https://profassist.net/settings" style="color:#1d4ed8;text-decoration:underline;">Param&egrave;tres</a>.</p>
+    <p style="margin:0 0 16px;">Sans action de votre part, vous ne recevrez que les informations relatives au service, comme celle-ci. Pour &ecirc;tre inform&eacute; des prochaines &eacute;volutions et recevoir des conseils p&eacute;dagogiques, vous pouvez activer la newsletter dans vos Param&egrave;tres.</p>
+    <p style="margin:0 0 16px;text-align:center;">
+      <a href="https://profassist.net/settings" style="display:inline-block;background-color:#1d4ed8;color:#ffffff;font-weight:600;font-size:14px;padding:10px 22px;border-radius:6px;text-decoration:none;">G&eacute;rer mes pr&eacute;f&eacute;rences e-mail</a>
+    </p>
 
     <p style="margin:26px 0 4px;">Bonne rentr&eacute;e &agrave; vous,</p>
     <p style="margin:0;">Lionel<br>

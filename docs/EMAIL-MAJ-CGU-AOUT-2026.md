@@ -101,15 +101,23 @@ dans la construction :
    d'élèves, c'est un motif de retour plus puissant qu'une liste de features.
 4. **« Et aussi »** — l'unique phrase promotionnelle autorisée : contexte,
    un lien, pas d'appel à l'action.
-5. **Le paragraphe préférences** récupère des opt-in pour les prochaines
-   vraies newsletters — c'est là que se joue la capacité de relance *future*.
+5. **Le paragraphe préférences et son bouton « Gérer mes préférences
+   e-mail »** récupèrent des opt-in pour les prochaines vraies newsletters —
+   et comme `/settings` exige d'être connecté (`EmailConfirmationGuard`), ce
+   bouton ramène de facto l'utilisateur dans l'application, avec une
+   justification de service irréprochable. Un bouton « Se connecter à
+   ProfAssist » nu ferait basculer le message dans la prospection ; celui-ci
+   produit le même effet sans franchir la ligne. C'est l'unique bouton du
+   message, et il doit le rester.
 6. **Signature humaine + « Bonne rentrée »** — un expéditeur identifié, un
    moment partagé. Gratuit, légitime, efficace.
 
 ## Garde-fous — ce que ce message ne doit jamais devenir
 
 - Pas d'appel à revenir (« redécouvrez », « revenez essayer », « profitez-en »),
-  pas de bouton d'action vers un outil, pas de mention des crédits ou des packs.
+  pas de bouton « Se connecter » ni de bouton vers un outil de génération, pas
+  de mention des crédits ou des packs. L'unique bouton autorisé est « Gérer mes
+  préférences e-mail ».
 - La section « Et aussi » ne grossit pas : une phrase, un lien. Si l'envie de
   lister les nouveautés vient, c'est la newsletter des 120 opt-in qui les reçoit.
 - Ne pas transformer le paragraphe préférences en sollicitation appuyée
@@ -127,18 +135,39 @@ dans la construction :
   la rentrée posée (les boîtes académiques débordent la semaine du 1er).
 - **C. Objet** — A ou B ci-dessus.
 
+## Envoi retenu : directement via Resend (décision du 27/08/2026)
+
+Ne pas passer par `send-newsletter` : son mode réel filtre en dur sur
+`newsletter_subscription = true` et ajoute un pied de page (« vous avez accepté
+de recevoir des informations ») qui serait faux ici. Le HTML embarque déjà le
+bon pied de page. Points opérationnels de l'envoi manuel :
+
+- **Destinataires** : export depuis l'éditeur SQL du dashboard Supabase —
+  `select email from auth.users order by created_at;` — fichier à supprimer
+  après l'envoi (données personnelles).
+- **Mode d'envoi : transactionnel (API `/emails`, éventuellement par lots),
+  jamais un Broadcast/Audience Resend.** Les Broadcasts imposent leur propre
+  lien de désinscription et alimentent une liste de suppression : un
+  utilisateur qui s'y désinscrirait ne recevrait plus l'annonce obligatoire de
+  janvier 2027 (trajectoire, arrêt des ventes). Une information de service ne
+  se désinscrit pas ; la seule désinscription proposée reste celle de la
+  newsletter, dans les Paramètres.
+- **Palier gratuit Resend : ~100 e-mails/jour (3 000/mois), sauf évolution de
+  leur grille.** Pour ~670 destinataires : étaler sur environ 7 jours (l'ordre
+  `created_at` rend les lots reproductibles), ou payer un seul mois de palier
+  supérieur — pas d'abonnement qui traîne.
+- **Cadence** : rester sous ~2 requêtes/seconde (la limite que respecte déjà
+  `send-newsletter` avec ses 550 ms entre envois).
+- **Expéditeur** : `ProfAssist <contact-profassist@teachtech.fr>` (domaine déjà
+  vérifié dans Resend). Surveiller la boîte de réception : le message invite à
+  répondre (documents du chatbot, questions sur les données).
+
 ## Checklist avant envoi
 
 1. Valider les points A/B/C et relire le HTML (`docs/email-maj-cgu-aout-2026.html`).
-2. **Prérequis technique** : `send-newsletter` ne peut pas faire cet envoi en
-   l'état — le mode réel filtre en dur sur `newsletter_subscription = true` et
-   ajoute un pied de page (« vous avez accepté de recevoir des informations »)
-   qui serait faux ici. Il faut d'abord ajouter un mode d'audience dédié
-   (ex. `LEGAL_NOTICE` : tous les comptes, pas de pied de page automatique,
-   admin uniquement) — ajout additif, réversible, déployé par CLI. À faire sur
-   demande.
-3. Envoi test à soi-même (mode test existant), vérification des liens
-   (`/legal/cgu`, `/legal/cgv`, `/legal/politique`, `/settings`) et du rendu
-   clair/sombre dans un vrai client mail.
-4. Envoi réel, puis surveiller les réponses (demandes liées aux documents du
-   chatbot) et le taux de plaintes dans Resend.
+2. Envoi test à soi-même via Resend, vérification des liens (`/legal/cgu`,
+   `/legal/cgv`, `/legal/politique`, `/settings`) et du rendu clair/sombre dans
+   un vrai client mail.
+3. Envoi réel par lots (voir ci-dessus), puis surveiller les réponses
+   (demandes liées aux documents du chatbot) et le taux de plaintes dans
+   Resend.
