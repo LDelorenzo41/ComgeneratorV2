@@ -7,7 +7,7 @@ export function CgvPage() {
   return (
     <LegalLayout 
       title="Conditions générales de vente" 
-      lastUpdated="17 août 2026"
+      lastUpdated="6 septembre 2026"
     >
       <div className="space-y-8">
         
@@ -320,23 +320,42 @@ export function CgvPage() {
                 <li>• Une prestation de service dont l'exécution a commencé avec votre accord</li>
               </ul>
               <p className="text-red-600 text-sm mt-4 bg-white p-3 rounded">
-                <strong>Important :</strong> Aucun remboursement n'est possible une fois les tokens crédités sur votre compte.
+                <strong>À noter :</strong> cette exclusion porte sur le <em>droit légal</em> de
+                rétractation — c'est ce qui permet de vous livrer vos tokens immédiatement plutôt
+                que de vous faire attendre quatorze jours. Elle ne fait pas obstacle à
+                l'engagement de remboursement ci-dessous, que nous prenons volontairement et qui
+                vous est plus favorable.
               </p>
             </div>
             
-            <div className="bg-blue-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">🔄 Exceptions et gestes commerciaux</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">
+                💶 Notre engagement de remboursement
+              </h3>
               <p className="text-gray-700 mb-4">
-                Dans certains cas exceptionnels, nous pourrons étudier des demandes de remboursement :
+                ProfAssist est un service à quelques euros, édité par une personne seule. Nous
+                préférons vous rembourser plutôt que de laisser un désaccord s'installer.
+                L'éditeur s'engage donc, sur simple demande adressée à{' '}
+                <a href="mailto:contact-profassist@teachtech.fr" className="text-blue-600 hover:text-blue-700 underline">contact-profassist@teachtech.fr</a>, à vous rembourser :
               </p>
               <ul className="text-gray-700 space-y-2">
-                <li>• Erreur technique de notre système</li>
-                <li>• Double paiement accidentel</li>
-                <li>• Dysfonctionnement majeur du service dans les 48h suivant l'achat</li>
-                <li>• Erreur manifeste de notre part</li>
+                <li>
+                  • <strong>intégralement</strong>, si vos tokens n'ont pas été crédités, ne l'ont
+                  été que partiellement, ou si un paiement a été prélevé deux fois ;
+                </li>
+                <li>
+                  • <strong>intégralement</strong>, si le service n'a pas fonctionné comme annoncé ;
+                </li>
+                <li>
+                  • <strong>à hauteur des tokens que vous n'avez pas consommés</strong>, si le
+                  service ne vous convient pas — quelle qu'en soit la raison, et sans que vous
+                  ayez à la justifier.
+                </li>
               </ul>
-              <p className="text-gray-600 text-sm mt-3">
-                💡 Ces demandes sont étudiées au cas par cas et ne constituent pas un droit.
+              <p className="text-gray-700 text-sm mt-4 bg-white p-3 rounded">
+                Le remboursement est effectué par le moyen de paiement utilisé lors de l'achat,
+                <strong> sous 14 jours</strong> à compter de votre demande. Cet engagement est
+                contractuel : il vous est opposable, et vous n'avez pas à négocier pour l'obtenir.
               </p>
             </div>
             
@@ -527,9 +546,12 @@ export function CgvPage() {
                 En cas de litige commercial :
               </p>
               <ol className="text-gray-700 space-y-2 text-sm">
-                <li><strong>1.</strong> Contact préalable avec notre service client</li>
-                <li><strong>2.</strong> Recherche d'une solution amiable (60 jours)</li>
-                <li><strong>3.</strong> Médiation de consommation si nécessaire</li>
+                <li><strong>1.</strong> Écrivez-nous à contact-profassist@teachtech.fr</li>
+                <li><strong>2.</strong> Réponse sous 48 heures ouvrées</li>
+                <li>
+                  <strong>3.</strong> Si votre réclamation porte sur un achat, elle est réglée par
+                  le remboursement prévu à l'article 5, sous 14 jours — sans discussion préalable
+                </li>
                 <li><strong>4.</strong> Tribunaux compétents en dernier recours</li>
               </ol>
             </div>
