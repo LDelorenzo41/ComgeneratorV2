@@ -17,9 +17,6 @@ export const FEATURES = {
   // Scénario pédagogique - à activer quand prêt
   SCENARIO_ENABLED: true,
   
-  // Formulaire de feedback testeurs
-  FEEDBACK_ENABLED: true,
-
   // Dictée vocale (transcription Mistral) sur la page Communication
   DICTATION_ENABLED: true,
 
