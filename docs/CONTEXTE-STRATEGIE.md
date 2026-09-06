@@ -242,6 +242,7 @@ inférieur à 10 €.
 | Réponses IA complètes (noms d'élèves) écrites dans les logs — `generate`, `synthesis` | **✅ réglé** — seules la structure et les longueurs sont journalisées ; fonctions redéployées |
 | Policy UPDATE de `profiles` sans restriction de colonne → auto-promotion admin, donc création de codes promo | **✅ réglé** — trigger `trg_block_client_privilege_change` appliqué en production |
 | `deleted_users_blacklist` lisible par `anon` : e-mails de comptes supprimés exposés | **✅ réglé** — `anon` révoqué, lecture réservée à `authenticated` ; inscription vérifiée après application |
+| `deleted_users_blacklist` : e-mails de comptes supprimés conservés sans durée ni finalité — la vérification à l'inscription n'a jamais été implémentée | **✅ réglé (06/09/2026)** — table vidée et alimentation neutralisée par trigger `BEFORE INSERT` ; `delete_user_account()` n'étant pas versionnée, on ne l'a pas réécrite de mémoire. Migration `20260906_stop_feeding_deleted_users_blacklist.sql` |
 | Fichiers `.backup` exposant le motif « clé API dans le navigateur », README documentant `VITE_OPENAI_API_KEY`, 15 Mo de binaire CLI commité | **✅ réglé** |
 | Dépendances `openai` et `gpt3-tokenizer` jamais importées | **✅ retirées**, verrou régénéré dans le même commit |
 | `rag-chat` : ni contrôle de solde ni rate-limit avant 5 appels fournisseur | **sans objet** — la fonction est réservée à l'administration depuis le 17/08 |
