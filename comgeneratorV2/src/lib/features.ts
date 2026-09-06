@@ -11,7 +11,11 @@ export const FEATURES = {
   // 0,003 € de consommation totale, aucun usage depuis des mois. La
   // fonctionnalité reste en place pour l'administration ; elle disparaît
   // simplement de la surface utilisateur.
-  // Repasser à false rétablit l'accès pour tous, sans autre modification.
+  // Repasser à false rétablit l'accès pour tous, sans autre modification —
+  // mais impose alors de déclarer Cohere dans la politique de confidentialité :
+  // rag-chat/index.ts envoie des extraits des documents importés à son service
+  // de rerank. Tant que le drapeau vaut true, seul le compte administrateur
+  // emprunte ce chemin, et aucune donnée d'utilisateur n'atteint Cohere.
   CHATBOT_ADMIN_ONLY: true,
   
   // Scénario pédagogique - à activer quand prêt
