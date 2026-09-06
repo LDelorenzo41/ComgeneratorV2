@@ -7,7 +7,7 @@ export function PolitiqueConfidentialitePage() {
   return (
     <LegalLayout 
       title="Politique de confidentialité" 
-      lastUpdated="17 août 2026"
+      lastUpdated="6 septembre 2026"
     >
       <div className="space-y-8">
         
@@ -469,22 +469,26 @@ export function PolitiqueConfidentialitePage() {
             </div>
             
             <div className="bg-blue-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">📊 Cookies analytiques (optionnels)</h3>
-              <ul className="text-gray-700 space-y-1 mb-3">
-                <li>• Mesures d'audience anonymes</li>
-                <li>• Statistiques d'utilisation</li>
-                <li>• Amélioration de l'expérience utilisateur</li>
-              </ul>
+              <h3 className="font-semibold text-gray-900 mb-3">🚫 Aucune mesure d'audience, aucune publicité</h3>
+              <p className="text-gray-700 mb-3">
+                ProfAssist n'utilise <strong>aucun outil de mesure d'audience</strong> (ni Google
+                Analytics, ni équivalent) et <strong>aucune régie publicitaire</strong>. Votre
+                navigation sur le site n'est transmise à aucun tiers et ne fait l'objet d'aucun
+                profilage.
+              </p>
               <p className="text-gray-600 text-sm">
-                Vous pouvez refuser ces cookies sans impact sur le fonctionnement du site.
+                Les statistiques d'usage que nous consultons sont calculées sur notre propre base
+                de données, à partir du nombre de générations effectuées — jamais à partir de votre
+                navigation.
               </p>
             </div>
           </div>
           
           <div className="bg-amber-50 rounded-lg p-4 mt-4">
             <p className="text-gray-700 text-sm">
-              💡 <strong>Gestion des cookies :</strong> Vous pouvez modifier vos préférences à tout moment 
-              depuis les paramètres de votre navigateur ou nous contacter.
+              💡 <strong>Gestion des cookies :</strong> Vous pouvez modifier vos préférences à tout moment
+              depuis la page <a href="/legal/cookies" className="text-blue-600 hover:text-blue-700 underline">Gestion des cookies</a>,
+              accessible en bas de chaque page du site.
             </p>
           </div>
         </section>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { LegalLayout } from '../../components/legal/LegalLayout';
 import { useCookieConsent } from '../../contexts/CookieConsentContext';
-import { Settings, Shield, BarChart3, Target, Sliders, RefreshCw, Trash2 } from 'lucide-react';
+import { Settings, Shield, Sliders, RefreshCw, Trash2 } from 'lucide-react';
 
 export function CookiePreferencesPage() {
   const {
@@ -51,32 +51,6 @@ export function CookiePreferencesPage() {
       ]
     },
     {
-      key: 'analytics' as keyof typeof consent,
-      title: 'Cookies analytiques',
-      description: 'Ces cookies nous aident à comprendre comment vous utilisez notre site pour l\'améliorer.',
-      icon: BarChart3,
-      color: 'blue',
-      details: [
-        'Google Analytics pour les statistiques d\'usage',
-        'Mesures d\'audience anonymes',
-        'Analyse des parcours utilisateurs',
-        'Optimisation des performances du site'
-      ]
-    },
-    {
-      key: 'advertising' as keyof typeof consent,
-      title: 'Cookies publicitaires',
-      description: 'Ces cookies permettent de personnaliser les publicités et mesurer leur efficacité.',
-      icon: Target,
-      color: 'purple',
-      details: [
-        'Google Ads pour le remarketing',
-        'Mesure des conversions publicitaires',
-        'Personnalisation des annonces',
-        'Suivi des campagnes marketing'
-      ]
-    },
-    {
       key: 'functional' as keyof typeof consent,
       title: 'Cookies fonctionnels',
       description: 'Ces cookies améliorent votre expérience avec des fonctionnalités supplémentaires.',
@@ -109,7 +83,7 @@ export function CookiePreferencesPage() {
   return (
     <LegalLayout 
       title="Gestion des cookies" 
-      lastUpdated="2 septembre 2025"
+      lastUpdated="6 septembre 2026"
     >
       <div className="space-y-8">
         
