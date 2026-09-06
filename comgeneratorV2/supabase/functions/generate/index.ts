@@ -968,9 +968,23 @@ function getSystemAddressModeMessage(addressMode) {
 /**
  * Vrai si la position `offset` dans `full` est un début de phrase.
  * Sert à savoir si le remplacement doit porter une majuscule.
+ *
+ * Volontairement limité au point, au point d'exclamation, au point
+ * d'interrogation et au saut de ligne. Le point-virgule et le deux-points en
+ * faisaient partie : en français ils n'appellent pas de majuscule, et le filet
+ * en produisait une parasite (« des résultats solides ; L'élève doit… »).
  */
 function isSentenceStart(full: string, offset: number): boolean {
-  return /(?:^|[.!?:;»"]\s*|\n\s*)$/.test(full.slice(0, offset));
+  return /(?:^|[.!?]\s*|\n\s*)$/.test(full.slice(0, offset));
+}
+
+/**
+ * Vrai si le texte trouvé se présente comme un nom propre, c'est-à-dire
+ * commence par une majuscule. C'est ce qui distingue le prénom « Rose » du nom
+ * commun « rose », « Constance » de « constance », « Marine » de « marine ».
+ */
+function ressembleAUnNomPropre(fragment: string): boolean {
+  return /^\p{Lu}/u.test(fragment);
 }
 
 /**
@@ -984,26 +998,62 @@ function isSentenceStart(full: string, offset: number): boolean {
  * N'est appelée QUE lorsque l'option « Ne pas citer le prénom » est cochée :
  * le chemin historique n'exécute pas une ligne de ce code.
  *
- * Volontairement minimal : on REMPLACE, on ne supprime jamais. Supprimer le
- * prénom et sa ponctuation adjacente produirait des phrases cassées dès que la
- * virgule n'est pas vocative (« le travail de Léa, régulier, … »). Remplacer
- * par « l'élève » reste toujours grammatical, au prix d'une formulation parfois
- * un peu raide en tutoiement — texte que l'utilisateur peut éditer.
+ * On REMPLACE, on ne supprime jamais. Supprimer le prénom et sa ponctuation
+ * adjacente casserait les phrases où la virgule n'est pas vocative (« le
+ * travail de Léa, régulier, … »). Remplacer par « l'élève » reste toujours
+ * grammatical.
  *
- * Deux règles, appliquées du candidat le plus long au plus court
- * (« Jean-Baptiste » avant « Jean », sinon un prénom composé donnerait
- * « l'élève-l'élève ») :
+ * ============================================================================
+ * DEUX GARDE-FOUS, issus de défauts constatés le 06/09/2026
+ * ============================================================================
+ *
+ * 1. CANDIDATS RESTREINTS. La version initiale ajoutait CHAQUE mot du nom à la
+ *    liste des candidats. « Marie De Souza » produisait le candidat « De », et
+ *    « le calcul de la moyenne de son travail » devenait « le calcul l'élève la
+ *    moyenne l'élève son travail ». Même effet avec « Le Goff » (« Le ») ou un
+ *    patronyme comme Bon, Petit, Blanc, Sage.
+ *
+ *    On ne retient donc que le NOM COMPLET tel qu'il a été saisi, et son
+ *    PREMIER JETON — le prénom, seul élément que le prompt demande au modèle
+ *    d'employer. Les composants suivants (particules, patronymes) ne sont
+ *    jamais remplacés isolément. Un patronyme qui fuirait seul échapperait au
+ *    filet : c'est le prix assumé pour ne plus mutiler le texte, et le cas est
+ *    bien moins probable que celui du prénom.
+ *
+ * 2. FORME DE NOM PROPRE EXIGÉE. La recherche reste insensible à la casse — le
+ *    modèle écrit « Léa » même si l'enseignant a saisi « léa » — mais le
+ *    remplacement n'a lieu QUE si le fragment trouvé commence par une
+ *    majuscule. Sans cette condition, un prénom homographe d'un nom commun
+ *    détruisait le texte : « Constance travaille avec constance » devenait
+ *    « L'élève travaille avec l'élève », « Marine progresse en biologie
+ *    marine » devenait « L'élève progresse en biologie l'élève ». La famille
+ *    est large au collège : Rose, Marine, Constance, Noël, Blanche, Aurore,
+ *    Ambre, Olive, Colombe, Prudence.
+ *
+ * Ordre : du candidat le plus long au plus court, sinon un prénom composé
+ * donnerait « l'élève-l'élève ».
  *   1. élision          « le travail d'Émile » → « le travail de l'élève »
  *   2. occurrence nue   « Léa progresse »      → « L'élève progresse »
  */
 function stripStudentName(text: string, studentName: string): string {
   if (!text || !studentName) return text;
 
+  const nomComplet = studentName.trim();
+  const premierJeton = nomComplet.split(/[\s'’\-]+/)[0] || '';
+
+  // Le nom complet est retenu dès 2 caractères : saisi seul, c'est le prénom,
+  // et un prénom de deux lettres doit rester couvert.
+  //
+  // Le premier jeton, lui, exige 3 caractères. Sans ce seuil, un nom commençant
+  // par une particule le réintroduit par une autre porte : « Le Goff » donnait
+  // le candidat « Le », et « Le travail est sérieux » devenait « L'élève
+  // travail est sérieux ». Un prénom de deux lettres suivi d'un patronyme reste
+  // couvert par le nom complet.
   const candidates = Array.from(new Set([
-    studentName.trim(),
-    ...studentName.trim().split(/[\s'’\-]+/)
+    nomComplet.length >= 2 ? nomComplet : '',
+    premierJeton.length >= 3 ? premierJeton : ''
   ]))
-    .filter((c: string) => c.length >= 2)
+    .filter((c: string) => c.length > 0)
     .sort((a: string, b: string) => b.length - a.length);
 
   // Bornes par propriété Unicode : \b est inopérant devant une majuscule
@@ -1017,19 +1067,24 @@ function stripStudentName(text: string, studentName: string): string {
     const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // 1. Élision, traitée en premier pour que « d'Émile » ne laisse pas un
-    //    « d'l'élève » derrière lui.
+    //    « d'l'élève » derrière lui. Le prénom est capturé à part pour tester
+    //    sa majuscule sans être trompé par le « d' » qui le précède.
     out = out.replace(
-      new RegExp(`${BEFORE}d['’]${escaped}${AFTER}`, 'giu'),
-      (_match: string, offset: number, full: string) =>
-        isSentenceStart(full, offset) ? "De l'élève" : "de l'élève"
+      new RegExp(`${BEFORE}d['’](${escaped})${AFTER}`, 'giu'),
+      (match: string, prenom: string, offset: number, full: string) => {
+        if (!ressembleAUnNomPropre(prenom)) return match;
+        return isSentenceStart(full, offset) ? "De l'élève" : "de l'élève";
+      }
     );
 
     // 2. Occurrence nue. Aucune borne sur l'apostrophe en amont : mieux vaut un
     //    « l'l'élève » disgracieux qu'un prénom qui fuite.
     out = out.replace(
       new RegExp(`${BEFORE}${escaped}${AFTER}`, 'giu'),
-      (_match: string, offset: number, full: string) =>
-        isSentenceStart(full, offset) ? "L'élève" : "l'élève"
+      (match: string, offset: number, full: string) => {
+        if (!ressembleAUnNomPropre(match)) return match;
+        return isSentenceStart(full, offset) ? "L'élève" : "l'élève";
+      }
     );
   }
 

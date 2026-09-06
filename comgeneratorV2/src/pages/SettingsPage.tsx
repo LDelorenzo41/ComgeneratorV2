@@ -494,7 +494,12 @@ export function SettingsPage() {
                   <h5 className="font-medium text-gray-900 dark:text-white mb-2">Cette action supprimera :</h5>
                   <ul className="text-gray-700 dark:text-gray-300 space-y-1 text-sm">
                     <li>• Votre compte et toutes vos informations personnelles</li>
-                    <li>• Tous vos tokens restants (aucun remboursement)</li>
+                    <li>
+                      • Tous vos tokens restants. Si vous souhaitez en demander le
+                      remboursement, faites-le <strong>avant</strong> de supprimer votre compte —
+                      voir l'article 5 des{' '}
+                      <a href="/legal/cgv" className="text-blue-600 dark:text-blue-400 underline">CGV</a>
+                    </li>
                     <li>• Toutes vos appréciations générées</li>
                     <li>• Vos communications et synthèses sauvegardées</li>
                     <li>• Vos séances pédagogiques archivées</li>
