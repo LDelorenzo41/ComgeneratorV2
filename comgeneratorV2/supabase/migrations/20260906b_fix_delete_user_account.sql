@@ -1,3 +1,41 @@
+-- ############################################################################
+-- ⛔⛔  NE PAS APPLIQUER CETTE MIGRATION — ELLE CASSE LA SUPPRESSION DE COMPTE
+-- ############################################################################
+--
+-- Appliquée le 06/09/2026, elle a rendu la suppression de compte impossible.
+-- ANNULÉE par 20260906d_rollback_delete_user_account.sql, qui a rétabli la
+-- fonction d'origine et qui fait foi.
+--
+-- CAUSE, établie en production :
+--   storage.objects porte un trigger `protect_objects_delete`,
+--   BEFORE DELETE ... FOR EACH STATEMENT, qui exécute storage.protect_delete().
+--   Cette fonction lève systématiquement :
+--
+--       « Direct deletion from storage tables is not allowed.
+--         Use the Storage API instead. »   (ERRCODE 42501)
+--
+--   sauf si le paramètre `storage.allow_delete_query` vaut 'true'.
+--
+--   Un trigger STATEMENT se déclenche à CHAQUE instruction DELETE, même
+--   lorsqu'elle ne touche AUCUNE ligne. Le `DELETE FROM storage.objects`
+--   ci-dessous s'exécutait donc pour tous les comptes, y compris ceux sans le
+--   moindre fichier — c'est-à-dire pratiquement tous, le corpus documentaire
+--   étant réservé à l'administrateur. D'où un échec systématique, malgré des
+--   droits accordés (postgres détient DELETE et porte BYPASSRLS) et des clés
+--   étrangères toutes en CASCADE ou SET NULL.
+--
+-- CE QUE CE FICHIER GARDE DE VALABLE :
+--   l'inventaire des tables oubliées par la fonction d'origine (scenarios_bank,
+--   chatbot_answers, rag_documents, rag_chunks, rag_conversations, rag_folders),
+--   la garde défensive to_regclass + colonne user_id, et le SET search_path.
+--   Une reprise éventuelle devra repartir de cette liste, SANS l'étape Storage :
+--   les fichiers doivent être supprimés via l'API Storage — depuis le client
+--   avant l'appel à la RPC, ou depuis une Edge Function à clé service — et non
+--   par un DELETE SQL, qui ne garantit d'ailleurs pas la disparition du fichier
+--   sous-jacent. Le trigger existe précisément pour l'imposer.
+--
+-- ############################################################################
+
 -- 20260906b_fix_delete_user_account.sql
 --
 -- Corrige `delete_user_account()` : la suppression de compte était INCOMPLÈTE.
