@@ -6,7 +6,7 @@ export function MentionsLegalesPage() {
   return (
     <LegalLayout 
       title="Mentions légales" 
-      lastUpdated="6 janvier 2026"
+      lastUpdated="6 septembre 2026"
     >
       <div className="space-y-8">
         
@@ -18,12 +18,15 @@ export function MentionsLegalesPage() {
           <div className="bg-gray-50 rounded-lg p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Dénomination</h3>
-                <p className="text-gray-700">ProfAssist</p>
+                <h3 className="font-semibold text-gray-900 mb-2">Éditeur</h3>
+                <p className="text-gray-700">
+                  Lionel Delorenzo<br />
+                  Entrepreneur individuel (EI)
+                </p>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Forme juridique</h3>
-                <p className="text-gray-700">Entreprise individuelle</p>
+                <h3 className="font-semibold text-gray-900 mb-2">Nom commercial</h3>
+                <p className="text-gray-700">ProfAssist</p>
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">Responsable de publication</h3>
@@ -32,8 +35,22 @@ export function MentionsLegalesPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">Siège social</h3>
                 <p className="text-gray-700">
-                  Busloup<br />
+                  8 sentier du coteau<br />
+                  41160 Busloup<br />
                   France
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Immatriculation</h3>
+                <p className="text-gray-700">
+                  SIREN : 929 482 107<br />
+                  SIRET : 929 482 107 00018
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">TVA</h3>
+                <p className="text-gray-700">
+                  TVA non applicable, article 293 B du CGI
                 </p>
               </div>
               <div className="md:col-span-2">
@@ -85,20 +102,58 @@ export function MentionsLegalesPage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-2">Intelligence artificielle</h3>
               <p className="text-gray-700 mb-2">
-                <strong>OpenAI</strong> - Traitement des demandes de génération de contenu
+                <strong>OpenAI</strong> — traitement des demandes de génération de contenu
+              </p>
+              <p className="text-gray-700 mb-2">
+                <strong>Mistral AI</strong> (société française) — génération de contenu lorsque ce
+                modèle est sélectionné dans vos paramètres, et transcription de la dictée vocale
               </p>
               <p className="text-gray-600 text-sm">
-                Les données traitées par OpenAI sont soumises à leur politique de confidentialité.
+                Les données transmises à ces services sont soumises à leurs politiques de
+                confidentialité respectives. Le détail des traitements figure dans notre{' '}
+                <a href="/legal/politique-confidentialite" className="text-blue-600 hover:text-blue-700 underline">politique de confidentialité</a>.
               </p>
             </div>
-            
+
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-2">Paiements</h3>
               <p className="text-gray-700 mb-2">
-                <strong>Stripe</strong> - Traitement sécurisé des paiements pour l'achat de tokens
+                <strong>Stripe</strong> — traitement sécurisé des paiements pour l'achat de tokens
               </p>
               <p className="text-gray-600 text-sm">
                 Aucune donnée de carte bancaire n'est stockée sur nos serveurs.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-2">Envoi d'e-mails</h3>
+              <p className="text-gray-700 mb-2">
+                <strong>Resend</strong> — acheminement de la newsletter, pour les seuls comptes qui
+                s'y sont abonnés
+              </p>
+              <p className="text-gray-600 text-sm">
+                Le désabonnement est possible à tout moment depuis vos réglages ou depuis le lien
+                présent dans chaque envoi.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-2">Sauvegarde</h3>
+              <p className="text-gray-700 mb-2">
+                <strong>GitHub, Inc.</strong> (groupe Microsoft) — conservation des sauvegardes
+                chiffrées quotidiennes de la base de données
+              </p>
+              <p className="text-gray-600 text-sm">
+                Les sauvegardes sont chiffrées avant tout envoi et conservées 90 jours.
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-2">Ce que nous n'utilisons pas</h3>
+              <p className="text-gray-700">
+                ProfAssist n'utilise <strong>aucun outil de mesure d'audience</strong> (ni Google
+                Analytics, ni équivalent), <strong>aucune régie publicitaire</strong> et aucun
+                traceur tiers. Votre navigation n'est transmise à personne.
               </p>
             </div>
           </div>
