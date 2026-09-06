@@ -1,3 +1,41 @@
+-- ############################################################################
+-- ⛔⛔  NE PAS APPLIQUER CETTE MIGRATION — ELLE CASSE LA SUPPRESSION DE COMPTE
+-- ############################################################################
+--
+-- Appliquée le 06/09/2026, elle a rendu la suppression de compte impossible.
+-- ANNULÉE par 20260906d_rollback_delete_user_account.sql, qui a rétabli la
+-- fonction d'origine et qui fait foi.
+--
+-- CAUSE, établie en production :
+--   storage.objects porte un trigger `protect_objects_delete`,
+--   BEFORE DELETE ... FOR EACH STATEMENT, qui exécute storage.protect_delete().
+--   Cette fonction lève systématiquement :
+--
+--       « Direct deletion from storage tables is not allowed.
+--         Use the Storage API instead. »   (ERRCODE 42501)
+--
+--   sauf si le paramètre `storage.allow_delete_query` vaut 'true'.
+--
+--   Un trigger STATEMENT se déclenche à CHAQUE instruction DELETE, même
+--   lorsqu'elle ne touche AUCUNE ligne. Le `DELETE FROM storage.objects`
+--   ci-dessous s'exécutait donc pour tous les comptes, y compris ceux sans le
+--   moindre fichier — c'est-à-dire pratiquement tous, le corpus documentaire
+--   étant réservé à l'administrateur. D'où un échec systématique, malgré des
+--   droits accordés (postgres détient DELETE et porte BYPASSRLS) et des clés
+--   étrangères toutes en CASCADE ou SET NULL.
+--
+-- CE QUE CE FICHIER GARDE DE VALABLE :
+--   l'inventaire des tables oubliées par la fonction d'origine (scenarios_bank,
+--   chatbot_answers, rag_documents, rag_chunks, rag_conversations, rag_folders),
+--   la garde défensive to_regclass + colonne user_id, et le SET search_path.
+--   Une reprise éventuelle devra repartir de cette liste, SANS l'étape Storage :
+--   les fichiers doivent être supprimés via l'API Storage — depuis le client
+--   avant l'appel à la RPC, ou depuis une Edge Function à clé service — et non
+--   par un DELETE SQL, qui ne garantit d'ailleurs pas la disparition du fichier
+--   sous-jacent. Le trigger existe précisément pour l'imposer.
+--
+-- ############################################################################
+
 -- 20260906b_fix_delete_user_account.sql
 --
 -- Corrige `delete_user_account()` : la suppression de compte était INCOMPLÈTE.
@@ -45,9 +83,9 @@
 --    des cascades — une suppression redondante avec une cascade est sans
 --    effet ni coût, une cascade absente serait une fuite.
 -- 2. Suppression des fichiers du bucket Storage.
--- 3. Retrait de l'INSERT dans deleted_users_blacklist (décision du 06/09/2026),
---    ce qui rend inutiles le trigger et la table : tous deux sont supprimés
---    en fin de script.
+-- 3. Retrait de l'INSERT dans deleted_users_blacklist (décision du 06/09/2026).
+--    ⚠️ La TABLE, elle, est CONSERVÉE : `handle_new_user()` la consulte à
+--    chaque inscription. Voir la note en fin de script.
 -- 4. Ajout de `SET search_path` : la fonction est SECURITY DEFINER et s'en
 --    passait, ce qui l'exposait à une résolution de noms détournée par un
 --    search_path hostile.
@@ -120,25 +158,49 @@ END;
 $function$;
 
 -- ============================================================================
--- La blacklist n'a plus de source d'alimentation
+-- La blacklist n'est plus alimentée — mais la table reste
 -- ============================================================================
 -- Le trigger posé par 20260906_stop_feeding_deleted_users_blacklist.sql
--- neutralisait l'INSERT ci-dessus faute de connaître la définition de la
--- fonction. Celle-ci étant désormais corrigée à la source, trigger et table
--- disparaissent. Les IF EXISTS rendent le script applicable que la migration
+-- neutralisait l'INSERT faute de connaître la définition de la fonction.
+-- Celle-ci étant corrigée à la source, le trigger devient inutile et peut
+-- partir. Les IF EXISTS rendent le script applicable que la migration
 -- précédente ait été passée ou non.
+--
+-- La TABLE, en revanche, doit rester : voir ci-dessous.
 
 DROP TRIGGER IF EXISTS discard_inserts ON public.deleted_users_blacklist;
 DROP FUNCTION IF EXISTS public.discard_deleted_users_blacklist_insert();
-DROP TABLE IF EXISTS public.deleted_users_blacklist;
+
+-- ⛔ LIGNE RETIRÉE LE 06/09/2026 — NE PAS LA RÉTABLIR
+--
+--     DROP TABLE IF EXISTS public.deleted_users_blacklist;
+--
+-- Ce DROP a cassé l'inscription en production : « Database error saving new
+-- user ». La fonction `public.handle_new_user()`, appelée par le trigger
+-- `on_auth_user_created AFTER INSERT ON auth.users`, référence cette table.
+-- Elle a été créée depuis le dashboard : sa définition ne figure dans aucune
+-- migration, et la recherche du 18/08 qui concluait qu'« aucun code ne lit
+-- cette table » ne portait que sur src/ et les Edge Functions.
+--
+-- Table rétablie par 20260906c_hotfix_restore_blacklist_table.sql.
+--
+-- Règle qui en découle, valable pour tout ce projet : avant tout DROP d'un
+-- objet, inventorier ses dépendances CÔTÉ BASE, pas seulement dans le dépôt :
+--
+--     SELECT n.nspname, p.proname
+--       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+--      WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+--        AND p.prosrc ILIKE '%<objet visé>%';
 
 -- ============================================================================
 -- Vérification attendue après application
 -- ============================================================================
 --
--- 1. La table a disparu :
+-- 1. La table est TOUJOURS LÀ (sa suppression casse l'inscription) :
 --
---        SELECT to_regclass('public.deleted_users_blacklist');  -- NULL
+--        SELECT to_regclass('public.deleted_users_blacklist');  -- non NULL
+--
+-- 1 bis. L'inscription fonctionne : créer un compte de test.
 --
 -- 2. Aucune table rattachée à un utilisateur n'échappe à la suppression.
 --    La requête ci-dessous liste toute table de `public` portant une colonne
