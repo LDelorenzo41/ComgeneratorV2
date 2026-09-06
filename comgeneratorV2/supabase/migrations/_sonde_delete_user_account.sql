@@ -62,6 +62,19 @@ SELECT conrelid::regclass  AS table_source,
          'scenarios_bank', 'chatbot_answers', 'subjects', 'profiles')
  ORDER BY 3, 1;
 
+-- 1.d TROISIÈME SUSPECT — les triggers de storage.objects.
+--     Les versions récentes de Supabase maintiennent une table
+--     `storage.prefixes` au moyen de triggers posés sur `storage.objects`.
+--     Un DELETE y déclenche donc du code annexe, qui peut échouer pour ses
+--     propres raisons même quand le droit de suppression est acquis.
+--     Résultat vide = suspect écarté.
+SELECT t.tgname                         AS trigger,
+       pg_get_triggerdef(t.oid)         AS definition
+  FROM pg_trigger t
+ WHERE t.tgrelid = 'storage.objects'::regclass
+   AND NOT t.tgisinternal
+ ORDER BY 1;
+
 -- ############################################################################
 -- ÉTAPE 2 — La sonde. À ne lancer que sur un COMPTE JETABLE.
 -- ############################################################################
