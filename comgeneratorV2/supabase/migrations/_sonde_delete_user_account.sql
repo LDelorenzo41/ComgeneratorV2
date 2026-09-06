@@ -13,23 +13,36 @@
 --           Elles suffiront peut-être à trancher.
 -- ############################################################################
 
--- 1.a Sous quelle identité s'exécutent les fonctions SECURITY DEFINER.
---     C'est le propriétaire, pas l'appelant, dont les droits comptent.
-SELECT p.proname                        AS fonction,
-       pg_get_userbyid(p.proowner)      AS proprietaire,
-       p.prosecdef                      AS security_definer
+-- 1.a + 1.b — UNE SEULE REQUÊTE, autonome.
+--
+--     Sous quelle identité s'exécutent les fonctions SECURITY DEFINER, et
+--     cette identité a-t-elle le droit d'écrire dans le Storage ? C'est le
+--     PROPRIÉTAIRE de la fonction dont les droits comptent à l'exécution,
+--     jamais l'utilisateur connecté — d'où la résolution automatique de son
+--     identité ci-dessous, sans valeur à substituer.
+--
+--     Colonne décisive : `peut_supprimer_fichiers`. Si elle vaut false pour
+--     delete_user_account, la cause de la panne est trouvée.
+
+SELECT p.proname                    AS fonction,
+       pg_get_userbyid(p.proowner)  AS proprietaire,
+       p.prosecdef                  AS security_definer,
+       r.rolsuper                   AS proprio_superuser,
+       r.rolbypassrls               AS proprio_ignore_rls,
+       has_table_privilege(p.proowner, 'storage.objects', 'DELETE')
+                                    AS peut_supprimer_fichiers,
+       has_table_privilege(p.proowner, 'storage.objects', 'SELECT')
+                                    AS peut_lire_storage,
+       (SELECT c.relrowsecurity
+          FROM pg_class c
+          JOIN pg_namespace ns ON ns.oid = c.relnamespace
+         WHERE ns.nspname = 'storage' AND c.relname = 'objects')
+                                    AS rls_active_sur_storage
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
+  JOIN pg_roles     r ON r.oid = p.proowner
  WHERE n.nspname = 'public'
    AND p.proname IN ('delete_user_account', 'handle_new_user');
-
--- 1.b PREMIER SUSPECT — le Storage était le seul schéma que ma version
---     touchait pour la première fois. Remplacer <PROPRIETAIRE> par la valeur
---     renvoyée en 1.a.
-SELECT has_table_privilege('<PROPRIETAIRE>', 'storage.objects', 'DELETE')
-         AS peut_supprimer_des_fichiers,
-       has_table_privilege('<PROPRIETAIRE>', 'storage.objects', 'SELECT')
-         AS peut_lire_le_storage;
 
 -- 1.c SECOND SUSPECT — une clé étrangère sans CASCADE vers l'une des tables
 --     que ma version ajoutait à la suppression. Toute ligne « NO ACTION » ou
