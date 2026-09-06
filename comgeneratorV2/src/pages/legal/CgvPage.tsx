@@ -348,14 +348,16 @@ export function CgvPage() {
                 </li>
                 <li>
                   • <strong>à hauteur des tokens que vous n'avez pas consommés</strong>, si le
-                  service ne vous convient pas — quelle qu'en soit la raison, et sans que vous
-                  ayez à la justifier.
+                  service ne vous convient pas — quelle qu'en soit la raison, sans que vous ayez à
+                  la justifier, <strong>dans les 30 jours suivant votre achat</strong>.
                 </li>
               </ul>
               <p className="text-gray-700 text-sm mt-4 bg-white p-3 rounded">
                 Le remboursement est effectué par le moyen de paiement utilisé lors de l'achat,
                 <strong> sous 14 jours</strong> à compter de votre demande. Cet engagement est
                 contractuel : il vous est opposable, et vous n'avez pas à négocier pour l'obtenir.
+                Seul le troisième cas est borné à 30 jours ; les deux premiers — tokens non
+                crédités, service défaillant — restent ouverts sans limite de temps.
               </p>
             </div>
             
