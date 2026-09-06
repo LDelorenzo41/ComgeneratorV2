@@ -76,6 +76,12 @@ $function$;
 CREATE UNIQUE INDEX IF NOT EXISTS deleted_users_blacklist_email_unique
   ON public.deleted_users_blacklist (email);
 
+-- Même prudence sur le NOT NULL : la table d'origine tolérait peut-être un
+-- email absent. Mon correctif d'urgence 20260906c a posé un NOT NULL qui n'y
+-- était pas forcément. On le relâche pour que la fonction restituée se
+-- comporte exactement comme avant.
+ALTER TABLE public.deleted_users_blacklist ALTER COLUMN email DROP NOT NULL;
+
 -- ============================================================================
 -- VÉRIFICATION IMMÉDIATE
 -- ============================================================================
