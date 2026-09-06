@@ -134,7 +134,9 @@ export function PolitiqueConfidentialitePage() {
                 <li>• Statut des paiements</li>
               </ul>
               <p className="text-sm text-gray-600 mt-3 bg-orange-50 p-2 rounded">
-                <strong>Note :</strong> Aucune donnée bancaire stockée
+                <strong>Note :</strong> aucune donnée bancaire n'est stockée. Ce que nous
+                conservons n'est qu'une copie de suivi : la pièce comptable, elle, est établie et
+                détenue par Stripe.
               </p>
             </div>
 
@@ -419,10 +421,13 @@ export function PolitiqueConfidentialitePage() {
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">💰 Données de paiement</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">💰 Historique d'achat</h3>
                 <p className="text-gray-700 text-sm">
-                  Conservées 10 ans, conformément aux obligations comptables et fiscales. Ce délai
-                  s'impose à nous et survit à la suppression du compte.
+                  La copie que nous en conservons — montants, dates, identifiants de transaction —
+                  est effacée avec votre compte. Les pièces comptables correspondantes restent
+                  détenues par Stripe et figurent dans notre comptabilité, que la loi nous impose
+                  de conserver 10 ans : cette obligation-là ne dépend pas de nous et survit à la
+                  suppression de votre compte.
                 </p>
               </div>
             </div>
