@@ -17,6 +17,8 @@ export interface GenerateAppreciationParams {
   maxLength: number;
   tone: 'bienveillant' | 'normal' | 'severe';
   addressMode: 'tutoiement' | 'vouvoiement' | 'impersonnel';
+  /** Anonymat : le prénom ne doit pas apparaître dans le texte généré */
+  hideStudentName?: boolean;
 }
 
 export interface CommunicationParams {

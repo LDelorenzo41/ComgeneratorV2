@@ -38,6 +38,7 @@ const appreciationSchema = z.object({
   personalNotes: z.string().optional(),
   tone: z.enum(['bienveillant', 'normal', 'severe'] as const),
   addressMode: z.enum(['tutoiement', 'vouvoiement', 'impersonnel'] as const),  // ✅ AJOUT
+  hideStudentName: z.boolean().optional(),  // ✅ AJOUT : anonymat, combinable avec les 3 modes
   minLength: z.number().min(50).max(500),
   maxLength: z.number().min(100).max(1000)
 }).refine((data) => data.maxLength > data.minLength, {
@@ -93,6 +94,7 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
       criteria: [],
       tone: 'normal',
       addressMode: 'tutoiement',  // ✅ AJOUT : valeur par défaut
+      hideStudentName: false,  // ✅ AJOUT : anonymat désactivé par défaut
       personalNotes: '',
       minLength: 150,
       maxLength: 300
@@ -235,7 +237,8 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
         minLength: data.minLength,
         maxLength: data.maxLength,
         tone: data.tone,
-        addressMode: data.addressMode  // ✅ AJOUT
+        addressMode: data.addressMode,  // ✅ AJOUT
+        hideStudentName: data.hideStudentName ?? false  // ✅ AJOUT
       });
 
       const usedTokens = generatedResult.usedTokens;
@@ -548,6 +551,25 @@ export function AppreciationForm({ onTokensUpdated, tokensAvailable }: Appreciat
                 <option value="vouvoiement">Vouvoiement</option>
                 <option value="impersonnel">Formulation impersonnelle</option>
               </select>
+
+              {/* ✅ AJOUT : anonymat — option transversale aux trois modes d'adresse */}
+              <label className="flex items-start gap-3 mt-3 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-all duration-200 has-[:disabled]:opacity-50 has-[:disabled]:cursor-not-allowed">
+                <input
+                  type="checkbox"
+                  {...register('hideStudentName')}
+                  disabled={tokenCount === 0}
+                  className="mt-0.5 w-4 h-4 shrink-0 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
+                />
+                <span className="text-sm">
+                  <span className="font-semibold text-gray-700 dark:text-gray-200">
+                    Ne pas citer le prénom
+                  </span>
+                  <span className="block text-gray-500 dark:text-gray-400 mt-0.5">
+                    Pour une appréciation anonyme. Le prénom reste utilisé pour les accords
+                    (« elle » / « il ») mais n'apparaît pas dans le texte.
+                  </span>
+                </span>
+              </label>
             </div>
             {/* Notes personnelles */}
             <div className="space-y-2">
