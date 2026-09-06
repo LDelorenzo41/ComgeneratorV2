@@ -1,13 +1,13 @@
 // src/pages/legal/PolitiqueConfidentialitePage.tsx
 import React from 'react';
 import { LegalLayout } from '../../components/legal/LegalLayout';
-import { Shield, Eye, Lock, Database, Share2, Clock, Bot, FileText } from 'lucide-react';
+import { Shield, Eye, Lock, Database, Share2, Clock, Bot, FileText, Mail } from 'lucide-react';
 
 export function PolitiqueConfidentialitePage() {
   return (
     <LegalLayout 
       title="Politique de confidentialité" 
-      lastUpdated="17 août 2026"
+      lastUpdated="6 septembre 2026"
     >
       <div className="space-y-8">
         
@@ -40,8 +40,12 @@ export function PolitiqueConfidentialitePage() {
             <p className="text-gray-700 mb-2">
               <strong>Contact :</strong> <a href="mailto:contact-profassist@teachtech.fr" className="text-blue-600 hover:text-blue-700">contact-profassist@teachtech.fr</a>
             </p>
+            <p className="text-gray-700 mb-2">
+              <strong>Adresse :</strong> 8 sentier du coteau, 41160 Busloup, France
+            </p>
             <p className="text-gray-700">
-              <strong>Adresse :</strong> Busloup, France
+              <strong>Immatriculation :</strong> SIREN 929 482 107 — entrepreneur individuel (EI),
+              exploitant le service sous le nom commercial ProfAssist
             </p>
           </div>
         </section>
@@ -130,7 +134,9 @@ export function PolitiqueConfidentialitePage() {
                 <li>• Statut des paiements</li>
               </ul>
               <p className="text-sm text-gray-600 mt-3 bg-orange-50 p-2 rounded">
-                <strong>Note :</strong> Aucune donnée bancaire stockée
+                <strong>Note :</strong> aucune donnée bancaire n'est stockée. Ce que nous
+                conservons n'est qu'une copie de suivi : la pièce comptable, elle, est établie et
+                détenue par Stripe.
               </p>
             </div>
 
@@ -164,7 +170,44 @@ export function PolitiqueConfidentialitePage() {
                 <li>• Réponses sauvegardées en banque</li>
               </ul>
               <p className="text-sm text-gray-600 mt-3 bg-teal-50 p-2 rounded">
-                <strong>Finalité :</strong> Amélioration des réponses
+                <strong>Accès :</strong> l'assistant documentaire est actuellement réservé au
+                compte administrateur et n'est pas proposé aux utilisateurs.
+              </p>
+            </div>
+
+            {/* Newsletter */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <Mail className="w-4 h-4 mr-2 text-rose-600" />
+                Abonnement à la newsletter
+              </h3>
+              <ul className="text-gray-700 space-y-2">
+                <li>• Votre adresse e-mail</li>
+                <li>• L'état de votre abonnement</li>
+              </ul>
+              <p className="text-sm text-gray-600 mt-3 bg-rose-50 p-2 rounded">
+                <strong>Base légale :</strong> votre consentement, donné en activant l'option dans
+                vos réglages. L'abonnement est <strong>désactivé par défaut</strong> et se retire à
+                tout moment, depuis vos réglages ou depuis le lien de désabonnement présent dans
+                chaque envoi.
+              </p>
+            </div>
+
+            {/* Preuve de consentement */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <Shield className="w-4 h-4 mr-2 text-gray-600" />
+                Preuve de vos choix de cookies
+              </h3>
+              <ul className="text-gray-700 space-y-2">
+                <li>• Les préférences que vous avez retenues</li>
+                <li>• La date du choix et un identifiant technique de session</li>
+                <li>• Le navigateur utilisé et la page depuis laquelle le choix a été fait</li>
+              </ul>
+              <p className="text-sm text-gray-600 mt-3 bg-gray-50 p-2 rounded">
+                <strong>Finalité :</strong> pouvoir démontrer que votre choix a bien été recueilli,
+                comme l'exige l'article 7.1 du RGPD. Cet enregistrement ne sert à rien d'autre : il
+                n'alimente aucune mesure d'audience ni aucun profilage.
               </p>
             </div>
           </div>
@@ -275,6 +318,46 @@ export function PolitiqueConfidentialitePage() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">✉️ Resend</h3>
+              <p className="text-gray-700 mb-2">
+                Si vous êtes abonné à la newsletter, votre adresse e-mail est transmise à Resend
+                pour l'acheminement des envois. Aucun autre contenu de votre compte ne lui est
+                communiqué.
+              </p>
+              <p className="text-gray-600 text-sm">
+                <strong>Retrait :</strong> vous pouvez vous désabonner à tout moment depuis vos
+                réglages ou depuis le lien présent dans chaque envoi ; votre adresse cesse alors
+                d'être transmise.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">💾 GitHub (groupe Microsoft)</h3>
+              <p className="text-gray-700 mb-2">
+                Une sauvegarde complète de la base de données est réalisée chaque nuit et conservée
+                chez GitHub, aux États-Unis, afin de pouvoir restaurer le service après un
+                incident. Elle contient donc une copie de vos données.
+              </p>
+              <p className="text-gray-600 text-sm">
+                <strong>Garantie :</strong> la sauvegarde est <strong>chiffrée avant tout
+                envoi</strong> — GitHub héberge un fichier qu'il ne peut pas lire. Elle est
+                conservée 90 jours, puis supprimée automatiquement.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-3">🌐 Netlify</h3>
+              <p className="text-gray-700 mb-2">
+                Netlify héberge le site lui-même (pages et fichiers de l'application) et reçoit à
+                ce titre les données techniques inhérentes à toute connexion web.
+              </p>
+              <p className="text-gray-600 text-sm">
+                Aucun contenu de votre compte n'est stocké chez Netlify : il réside dans la base
+                Supabase.
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">🏢 Supabase</h3>
               <p className="text-gray-700 mb-2">
                 Hébergement sécurisé de la base de données et des documents importés (serveurs en Europe).
@@ -291,46 +374,81 @@ export function PolitiqueConfidentialitePage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
             5. Durée de conservation
           </h2>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+            <h3 className="font-semibold text-gray-900 mb-2">
+              🗑️ La suppression de votre compte est immédiate
+            </h3>
+            <p className="text-gray-700">
+              Vous pouvez supprimer votre compte vous-même, à tout moment, depuis vos{' '}
+              <strong>réglages</strong>. La suppression est <strong>immédiate et
+              irréversible</strong> : votre compte, vos contenus enregistrés et vos documents
+              importés sont effacés sans délai ni demande préalable à nous adresser.
+            </p>
+          </div>
+
           <div className="bg-gray-50 rounded-lg p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">📝 Contenu créé</h3>
                 <p className="text-gray-700 text-sm">
-                  Conservé tant que votre compte est actif + 1 an après suppression du compte
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">💰 Données de paiement</h3>
-                <p className="text-gray-700 text-sm">
-                  Conservées 10 ans pour obligations comptables et fiscales
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">📊 Logs techniques</h3>
-                <p className="text-gray-700 text-sm">
-                  Supprimés automatiquement après 12 mois
-                </p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">🔐 Données d'authentification</h3>
-                <p className="text-gray-700 text-sm">
-                  Supprimées immédiatement lors de la suppression du compte
+                  Appréciations, séances, scénarios, synthèses et banques personnelles : conservés
+                  tant que votre compte existe, effacés avec lui.
                 </p>
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">📄 Documents importés</h3>
                 <p className="text-gray-700 text-sm">
-                  Conservés tant que votre compte est actif. Supprimés sous 30 jours après suppression du compte.
+                  Conservés tant que votre compte existe, effacés avec lui.
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">💬 Historique de l'assistant documentaire</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">🔐 Compte et authentification</h3>
                 <p className="text-gray-700 text-sm">
-                  Conversations conservées 12 mois, puis anonymisées ou supprimées.
+                  Supprimés immédiatement lors de la suppression du compte.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">💬 Communications générées</h3>
+                <p className="text-gray-700 text-sm">
+                  Jamais conservées : elles n'existent que le temps de votre session.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">🎙️ Enregistrements de dictée</h3>
+                <p className="text-gray-700 text-sm">
+                  Jamais conservés : transmis pour transcription, puis supprimés. Seul le texte
+                  transcrit vous est restitué.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">💰 Historique d'achat</h3>
+                <p className="text-gray-700 text-sm">
+                  La copie que nous en conservons — montants, dates, identifiants de transaction —
+                  est effacée avec votre compte. Les pièces comptables correspondantes restent
+                  détenues par Stripe et figurent dans notre comptabilité, que la loi nous impose
+                  de conserver 10 ans : cette obligation-là ne dépend pas de nous et survit à la
+                  suppression de votre compte.
                 </p>
               </div>
             </div>
           </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
+            <h3 className="font-semibold text-gray-900 mb-3">
+              💾 Le cas des sauvegardes : jusqu'à 90 jours
+            </h3>
+            <p className="text-gray-700 mb-3">
+              Une sauvegarde chiffrée de la base est réalisée chaque nuit et conservée 90 jours,
+              afin de pouvoir rétablir le service après un incident. Une donnée que vous supprimez
+              aujourd'hui disparaît immédiatement du service, mais peut subsister jusqu'à 90 jours
+              dans ces sauvegardes, le temps que celles qui la contiennent expirent.
+            </p>
+            <p className="text-gray-600 text-sm">
+              Ces sauvegardes ne sont jamais consultées dans le cours normal du service : elles ne
+              sont déchiffrées qu'en cas de restauration après incident.
+            </p>
+          </div>
+
         </section>
 
         {/* Droits des utilisateurs */}
@@ -392,8 +510,10 @@ export function PolitiqueConfidentialitePage() {
               avec votre demande. Nous vous répondrons sous 30 jours.
             </p>
             <p className="text-gray-600 text-sm">
-              💡 <strong>Astuce :</strong> Vous pouvez aussi gérer la plupart de vos données directement depuis votre dashboard ProfAssist, 
-              Pour supprimer les documents que vous aviez importés, écrivez-nous : nous procédons à l'effacement sous 30 jours.
+              💡 <strong>Astuce :</strong> l'essentiel se fait sans nous écrire. Vos contenus se
+              gèrent depuis votre tableau de bord, et la suppression complète de votre compte — avec
+              vos contenus et vos documents importés — s'effectue en autonomie depuis vos réglages,
+              avec effet immédiat.
             </p>
           </div>
         </section>
@@ -436,7 +556,7 @@ export function PolitiqueConfidentialitePage() {
               <li>• <strong>Isolation :</strong> Chaque utilisateur a son propre espace de stockage isolé</li>
               <li>• <strong>Accès :</strong> Vos documents ne sont accessibles qu'à vous via votre session authentifiée</li>
               <li>• <strong>Chiffrement :</strong> Documents stockés de manière chiffrée sur les serveurs Supabase</li>
-              <li>• <strong>Suppression :</strong> Sur simple demande à contact-profassist@teachtech.fr, effacement sous 30 jours</li>
+              <li>• <strong>Suppression :</strong> immédiate, depuis vos réglages, en même temps que votre compte</li>
             </ul>
           </div>
           
@@ -469,22 +589,26 @@ export function PolitiqueConfidentialitePage() {
             </div>
             
             <div className="bg-blue-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">📊 Cookies analytiques (optionnels)</h3>
-              <ul className="text-gray-700 space-y-1 mb-3">
-                <li>• Mesures d'audience anonymes</li>
-                <li>• Statistiques d'utilisation</li>
-                <li>• Amélioration de l'expérience utilisateur</li>
-              </ul>
+              <h3 className="font-semibold text-gray-900 mb-3">🚫 Aucune mesure d'audience, aucune publicité</h3>
+              <p className="text-gray-700 mb-3">
+                ProfAssist n'utilise <strong>aucun outil de mesure d'audience</strong> (ni Google
+                Analytics, ni équivalent) et <strong>aucune régie publicitaire</strong>. Votre
+                navigation sur le site n'est transmise à aucun tiers et ne fait l'objet d'aucun
+                profilage.
+              </p>
               <p className="text-gray-600 text-sm">
-                Vous pouvez refuser ces cookies sans impact sur le fonctionnement du site.
+                Les statistiques d'usage que nous consultons sont calculées sur notre propre base
+                de données, à partir du nombre de générations effectuées — jamais à partir de votre
+                navigation.
               </p>
             </div>
           </div>
           
           <div className="bg-amber-50 rounded-lg p-4 mt-4">
             <p className="text-gray-700 text-sm">
-              💡 <strong>Gestion des cookies :</strong> Vous pouvez modifier vos préférences à tout moment 
-              depuis les paramètres de votre navigateur ou nous contacter.
+              💡 <strong>Gestion des cookies :</strong> Vous pouvez modifier vos préférences à tout moment
+              depuis la page <a href="/legal/cookies" className="text-blue-600 hover:text-blue-700 underline">Gestion des cookies</a>,
+              accessible en bas de chaque page du site.
             </p>
           </div>
         </section>

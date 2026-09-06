@@ -1,6 +1,6 @@
 // src/components/CookieBanner.tsx
 import React, { useState } from 'react';
-import { X, Settings, Shield, BarChart3, Target, Sliders, RotateCcw } from 'lucide-react';
+import { X, Settings, Shield, Sliders, RotateCcw } from 'lucide-react';
 import { useCookieConsent, CookieConsent } from '../contexts/CookieConsentContext';
 import { Link } from 'react-router-dom';
 
@@ -48,8 +48,6 @@ export function CookieBanner() {
   const handleReset = () => {
     const defaultConsent: CookieConsent = {
       necessary: true,
-      analytics: false,
-      advertising: false,
       functional: false,
     };
     setLocalConsent(defaultConsent);
@@ -59,8 +57,6 @@ export function CookieBanner() {
   const handleAcceptAll = () => {
     const fullConsent: CookieConsent = {
       necessary: true,
-      analytics: true,
-      advertising: true,
       functional: true,
     };
     updateConsent(fullConsent);
@@ -69,8 +65,6 @@ export function CookieBanner() {
   const handleAcceptNecessaryOnly = () => {
     const minimalConsent: CookieConsent = {
       necessary: true,
-      analytics: false,
-      advertising: false,
       functional: false,
     };
     updateConsent(minimalConsent);
@@ -80,8 +74,6 @@ export function CookieBanner() {
   const handleAcceptAllDetailed = () => {
     const fullConsent: CookieConsent = {
       necessary: true,
-      analytics: true,
-      advertising: true,
       functional: true,
     };
     setLocalConsent(fullConsent);
@@ -90,8 +82,6 @@ export function CookieBanner() {
   const handleAcceptNecessaryOnlyDetailed = () => {
     const minimalConsent: CookieConsent = {
       necessary: true,
-      analytics: false,
-      advertising: false,
       functional: false,
     };
     setLocalConsent(minimalConsent);
@@ -105,22 +95,6 @@ export function CookieBanner() {
       icon: Shield,
       required: true,
       examples: 'Session utilisateur, préférences de sécurité, tokens d\'authentification'
-    },
-    {
-      key: 'analytics' as keyof CookieConsent,
-      title: 'Cookies analytiques',
-      description: 'Nous aident à comprendre comment vous utilisez notre site pour l\'améliorer',
-      icon: BarChart3,
-      required: false,
-      examples: 'Google Analytics, mesures d\'audience anonymes, statistiques de navigation'
-    },
-    {
-      key: 'advertising' as keyof CookieConsent,
-      title: 'Cookies publicitaires',
-      description: 'Permettent de personnaliser les publicités et mesurer leur efficacité',
-      icon: Target,
-      required: false,
-      examples: 'Google Ads, remarketing, mesure des conversions publicitaires'
     },
     {
       key: 'functional' as keyof CookieConsent,

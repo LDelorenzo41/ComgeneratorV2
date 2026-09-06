@@ -42,6 +42,12 @@ export interface AppreciationFormFields {
   maxLength: number;
   tone: AppreciationTone;
   addressMode: AddressMode;  // ✅ AJOUT
+  /**
+   * Anonymat : interdit de citer le prénom dans le texte généré.
+   * Optionnel et faux par défaut — absent = comportement historique.
+   * Orthogonal au mode d'adresse : combinable avec les trois.
+   */
+  hideStudentName?: boolean;
 }
 
 export interface SavedAppreciation {

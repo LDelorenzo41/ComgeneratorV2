@@ -7,7 +7,7 @@ export function CguPage() {
   return (
     <LegalLayout 
       title="Conditions générales d'utilisation" 
-      lastUpdated="17 août 2026"
+      lastUpdated="6 septembre 2026"
 
     >
       <div className="space-y-8">
@@ -57,7 +57,9 @@ export function CguPage() {
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">🤖 "Services d'IA"</h3>
                 <p className="text-gray-700 text-sm">
-                  Génération d'appréciations, synthèses, communications, séances pédagogiques et scénarios pédagogiques.
+                  Génération d'appréciations, synthèses de bulletins, communications, séances
+                  pédagogiques, scénarios pédagogiques et supports pédagogiques, ainsi que la
+                  transcription de la dictée vocale.
                 </p>
               </div>
               <div>
@@ -87,7 +89,10 @@ export function CguPage() {
                 <li>• <strong>Communications professionnelles :</strong> Rédaction d'emails, courriers et messages aux parents</li>
                 <li>• <strong>Séances pédagogiques :</strong> Création de fiches de préparation de cours</li>
                 <li>• <strong>Scénarios pédagogiques :</strong> Planification de séquences complètes avec objectifs, attendus et prérequis par séance</li>
-                                <li>• <strong>Banques de données :</strong> Stockage et recherche de vos contenus (appréciations, séances, scénarios)</li>
+                <li>• <strong>Supports pédagogiques :</strong> Génération d'exercices et de supports à partir d'une phase de séance</li>
+                <li>• <strong>Dictée vocale :</strong> Transcription de votre voix pour renseigner un formulaire sans le saisir</li>
+                <li>• <strong>Ressources éducatives :</strong> Veille documentaire par flux d'actualité sélectionnés</li>
+                <li>• <strong>Banques de données :</strong> Stockage et recherche de vos contenus (appréciations, séances, scénarios)</li>
                 <li>• <strong>Gestion des tokens :</strong> Système de crédits pour l'utilisation des services d'IA</li>
               </ul>
             </div>
@@ -146,7 +151,7 @@ export function CguPage() {
               <ul className="text-gray-700 space-y-1 text-sm">
                 <li>• Maintenances programmées (notification préalable)</li>
                 <li>• Interruptions techniques imprévisibles</li>
-                <li>• Limitations liées aux services tiers (OpenAI, Stripe)</li>
+                <li>• Limitations liées aux services tiers (OpenAI, Mistral AI, Stripe)</li>
               </ul>
             </div>
           </div>
@@ -170,13 +175,18 @@ export function CguPage() {
                 <div className="bg-white rounded-lg p-4">
                   <h4 className="font-semibold text-gray-900 mb-2">💰 Consommation moyenne</h4>
                   <ul className="text-gray-700 text-sm space-y-1">
-                    <li>• Appréciation : ~3000 tokens</li>
-                    <li>• Synthèse : ~1800 tokens</li>
-                    <li>• Communication : ~1000 tokens</li>
-                    <li>• Séance : ~3500 tokens</li>
-                    <li>• Scénario pédagogique : 8 000 à 10 000+ tokens</li>
-                    
+                    <li>• Appréciation : ~3 000 tokens</li>
+                    <li>• Synthèse : ~1 800 tokens</li>
+                    <li>• Communication : 1 000 à 2 000 tokens</li>
+                    <li>• Rapport / dossier : 2 000 à 4 000 tokens</li>
+                    <li>• Séance : 5 000 à 6 000 tokens</li>
+                    <li>• Support pédagogique : 1 000 tokens (forfait)</li>
+                    <li>• Scénario pédagogique : 6 000 à 14 000 tokens</li>
+                    <li>• Dictée vocale : ~100 tokens par minute</li>
                   </ul>
+                  <p className="text-gray-600 text-xs mt-2">
+                    Ces estimations sont celles affichées sur la page d'achat.
+                  </p>
                 </div>
                 
                 <div className="bg-white rounded-lg p-4">
@@ -254,7 +264,13 @@ export function CguPage() {
             <ul className="text-gray-700 space-y-2">
               <li>• Vérifiez toujours le contenu généré avant utilisation</li>
               <li>• Personnalisez les résultats selon vos élèves</li>
-              <li>• Respectez la confidentialité des données de vos élèves</li>
+              <li>
+                • Respectez la confidentialité des données de vos élèves. Deux dispositifs vous y
+                aident : l'option <strong>« Ne pas citer le prénom »</strong> du générateur
+                d'appréciations, qui produit un texte anonyme ; et, pour les synthèses de bulletins,
+                la recommandation de ne capturer que les commentaires des professeurs, à l'exclusion
+                des données personnelles de l'élève
+              </li>
               <li>• Utilisez ProfAssist comme un assistant, pas un remplaçant</li>
                           </ul>
           </div>
@@ -294,6 +310,12 @@ export function CguPage() {
             
             <div className="bg-purple-50 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">📝 Documents que vous avez importés</h3>
+              <p className="text-gray-700 text-sm mb-3 bg-white p-3 rounded">
+                <strong>À noter :</strong> l'import de documents et l'assistant documentaire qui
+                s'appuie dessus sont actuellement réservés au compte administrateur et ne sont pas
+                proposés aux utilisateurs. Les clauses ci-dessous s'appliquent aux documents déjà
+                importés, et vaudraient de nouveau si cette fonction était rouverte.
+              </p>
               <p className="text-gray-700 mb-3">
                 Vous restez propriétaire des documents que vous avez importés dans ProfAssist. 
                 Nous ne revendiquons aucun droit sur ces contenus.
@@ -416,7 +438,7 @@ export function CguPage() {
             <ul className="text-gray-700 space-y-1">
               <li>• Catastrophes naturelles</li>
               <li>• Actes gouvernementaux, guerres, troubles sociaux</li>
-              <li>• Défaillance majeure des services tiers (OpenAI, hébergeurs)</li>
+              <li>• Défaillance majeure des services tiers (OpenAI, Mistral AI, hébergeurs)</li>
               <li>• Cyberattaques d'envergure</li>
               <li>• Pannes généralisées d'infrastructure internet</li>
             </ul>

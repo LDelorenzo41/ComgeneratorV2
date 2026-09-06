@@ -8,8 +8,6 @@ import { supabase } from '../supabase';
 
 interface ConsentData {
   necessary: boolean;
-  analytics: boolean;
-  advertising: boolean;
   functional: boolean;
 }
 
@@ -223,8 +221,6 @@ export async function withdrawConsent(
 ): Promise<ConsentLogResponse> {
   const withdrawData: ConsentData = {
     necessary: true,
-    analytics: false,
-    advertising: false,
     functional: false,
   };
 

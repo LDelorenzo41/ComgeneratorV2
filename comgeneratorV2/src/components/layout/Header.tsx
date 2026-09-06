@@ -31,7 +31,6 @@ import useTokenBalance from '../../hooks/useTokenBalance';
 import { FEATURES, isChatbotVisible } from '../../lib/features';
 import { checkIsAdmin } from '../../lib/ragApi';
 import { RedeemCodeModal } from '../modals/RedeemCodeModal';
-import { useHasSubmittedFeedback } from '../../hooks/useHasSubmittedFeedback';
 
 // Event pour notifier les changements de tokens
 export const tokenUpdateEvent = new EventTarget();
@@ -45,7 +44,6 @@ export function Header() {
   const [isSettingsDropdownOpen, setIsSettingsDropdownOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isRedeemModalOpen, setIsRedeemModalOpen] = React.useState(false);
-  const { hasSubmitted: hasSubmittedFeedback } = useHasSubmittedFeedback();
   const location = useLocation();
 
   // États pour les 4 menus déroulants
@@ -469,14 +467,6 @@ Scénarios pédagogiques
                               <Megaphone className="w-4 h-4 mr-2" />
                               Campagnes promo
                             </Link>
-                            <Link
-                              to="/admin/feedback"
-                              className="flex items-center px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              onClick={() => setIsSettingsDropdownOpen(false)}
-                            >
-                              <ClipboardList className="w-4 h-4 mr-2" />
-                              Feedback testeurs
-                            </Link>
                             <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
                           </>
                         )}
@@ -493,22 +483,6 @@ Scénarios pédagogiques
                           <Gift className="w-4 h-4 mr-2" />
                           J'ai un code !
                         </button>
-
-                        {hasSubmittedFeedback ? (
-                          <span className="flex items-center px-4 py-2 text-sm text-gray-400 dark:text-gray-500 cursor-not-allowed">
-                            <ClipboardList className="w-4 h-4 mr-2" />
-                            Avis envoyé
-                          </span>
-                        ) : (
-                          <Link
-                            to="/feedback"
-                            className="flex items-center px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                            onClick={() => setIsSettingsDropdownOpen(false)}
-                          >
-                            <ClipboardList className="w-4 h-4 mr-2" />
-                            Donner votre avis
-                          </Link>
-                        )}
 
                         <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
 
@@ -803,14 +777,6 @@ Scénarios pédagogiques
                     <Megaphone className="h-5 w-5 mr-2" />
                     <span>Campagnes promo</span>
                   </Link>
-                  <Link
-                    to="/admin/feedback"
-                    className="flex items-center w-full px-3 py-2 text-base font-medium text-purple-600 dark:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <ClipboardList className="h-5 w-5 mr-2" />
-                    <span>Feedback testeurs</span>
-                  </Link>
                   <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
                 </>
               )}
@@ -827,22 +793,6 @@ Scénarios pédagogiques
                 <Gift className="h-5 w-5 mr-2" />
                 <span>J'ai un code !</span>
               </button>
-
-              {hasSubmittedFeedback ? (
-                <span className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed rounded-md">
-                  <ClipboardList className="h-5 w-5 mr-2" />
-                  <span>Avis envoyé</span>
-                </span>
-              ) : (
-                <Link
-                  to="/feedback"
-                  className="flex items-center w-full px-3 py-2 text-base font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <ClipboardList className="h-5 w-5 mr-2" />
-                  <span>Donner votre avis</span>
-                </Link>
-              )}
 
               <div className="border-t border-gray-200 dark:border-gray-600 my-2 mx-3"></div>
 

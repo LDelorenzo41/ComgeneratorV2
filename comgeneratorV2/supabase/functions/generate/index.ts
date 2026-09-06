@@ -305,6 +305,28 @@ const generateHandler = async (req) => {
       });
     }
 
+    // ✅ ANONYMAT : le prénom ne doit pas apparaître dans le texte généré.
+    // Absent ou faux = comportement historique, prompt inchangé au caractère près.
+    // Option transversale : combinable avec les trois modes d'adresse.
+    const hideStudentName = params.hideStudentName === true;
+
+    // Bloc de contrainte inséré dans le prompt utilisateur (vide si option décochée)
+    const anonymityConstraint = hideStudentName ? `
+**⚠️ CONTRAINTE CRITIQUE #2 - ANONYMAT (PRIORITÉ ABSOLUE) :**
+Le prénom de l'élève ne doit JAMAIS apparaître dans le texte que tu produis :
+- Le prénom t'est fourni UNIQUEMENT pour accorder correctement en genre ("elle"/"il", "attentive"/"attentif")
+- Tu ne dois l'écrire NULLE PART : ni dans la version détaillée, ni dans la version synthétique
+- INTERDIT également : nom de famille, initiales, surnom, ou toute périphrase identifiante
+- Désigne l'élève selon le mode d'adresse imposé ci-dessus ("tu", "vous", ou "l'élève"/"il"/"elle")
+- Cette règle s'applique à CHAQUE phrase sans exception.
+` : '';
+
+    // Règle correspondante dans le system prompt (vide si option décochée)
+    const anonymitySystemRule = hideStudentName ? `
+⚠️ RÈGLE ABSOLUE #1 bis - ANONYMAT :
+Le prénom de l'élève ne doit apparaître NULLE PART dans le texte. Il t'est communiqué uniquement pour les accords en genre. Écrire le prénom, le nom, les initiales ou un surnom est une ERREUR CRITIQUE.
+` : '';
+
     const criteriaText = formatCriteriaForPrompt(params.criteria);
 
     const toneDescriptions = {
@@ -323,8 +345,8 @@ const generateHandler = async (req) => {
     const prompt = `Tu es un enseignant expérimenté, expert en évaluation pédagogique et en rédaction d'appréciations de bulletins scolaires. Tu maîtrises parfaitement les enjeux de l'évaluation formative et les codes de communication avec les élèves et leurs familles.
 
 **⚠️ CONTRAINTE CRITIQUE #1 - MODE D'ADRESSE (PRIORITÉ ABSOLUE) :**
-${getAddressModeInstructions(params.addressMode, params.studentName)}
-
+${getAddressModeInstructions(params.addressMode, params.studentName, hideStudentName)}
+${anonymityConstraint}
 **⚠️ CONTRAINTES CRITIQUES DE LONGUEUR (IMPÉRATIF ABSOLU) :**
 - Version détaillée : EXACTEMENT entre ${params.minLength} et ${params.maxLength} caractères (espaces compris)
 - Version synthétique : EXACTEMENT entre ${Math.floor(params.maxLength * 0.35)} et ${Math.floor(params.maxLength * 0.45)} caractères (espaces compris)
@@ -336,7 +358,7 @@ ${getAddressModeInstructions(params.addressMode, params.studentName)}
 **CONTEXTE PÉDAGOGIQUE :**
 
 **MATIÈRE ENSEIGNÉE :** ${params.subject}
-**ÉLÈVE ÉVALUÉ :** ${params.studentName}
+**ÉLÈVE ÉVALUÉ :** ${params.studentName}${hideStudentName ? " — prénom fourni pour les accords en genre UNIQUEMENT, à ne JAMAIS écrire dans l'appréciation" : ''}
 **TON REQUIS :** ${toneDescriptions[params.tone]}
 **MODE D'ADRESSE IMPOSÉ :** ${addressModeDescriptions[params.addressMode]}
 
@@ -355,7 +377,7 @@ ${params.personalNotes || "Aucune observation particulière"}
    - Établis des **liens pédagogiques** entre les différents critères évalués
 
 2. **Adaptation au profil de l'élève :**
-   - Personnalise l'appréciation en utilisant le prénom de ${params.studentName}
+   - ${hideStudentName ? "Ne cite JAMAIS le prénom : personnalise par le contenu (critères évalués, progrès, conseils), jamais par le nom" : `Personnalise l'appréciation en utilisant le prénom de ${params.studentName}`}
    - Adapte le vocabulaire au niveau scolaire (collège/lycée)
    - Contextualise les remarques selon la discipline ${params.subject}
    - Intègre les observations personnelles du professeur de manière naturelle
@@ -506,7 +528,7 @@ ${getToneInstructionsForAppreciation(params.tone)}
    - Les critères "Normal" sont **mentionnés** de manière équilibrée
 
 **PROCESSUS DE VÉRIFICATION OBLIGATOIRE :**
-1. VÉRIFIE d'abord que tu respectes le mode d'adresse : ${addressModeDescriptions[params.addressMode]}
+1. VÉRIFIE d'abord que tu respectes le mode d'adresse : ${addressModeDescriptions[params.addressMode]}${hideStudentName ? "\n1 bis. VÉRIFIE qu'aucune occurrence du prénom de l'élève n'apparaît dans tes deux versions" : ''}
 2. IDENTIFIE les critères de RÉSULTATS et les critères ACTIONNABLES dans la liste fournie
 3. Si des résultats sont faibles ET qu'il existe des critères actionnables faibles : FAIS LE LIEN explicite
 4. N'INVENTE JAMAIS de causes non présentes dans les critères évalués
@@ -517,10 +539,10 @@ ${getToneInstructionsForAppreciation(params.tone)}
 9. Si une version dépasse les limites : RACCOURCIS immédiatement
 10. Si une version est trop courte : DÉVELOPPE avec plus de détails
 11. VÉRIFIE UNE SECONDE FOIS que les longueurs respectent les contraintes
-12. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase
+12. VÉRIFIE UNE DERNIÈRE FOIS le mode d'adresse dans CHAQUE phrase${hideStudentName ? "\n13. VÉRIFIE UNE DERNIÈRE FOIS qu'aucune occurrence du prénom ne subsiste dans les deux versions" : ''}
 
 **CONSIGNES DE FINALISATION :**
-- **Respect ABSOLU** du mode d'adresse ${addressModeDescriptions[params.addressMode]}
+- **Respect ABSOLU** du mode d'adresse ${addressModeDescriptions[params.addressMode]}${hideStudentName ? "\n- **Anonymat ABSOLU** : le prénom de l'élève n'apparaît nulle part" : ''}
 - **Respect ABSOLU** des limites de caractères imposées
 - **Vocabulaire adapté** au type de compétence (disciplinaire/comportementale/méthodologique)
 - **Analyse causale STRICTE** : liens uniquement avec critères évalués, pas d'invention
@@ -537,7 +559,7 @@ Version détaillée :
 
 [Rédige ici l'appréciation synthétique respectant STRICTEMENT ${Math.floor(params.maxLength * 0.35)}-${Math.floor(params.maxLength * 0.45)} caractères]
 
-⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE, les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom.`;
+⚠️ RAPPEL FINAL : Le mode d'adresse ${addressModeDescriptions[params.addressMode]} est une CONTRAINTE ABSOLUE,${hideStudentName ? " l'anonymat (aucune occurrence du prénom) est une CONTRAINTE ABSOLUE," : ''} les contraintes de longueur sont CRITIQUES, le vocabulaire doit être adapté au type de compétence évaluée, l'analyse causale doit se limiter STRICTEMENT aux critères évalués (pas d'invention), et la grammaire pour niveau/résultats/notes doit placer l'adjectif AVANT le nom.`;
 
     // ✅ Calculer le nombre de tokens selon le modèle
     let tokenLimit;
@@ -559,7 +581,7 @@ Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compr�
 
 ⚠️ RÈGLE ABSOLUE #1 - MODE D'ADRESSE :
 ${getSystemAddressModeMessage(params.addressMode)}
-
+${anonymitySystemRule}
 RÈGLE #2 : Tu dois ABSOLUMENT ignorer tous les critères marqués comme "Non évalué" et ne jamais les mentionner dans l'appréciation.
 
 RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposées et utiliser un vocabulaire adapté selon le type de compétence (disciplinaire, comportementale, méthodologique).
@@ -694,6 +716,20 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
     // ✅ Nettoyer les sorties avec la fonction améliorée
     detailed = cleanOutputText(detailed);
     summary = cleanOutputText(summary);
+
+    // ✅ ANONYMAT — filet déterministe, appliqué AVANT le contrôle des longueurs
+    // pour que la troncature travaille sur le texte définitif.
+    if (hideStudentName) {
+      const detailedAnon = stripStudentName(detailed, params.studentName);
+      const summaryAnon = stripStudentName(summary, params.studentName);
+      if (detailedAnon !== detailed || summaryAnon !== summary) {
+        // Aucun contenu généré n'est journalisé : uniquement le fait qu'un
+        // rattrapage a eu lieu, utile pour surveiller la fiabilité du prompt.
+        console.log('Anonymat : occurrence(s) du prénom rattrapée(s) par le filet déterministe');
+      }
+      detailed = detailedAnon;
+      summary = summaryAnon;
+    }
 
     // ✅ VALIDATION ET CORRECTION AUTOMATIQUE DES LONGUEURS
     const detailedLength = detailed.length;
@@ -878,21 +914,34 @@ function getToneInstructionsForAppreciation(tone) {
   }
 }
 
-function getAddressModeInstructions(addressMode, studentName) {
+function getAddressModeInstructions(addressMode, studentName, hideStudentName: boolean) {
+  // Ajout à la liste des INTERDIT quand l'anonymat est demandé ; chaîne vide
+  // sinon, de sorte que le prompt reste identique au caractère près.
+  const nameBan = hideStudentName ? ", ainsi que le prénom de l'élève" : '';
+
   switch (addressMode) {
     case "tutoiement":
       return `Tu DOIS ABSOLUMENT utiliser le TUTOIEMENT dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "tu", "te", "t'", "ton", "ta", "tes"
 - Exemples corrects : "Tu montres", "Ton travail", "Tu dois", "Tes efforts"
-- INTERDIT : "vous", "votre", "vos", "l'élève", "il/elle"
+- INTERDIT : "vous", "votre", "vos", "l'élève", "il/elle"${nameBan}
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
     case "vouvoiement":
       return `Tu DOIS ABSOLUMENT utiliser le VOUVOIEMENT dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "vous", "votre", "vos"
 - Exemples corrects : "Vous montrez", "Votre travail", "Vous devez", "Vos efforts"
-- INTERDIT : "tu", "te", "ton", "ta", "tes", "l'élève", "il/elle"
+- INTERDIT : "tu", "te", "ton", "ta", "tes", "l'élève", "il/elle"${nameBan}
 - Cette règle s'applique à CHAQUE phrase sans exception.`;
     case "impersonnel":
+      // En mode anonyme, le prénom sort de la liste des désignations autorisées
+      // et l'exemple qui l'employait est retiré.
+      if (hideStudentName) {
+        return `Tu DOIS ABSOLUMENT utiliser une FORMULATION IMPERSONNELLE dans TOUTE l'appréciation :
+- Utilise UNIQUEMENT : "l'élève", "il", "elle", "son", "sa", "ses"
+- Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts"
+- INTERDIT : "tu", "te", "ton", "ta", "tes", "vous", "votre", "vos", ainsi que le prénom de l'élève
+- Cette règle s'applique à CHAQUE phrase sans exception.`;
+      }
       return `Tu DOIS ABSOLUMENT utiliser une FORMULATION IMPERSONNELLE dans TOUTE l'appréciation :
 - Utilise UNIQUEMENT : "l'élève", "il", "elle", "son", "sa", "ses", le prénom de l'élève
 - Exemples corrects : "L'élève montre", "Son travail", "Elle doit", "Ses efforts", "${studentName} démontre"
@@ -914,6 +963,77 @@ function getSystemAddressModeMessage(addressMode) {
     default:
       return `Utilise le tutoiement par défaut.`;
   }
+}
+
+/**
+ * Vrai si la position `offset` dans `full` est un début de phrase.
+ * Sert à savoir si le remplacement doit porter une majuscule.
+ */
+function isSentenceStart(full: string, offset: number): boolean {
+  return /(?:^|[.!?:;»"]\s*|\n\s*)$/.test(full.slice(0, offset));
+}
+
+/**
+ * FILET DÉTERMINISTE D'ANONYMAT.
+ *
+ * Les consignes de prompt ne sont pas respectées à 100 % par les modèles. Sur
+ * une fonction d'anonymat une fuite est immédiatement visible par l'utilisateur :
+ * on retire donc ici, de façon déterministe, toute occurrence résiduelle du
+ * prénom dans le texte produit.
+ *
+ * N'est appelée QUE lorsque l'option « Ne pas citer le prénom » est cochée :
+ * le chemin historique n'exécute pas une ligne de ce code.
+ *
+ * Volontairement minimal : on REMPLACE, on ne supprime jamais. Supprimer le
+ * prénom et sa ponctuation adjacente produirait des phrases cassées dès que la
+ * virgule n'est pas vocative (« le travail de Léa, régulier, … »). Remplacer
+ * par « l'élève » reste toujours grammatical, au prix d'une formulation parfois
+ * un peu raide en tutoiement — texte que l'utilisateur peut éditer.
+ *
+ * Deux règles, appliquées du candidat le plus long au plus court
+ * (« Jean-Baptiste » avant « Jean », sinon un prénom composé donnerait
+ * « l'élève-l'élève ») :
+ *   1. élision          « le travail d'Émile » → « le travail de l'élève »
+ *   2. occurrence nue   « Léa progresse »      → « L'élève progresse »
+ */
+function stripStudentName(text: string, studentName: string): string {
+  if (!text || !studentName) return text;
+
+  const candidates = Array.from(new Set([
+    studentName.trim(),
+    ...studentName.trim().split(/[\s'’\-]+/)
+  ]))
+    .filter((c: string) => c.length >= 2)
+    .sort((a: string, b: string) => b.length - a.length);
+
+  // Bornes par propriété Unicode : \b est inopérant devant une majuscule
+  // accentuée (« Émile »), car « É » n'appartient pas à \w.
+  const BEFORE = '(?<![\\p{L}\\p{N}])';
+  const AFTER = '(?![\\p{L}\\p{N}])';
+
+  let out = text;
+
+  for (const candidate of candidates) {
+    const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // 1. Élision, traitée en premier pour que « d'Émile » ne laisse pas un
+    //    « d'l'élève » derrière lui.
+    out = out.replace(
+      new RegExp(`${BEFORE}d['’]${escaped}${AFTER}`, 'giu'),
+      (_match: string, offset: number, full: string) =>
+        isSentenceStart(full, offset) ? "De l'élève" : "de l'élève"
+    );
+
+    // 2. Occurrence nue. Aucune borne sur l'apostrophe en amont : mieux vaut un
+    //    « l'l'élève » disgracieux qu'un prénom qui fuite.
+    out = out.replace(
+      new RegExp(`${BEFORE}${escaped}${AFTER}`, 'giu'),
+      (_match: string, offset: number, full: string) =>
+        isSentenceStart(full, offset) ? "L'élève" : "l'élève"
+    );
+  }
+
+  return out;
 }
 
 Deno.serve(generateHandler);

@@ -5,18 +5,8 @@ import { logConsent, getOrCreateSessionId } from '../lib/api/consent';
 import { safeStorage } from '../lib/storage/safeStorage';
 import { useAuthStore } from '../lib/store';
 
-// Types pour Google Analytics/Ads
-declare global {
-  interface Window {
-    dataLayer: any[];
-    gtag: (...args: any[]) => void;
-  }
-}
-
 export type CookieConsent = {
   necessary: boolean;      // Toujours true (obligatoires)
-  analytics: boolean;      // Google Analytics
-  advertising: boolean;    // Google Ads
   functional: boolean;     // Préférences utilisateur
 };
 
@@ -39,8 +29,6 @@ const CookieConsentContext = createContext<CookieConsentContextType | undefined>
 // Valeurs par défaut
 const DEFAULT_CONSENT: CookieConsent = {
   necessary: true,
-  analytics: false,
-  advertising: false,
   functional: false,
 };
 
@@ -80,9 +68,6 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
           
           // Charger les scripts autorisés
           loadAuthorizedScripts(consentData.consent);
-          
-          // ✅ AJOUT : Mettre à jour Consent Mode avec les préférences sauvegardées
-          updateGoogleConsentMode(consentData.consent);
           return;
         }
       }
@@ -100,44 +85,11 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
 
   // Mettre à jour le statut basé sur le consentement
   const updateConsentStatus = (currentConsent: CookieConsent) => {
-    const optionalCookies = currentConsent.analytics || currentConsent.advertising || currentConsent.functional;
-    
-    if (optionalCookies && currentConsent.analytics && currentConsent.advertising && currentConsent.functional) {
-      setConsentStatus('given');
-    } else if (optionalCookies) {
-      setConsentStatus('partial');
-    } else {
-      setConsentStatus('denied');
-    }
+    // Une seule catégorie optionnelle subsiste : le statut est donc binaire.
+    // 'partial' n'est plus atteignable, mais reste dans le type ConsentStatus
+    // pour les enregistrements historiques de consent_logs.
+    setConsentStatus(currentConsent.functional ? 'given' : 'denied');
   };
-
-  // ============================================
-  // ✅ AJOUT : Fonction Google Consent Mode v2
-  // ============================================
-  /**
-   * Met à jour Google Consent Mode v2 selon les préférences utilisateur
-   */
-  const updateGoogleConsentMode = (consentData: CookieConsent) => {
-    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
-      window.gtag('consent', 'update', {
-        'analytics_storage': consentData.analytics ? 'granted' : 'denied',
-        'ad_storage': consentData.advertising ? 'granted' : 'denied',
-        'ad_user_data': consentData.advertising ? 'granted' : 'denied',
-        'ad_personalization': consentData.advertising ? 'granted' : 'denied',
-        'functionality_storage': consentData.functional ? 'granted' : 'denied',
-        'personalization_storage': consentData.functional ? 'granted' : 'denied',
-      });
-
-      console.log('✅ Google Consent Mode mis à jour:', {
-        analytics: consentData.analytics ? 'granted' : 'denied',
-        advertising: consentData.advertising ? 'granted' : 'denied',
-        functional: consentData.functional ? 'granted' : 'denied',
-      });
-    }
-  };
-  // ============================================
-  // FIN AJOUT
-  // ============================================
 
   // ✅ MODIFIÉ : Fonction saveConsent avec logging RGPD
   const saveConsent = async (newConsent: CookieConsent) => {
@@ -161,9 +113,6 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
       // Charger ou décharger les scripts selon le consentement
       loadAuthorizedScripts(newConsent);
       
-      // ✅ AJOUT : Mettre à jour Google Consent Mode
-      updateGoogleConsentMode(newConsent);
-      
       // ✅ AJOUT : Logging RGPD asynchrone (ne bloque pas l'UX)
       const action = !hasConsented ? 'grant' : 'update';
       
@@ -185,71 +134,9 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
 
   // Charger les scripts autorisés
   const loadAuthorizedScripts = (currentConsent: CookieConsent) => {
-    // Google Analytics
-    if (currentConsent.analytics) {
-      loadGoogleAnalytics();
-    }
-    
-    // Google Ads
-    if (currentConsent.advertising) {
-      loadGoogleAds();
-    }
-    
-    // Autres scripts fonctionnels
     if (currentConsent.functional) {
       loadFunctionalScripts();
     }
-  };
-
-  // Chargement Google Analytics
-  const loadGoogleAnalytics = () => {
-    if (window.gtag) return; // Déjà chargé
-    
-    const GA_ID = 'G-47T63MYM3K'; // Remplacez par votre ID GA4
-    
-    // Charger le script GA4
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
-    document.head.appendChild(script);
-    
-    // Initialiser gtag
-    window.dataLayer = window.dataLayer || [];
-    window.gtag = function() {
-      window.dataLayer.push(arguments);
-    };
-    window.gtag('js', new Date());
-    window.gtag('config', GA_ID, {
-      anonymize_ip: true,
-      cookie_flags: 'max-age=7200;secure;samesite=none'
-    });
-    
-    console.log('✅ Google Analytics chargé');
-  };
-
-  // Chargement Google Ads
-  const loadGoogleAds = () => {
-    const ADS_ID = 'AW-7580889075'; // Remplacez par votre ID Google Ads
-    
-    if (window.gtag) {
-      // Si gtag existe déjà (via Analytics), ajouter juste la config Ads
-      window.gtag('config', ADS_ID);
-    } else {
-      // Charger gtag pour Ads seulement
-      const script = document.createElement('script');
-      script.async = true;
-      script.src = `https://www.googletagmanager.com/gtag/js?id=${ADS_ID}`;
-      document.head.appendChild(script);
-      
-      window.dataLayer = window.dataLayer || [];
-      window.gtag = function() {
-        window.dataLayer.push(arguments);
-      };
-      window.gtag('js', new Date());
-      window.gtag('config', ADS_ID);
-    }
-    
-    console.log('✅ Google Ads chargé');
   };
 
   // Scripts fonctionnels (optionnel)
@@ -270,8 +157,6 @@ export function CookieConsentProvider({ children }: { children: React.ReactNode 
   const acceptAll = () => {
     const fullConsent: CookieConsent = {
       necessary: true,
-      analytics: true,
-      advertising: true,
       functional: true,
     };
     saveConsent(fullConsent);
