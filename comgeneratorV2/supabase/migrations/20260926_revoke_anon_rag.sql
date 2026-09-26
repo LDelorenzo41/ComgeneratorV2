@@ -1,0 +1,87 @@
+-- 20260926_revoke_anon_rag.sql
+--
+-- Retire aux visiteurs non connectés (rôle `anon`) tout accès aux deux tables
+-- de l'assistant documentaire : `rag_documents` et `rag_chunks`.
+--
+-- ============================================================================
+-- Constat, mesuré en production le 26/09/2026
+-- ============================================================================
+-- Mesure exécutée en tant que `anon` sur les 26 tables de `public` :
+--
+--     rag_chunks        3 944 lignes lisibles sans connexion
+--     rag_documents        58 lignes lisibles sans connexion
+--     24 autres tables      0 ligne, ou aucun accès
+--
+-- C'est l'intégralité du corpus global de l'assistant (58 documents, cf.
+-- mesures du 17/08) : titres, texte extrait, vecteurs. Les documents
+-- personnels des utilisateurs (scope = 'user') n'étaient pas lisibles.
+--
+-- Cause : les policies de lecture, créées depuis le dashboard et relevées dans
+-- 20260302_snapshot_rls_policies.sql, visent `TO public` — donc `anon`
+-- compris — avec la condition `auth.uid() = user_id OR scope = 'global'`, dont
+-- la seconde branche ne dépend pas de la connexion. Et `anon` conserve sur ces
+-- deux tables les droits par défaut historiques de Supabase. La clé `anon`
+-- étant publique (bundle Netlify), n'importe qui pouvait lire le corpus.
+--
+-- ============================================================================
+-- Pourquoi retirer `anon` ne casse rien (vérifié dans le code le 26/09/2026)
+-- ============================================================================
+-- Aucun chemin légitime ne lit ces tables sans session :
+--   * front : tous les accès passent par src/lib/ragApi.ts, appelé depuis des
+--     pages sous AuthLayout, ou depuis le bouton flottant de l'assistant, monté
+--     seulement pour un utilisateur connecté (`{user && …}` dans App.tsx).
+--     Header.tsx n'en importe que checkIsAdmin(), qui lit `profiles`. Aucune
+--     page publique ne lit de table ; aucun abonnement Realtime ;
+--   * Edge Functions (rag-chat, rag-ingest, rag-upload-sign, lessons,
+--     scenario) : accès par la clé service (`service_role`), non concernée.
+--     Leurs clients « au nom de l'utilisateur » ne servent qu'à auth.getUser().
+-- `authenticated` et `service_role` ne sont pas touchés : un utilisateur
+-- connecté voit toujours les documents globaux et les siens. Testé sur une
+-- base jetable reproduisant ces policies : visiteur refusé, utilisateur
+-- connecté inchangé, clé service inchangée, retour arrière opérant.
+--
+-- Choix : un REVOKE sur les tables plutôt qu'une réécriture des policies. Il
+-- ne dépend ni du nom ni du texte exact des policies de production (créées
+-- depuis le dashboard, non garanties depuis le relevé du 02/03), et tient en
+-- une instruction. Les policies `TO public` restent en place : sans droit sur
+-- la table, elles ne s'appliquent plus à `anon`.
+--
+-- Périmètre : ce script ferme la lecture DIRECTE des tables. Les fonctions de
+-- recherche (RPC) font l'objet d'une vérification séparée.
+
+REVOKE ALL ON public.rag_documents, public.rag_chunks FROM anon;
+
+-- ============================================================================
+-- Retour arrière
+-- ============================================================================
+--
+--     GRANT ALL ON public.rag_documents, public.rag_chunks TO anon;
+--
+-- ============================================================================
+-- Vérifications après application
+-- ============================================================================
+--
+-- 1. Droits — attendu : false / false
+--
+--        SELECT has_table_privilege('anon', 'public.rag_documents', 'SELECT') AS documents_publics,
+--               has_table_privilege('anon', 'public.rag_chunks', 'SELECT')    AS extraits_publics;
+--
+-- 2. Mesure d'exposition, en visiteur — attendu : aucune table au-dessus de 0 ;
+--    rag_documents et rag_chunks à NULL, comme credit_ledger et
+--    deleted_users_blacklist. Coller les deux instructions ensemble :
+--
+--        SET LOCAL ROLE anon;
+--        SELECT current_user AS "exécuté en tant que",
+--               c.relname AS "table",
+--               CASE WHEN has_table_privilege(c.oid, 'SELECT')
+--                    THEN (xpath('/row/n/text()',
+--                           query_to_xml(format('SELECT count(*) AS n FROM public.%I', c.relname),
+--                                        false, true, '')))[1]::text::int
+--               END AS "lignes lisibles sans connexion"
+--          FROM pg_class c
+--          JOIN pg_namespace n ON n.oid = c.relnamespace
+--         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')
+--         ORDER BY 3 DESC NULLS LAST, 2;
+--
+-- 3. Dans l'application, connecté en administrateur : l'assistant documentaire
+--    affiche toujours ses documents et répond à une question.

@@ -197,7 +197,8 @@ Pièges propres à ce projet :
   `deleted_users_blacklist`, 06/09/2026.
 - **Jamais de `GRANT … ON ALL TABLES IN SCHEMA public`** dans une nouvelle
   migration : il rouvrirait des restrictions volontaires (`credit_ledger` en
-  lecture seule pour `authenticated`, `anon` retiré de `deleted_users_blacklist`).
+  lecture seule pour `authenticated` ; `anon` retiré de `deleted_users_blacklist`,
+  `rag_documents` et `rag_chunks`).
 - **Une restauration de la sauvegarde crée des tables neuves sans aucun droit** :
   le dump nocturne est pris avec `--no-privileges`. Après restauration dans un
   nouveau projet, rejouer tous les `GRANT` et `REVOKE` des migrations, dans
@@ -205,7 +206,9 @@ Pièges propres à ce projet :
 - **Les fonctions ne sont pas concernées par la règle du 30/10** : elles restent
   exécutables par tous par défaut, `anon` compris. Toute nouvelle fonction :
   `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` puis `GRANT EXECUTE`
-  ciblé (modèle : `consume_credits` dans `20260813_credit_ledger.sql`).
+  ciblé (modèle : `consume_credits` dans `20260813_credit_ledger.sql`). Retirer le
+  droit à `anon` sans le retirer à `PUBLIC` ne sert à rien : tout rôle hérite des
+  droits de `PUBLIC`.
 
 ## Git — les PR sont fusionnées en *squash*
 
