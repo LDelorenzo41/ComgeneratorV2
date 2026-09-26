@@ -107,6 +107,106 @@ sans être en production. Vérifier lequel des trois circuits est concerné :
   explicitement à l'exploitant ce qu'il doit déployer ou appliquer**, et par quel
   circuit. Sans cela le travail reste sans effet.
 
+## Supabase : toute nouvelle table doit recevoir ses droits d'accès
+
+À partir du **30 octobre 2026**, Supabase n'accorde plus aucun droit automatique sur
+les **nouvelles** tables du schéma `public`, ni sur leurs séquences. Sans `GRANT`
+explicite, l'API (supabase-js, PostgREST, GraphQL) répond `42501 permission
+denied`, même avec une RLS correcte — **`service_role` compris** : il contourne la
+RLS, pas les `GRANT`. Les tables existantes gardent leurs droits ; elles ont en
+plus reçu des `GRANT` explicites le 04/07/2026 (`comgeneratorV2/supabase/GRANTS_DATA_API.md`).
+
+**Règle : le script qui contient le `CREATE TABLE` contient aussi, dans le même
+fichier :**
+
+1. `ALTER TABLE … ENABLE ROW LEVEL SECURITY` ;
+2. les policies, une par opération réellement utilisée, avec un rôle nommé
+   (`TO authenticated`, jamais `TO public`) ;
+3. un `REVOKE ALL`, puis les `GRANT` explicites pour `anon`, `authenticated` et
+   `service_role`, limités à ce dont chaque rôle a besoin. Le `REVOKE` rend le
+   résultat identique avant ou après le 30/10, et dans un projet restauré.
+
+| Rôle | Qui l'utilise dans ProfAssist | Droits sur une nouvelle table |
+|---|---|---|
+| `anon` | Visiteurs non connectés : `/`, `/landing`, `/login`, `/register`, `/reset-password`, `/auth/callback`, `/legal/*`, `/unsubscribe`. Aucune de ces pages ne lit de table : `/unsubscribe` passe par la fonction `unsubscribe_newsletter`, et l'écriture du bandeau cookies dans `consent_logs` est refusée, faute de policy `anon` (sans effet visible). La clé `anon` est publique : elle figure dans le bundle servi par Netlify. | **Aucun `GRANT`.** Exception possible pour une page publique qui en a réellement besoin : policy `TO anon` dédiée et justification écrite dans le script. |
+| `authenticated` | Le front React (`src/**`) une fois connecté. | Seulement les opérations que le front effectue, chacune couverte par une policy `auth.uid() = user_id`. Table écrite uniquement par le serveur : `SELECT` seul (modèle : `credit_ledger`). |
+| `service_role` | Toutes les Edge Functions (`SUPABASE_SERVICE_ROLE_KEY`, y compris `_shared/credits.ts`) : génération IA, crédits, webhook Stripe, `verify-payment`, `fetch-rss`, `send-newsletter`, et le keep-alive `ping` lancé chaque jour par GitHub Actions. | Les opérations que les fonctions effectuent. Un oubli casse la fonction côté serveur, sans message clair dans le navigateur. |
+
+Une table touchée **uniquement** par une fonction `SECURITY DEFINER` appartenant à
+`postgres` (`handle_new_user()`, `consume_credits()`, `delete_user_account()`…) n'a
+besoin d'aucun `GRANT` pour ce chemin : la fonction agit avec les droits de son
+propriétaire.
+
+Modèle à recopier :
+
+```sql
+-- 1. Table. Clé UUID comme partout dans le projet : aucune séquence à gérer.
+CREATE TABLE IF NOT EXISTS public.ma_table (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contenu    text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 2. RLS
+ALTER TABLE public.ma_table ENABLE ROW LEVEL SECURITY;
+
+-- 3. Policies : une par opération utilisée, rôle nommé
+DROP POLICY IF EXISTS "ma_table_select_own" ON public.ma_table;
+CREATE POLICY "ma_table_select_own" ON public.ma_table
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "ma_table_insert_own" ON public.ma_table;
+CREATE POLICY "ma_table_insert_own" ON public.ma_table
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- 4. Droits d'accès : on part de zéro, puis le strict nécessaire
+REVOKE ALL ON public.ma_table FROM anon, authenticated, service_role;
+GRANT SELECT, INSERT ON public.ma_table TO authenticated;                 -- ce que fait le front
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.ma_table TO service_role;  -- ce que font les Edge Functions
+-- anon : rien.
+
+-- Seulement si la table a une colonne serial ou identity (à éviter), pour les rôles
+-- qui insèrent — indispensable pour serial, sans quoi l'INSERT échoue :
+-- GRANT USAGE, SELECT ON SEQUENCE public.ma_table_id_seq TO authenticated, service_role;
+```
+
+Rappel : `SELECT` est exigé en plus dès qu'une requête relit ou filtre des lignes —
+`.insert(…).select()`, `UPDATE` ou `DELETE` filtré, upsert (qui exige aussi `INSERT`
+et `UPDATE`) — avec la policy `SELECT` qui va avec.
+
+Contrôle après application, dans l'éditeur SQL :
+
+```sql
+SELECT grantee, string_agg(privilege_type, ', ' ORDER BY privilege_type) AS droits
+  FROM information_schema.role_table_grants
+ WHERE table_schema = 'public' AND table_name = 'ma_table'
+   AND grantee IN ('anon', 'authenticated', 'service_role')
+ GROUP BY grantee;
+```
+
+Pièges propres à ce projet :
+
+- **Un test dans l'éditeur SQL ne prouve rien** : il s'exécute en `postgres`,
+  propriétaire des tables. Tester depuis l'application, ou avec la requête ci-dessus.
+- **Ne pas compter sur les `ALTER DEFAULT PRIVILEGES`** posés par
+  `20260704_grant_data_api_explicit.sql` : le changement Supabase peut les
+  neutraliser, et ils n'existent pas dans un projet neuf.
+- **Recréer une table, c'est créer une table neuve** : un `DROP` suivi d'un
+  `CREATE`, correctif d'urgence compris, perd droits et policies. Précédent :
+  `deleted_users_blacklist`, 06/09/2026.
+- **Jamais de `GRANT … ON ALL TABLES IN SCHEMA public`** dans une nouvelle
+  migration : il rouvrirait des restrictions volontaires (`credit_ledger` en
+  lecture seule pour `authenticated`, `anon` retiré de `deleted_users_blacklist`).
+- **Une restauration de la sauvegarde crée des tables neuves sans aucun droit** :
+  le dump nocturne est pris avec `--no-privileges`. Après restauration dans un
+  nouveau projet, rejouer tous les `GRANT` et `REVOKE` des migrations, dans
+  l'ordre, avant de rouvrir le service.
+- **Les fonctions ne sont pas concernées par la règle du 30/10** : elles restent
+  exécutables par tous par défaut, `anon` compris. Toute nouvelle fonction :
+  `REVOKE ALL ON FUNCTION … FROM PUBLIC, anon, authenticated;` puis `GRANT EXECUTE`
+  ciblé (modèle : `consume_credits` dans `20260813_credit_ledger.sql`).
+
 ## Git — les PR sont fusionnées en *squash*
 
 Conséquence à connaître, sous peine de diagnostics erronés :
