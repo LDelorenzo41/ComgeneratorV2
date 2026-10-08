@@ -35,7 +35,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'appreciations',
     title: 'Appréciations',
     routes: ['/dashboard'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/appreciations.md?raw').then((m) => m.default),
   },
   {
