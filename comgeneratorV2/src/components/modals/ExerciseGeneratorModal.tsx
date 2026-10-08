@@ -142,6 +142,21 @@ export function ExerciseGeneratorModal({
     setExpandedPinnedId(null);
   }, [lessonKey]);
 
+  // Le support affiché appartient à la phase pour laquelle il a été généré.
+  // Rouverte sur une autre phase ou une autre séance, la fenêtre repart du
+  // formulaire : sinon « Ajouter à la séance » pouvait l'écrire dans une autre
+  // séance (depuis la banque, l'ajout est enregistré aussitôt).
+  useEffect(() => {
+    setGeneratedContent(null);
+    setGeneratedHeading('');
+    setError(null);
+  }, [lessonKey, phaseHeading]);
+
+  // Cible courante, relue au retour de l'IA : la fenêtre a pu changer de phase
+  // ou de séance pendant la génération
+  const targetRef = useRef({ lessonKey, phaseHeading });
+  targetRef.current = { lessonKey, phaseHeading };
+
   const isCurrentPinned =
     !!generatedContent && pinnedSupports.some((p) => p.content === generatedContent);
 
@@ -189,7 +204,7 @@ export function ExerciseGeneratorModal({
           : 'Support ajouté à la séance'
       );
     } catch (err: any) {
-      showToast("Échec de l'ajout à la séance");
+      showToast("Échec de l'ajout à la séance", 'error');
     } finally {
       setIsAttaching(false);
     }
@@ -248,6 +263,11 @@ export function ExerciseGeneratorModal({
   if (!isOpen) return null;
 
   const handleGenerate = async () => {
+    const requested = { lessonKey, phaseHeading };
+    const isStillTarget = () =>
+      targetRef.current.lessonKey === requested.lessonKey &&
+      targetRef.current.phaseHeading === requested.phaseHeading;
+
     setIsGenerating(true);
     setError(null);
     setGeneratedContent(null);
@@ -261,14 +281,33 @@ export function ExerciseGeneratorModal({
         fullLessonContext: fullLessonContent,
       });
 
-      setGeneratedContent(result.content);
       logGeneration('exercise');
-      setGeneratedHeading(`${phaseHeading} — ${cleanSupportLabel(supportType)}`);
 
       // Rafraîchir le solde de tokens
       tokenUpdateEvent.dispatchEvent(new CustomEvent(TOKEN_UPDATED));
+
+      const heading = `${requested.phaseHeading} — ${cleanSupportLabel(supportType)}`;
+      if (isStillTarget()) {
+        setGeneratedContent(result.content);
+        setGeneratedHeading(heading);
+      } else if (targetRef.current.lessonKey === requested.lessonKey) {
+        // Autre phase de la même séance : le support est gardé de côté, épinglé
+        setPinnedSupports((prev) => [
+          ...prev,
+          {
+            id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+            heading,
+            content: result.content,
+          },
+        ]);
+      } else {
+        // Autre séance : ce support ne la concerne pas
+        showToast("Le support généré pour la séance précédente n'a pas été conservé.", 'info');
+      }
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue lors de la génération.');
+      if (isStillTarget()) {
+        setError(err.message || 'Une erreur est survenue lors de la génération.');
+      }
     } finally {
       setIsGenerating(false);
     }
