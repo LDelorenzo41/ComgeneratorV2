@@ -56,14 +56,14 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'seance',
     title: 'Créer une séance',
     routes: ['/generate-lesson'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/seance.md?raw').then((m) => m.default),
   },
   {
     id: 'banque-seances',
     title: 'Banque de séances',
     routes: ['/lessons-bank'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/banque-seances.md?raw').then((m) => m.default),
   },
   {
