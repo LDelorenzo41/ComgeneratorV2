@@ -16,6 +16,11 @@ const subjectSchema = z.object({
 
 type SubjectFormData = z.infer<typeof subjectSchema>;
 
+const EMPTY_SUBJECT: SubjectFormData = {
+  name: '',
+  criteria: [{ name: '', importance: 1 }]
+};
+
 interface SubjectModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,10 +37,7 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
   
   const { register, control, handleSubmit, formState: { errors }, reset } = useForm<SubjectFormData>({
     resolver: zodResolver(subjectSchema),
-    defaultValues: initialData || {
-      name: '',
-      criteria: [{ name: '', importance: 1 }]
-    }
+    defaultValues: initialData || EMPTY_SUBJECT
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -48,6 +50,15 @@ export function SubjectModal({ isOpen, onClose, onSubmit, initialData, mode = 'c
       reset(initialData);
     }
   }, [initialData, reset]);
+
+  // Ouverture en création : formulaire vide. Le composant reste monté d'une
+  // ouverture à l'autre et gardait la saisie précédente, ou la matière ouverte
+  // en modification, d'où des doublons de matières.
+  React.useEffect(() => {
+    if (isOpen && !initialData) {
+      reset(EMPTY_SUBJECT);
+    }
+  }, [isOpen, initialData, reset]);
 
   const dialogRef = useModalBehavior({ isOpen, onClose });
 
