@@ -909,6 +909,17 @@ export function SynthesePage() {
                   </div>
                 )}
 
+                {/* Autres erreurs (session expirée, trop de requêtes, panne du
+                    serveur…) : jusqu'ici enregistrées mais jamais affichées */}
+                {error && error !== 'INSUFFICIENT_TOKENS' && (
+                  <div
+                    role="alert"
+                    className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4"
+                  >
+                    <p className="text-sm text-red-700 dark:text-red-300 font-medium">❌ {error}</p>
+                  </div>
+                )}
+
                 {/* ✅ BOUTON DE GÉNÉRATION */}
                 <Button
                   onClick={generateSynthese}
