@@ -12,7 +12,7 @@ Tous les outils sont aussi dans le menu du haut :
 - **Communiquer** : écrire un message ou répondre à un message reçu ;
 - **Ressources** : vos flux d'actualités.
 
-> 💡 Chaque page a sa propre aide : l'onglet **Aide**, sur le bord de l'écran, ouvre le tutoriel de la page où vous êtes.
+> 💡 Chaque outil a sa propre aide : l'onglet **Aide**, sur le bord de l'écran, ouvre le tutoriel de la page où vous êtes.
 
 ## Mes crédits
 
