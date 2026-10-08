@@ -77,8 +77,8 @@ Le coût n'est pas affiché avant la génération : comptez environ 1 800 toke
 **« Aucun texte détecté dans votre capture »**
 Refaites une capture plus nette : agrandissez le bulletin à l'écran avant de capturer. La première analyse peut être un peu plus longue.
 
-**Le bouton revient à « Générer la synthèse » sans résultat.**
-Attendez une minute (10 générations par minute au maximum, tous outils confondus), puis réessayez. Si cela persiste, déconnectez-vous puis reconnectez-vous.
+**Un message d'erreur s'affiche au-dessus du bouton.**
+« Trop de requêtes » : 10 générations par minute au maximum, tous outils confondus ; patientez une minute. « Session expirée » : déconnectez-vous puis reconnectez-vous. Dans les autres cas, réessayez un peu plus tard.
 
 **Puis-je utiliser les autres pages du PDF ?**
 Seule la page 1 s'affiche ici. Pour une autre page, ouvrez le PDF dans votre lecteur habituel et capturez-la depuis celui-ci.
