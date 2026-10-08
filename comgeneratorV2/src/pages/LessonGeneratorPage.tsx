@@ -1180,7 +1180,17 @@ export function LessonGeneratorPage() {
       }
 
       setLastFormData(data);
-      reset();
+      // Matière, thème et niveau sont vidés pour la séance suivante ; la durée
+      // et la pédagogie sont conservées. Un reset() sans valeurs les ramenait à
+      // 60 min et « traditionnelle » alors que la liste « Durée » et l'encadré
+      // « Description » affichaient encore le choix précédent.
+      reset({
+        subject: '',
+        topic: '',
+        level: '',
+        pedagogy_type: data.pedagogy_type,
+        duration: data.duration
+      });
     } catch (err: any) {
       console.error('Erreur lors de la génération:', err);
 
