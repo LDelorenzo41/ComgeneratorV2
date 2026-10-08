@@ -581,7 +581,7 @@ export function ScenariosBankPage() {
             <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-sm text-green-800 dark:text-green-200">
-                <strong>Astuce :</strong> Utilisez le bouton <span className="inline-flex items-center px-2 py-0.5 bg-green-100 dark:bg-green-800/50 rounded text-xs font-medium"><Copy className="w-3 h-3 mr-1" />Copier thème</span> pour générer un prompt optimisé à coller dans le champ "Thème" du <Link to="/generate" className="underline hover:no-underline font-medium">générateur de séance</Link>.
+                <strong>Astuce :</strong> Utilisez le bouton <span className="inline-flex items-center px-2 py-0.5 bg-green-100 dark:bg-green-800/50 rounded text-xs font-medium"><Copy className="w-3 h-3 mr-1" />Copier thème</span> pour générer un prompt optimisé à coller dans le champ "Thème" du <Link to="/generate-lesson" className="underline hover:no-underline font-medium">générateur de séance</Link>.
               </p>
             </div>
           </div>
