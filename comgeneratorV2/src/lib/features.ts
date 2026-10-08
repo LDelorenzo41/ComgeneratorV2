@@ -27,6 +27,11 @@ export const FEATURES = {
   // Analyse de brouillon (pré-remplissage du formulaire Communication)
   BRIEF_ANALYSIS_ENABLED: true,
 
+  // Aide intégrée : onglet « Aide » et panneau latéral (components/help/).
+  // Les tutoriels sont dans src/help/tutorials/, leur publication page par
+  // page se règle dans src/help/topics.ts. false retire l'onglet partout.
+  HELP_PANEL_ENABLED: true,
+
   // Autres features à venir...
 } as const;
 
