@@ -45,9 +45,7 @@ Chaque phase de la séance peut recevoir son exercice ou son support : texte à
 
 **Ajouter à la séance** place le support à la fin de la séance, sous **📎 Supports pédagogiques**. Pensez ensuite à enregistrer la séance (rubrique Enregistrer).
 
-> ⚠️ La fenêtre garde le dernier support généré. Avant de créer l'exercice d'une autre phase, cliquez sur **Nouveau support**.
-
-La fenêtre ne bloque pas la page : déplacez-la en la saisissant par son en-tête, ou réduisez-la pour relire la séance. Elle se ferme avec la croix ou le bouton **Fermer**, sans perdre le support affiché.
+La fenêtre ne bloque pas la page : déplacez-la en la saisissant par son en-tête, ou réduisez-la pour relire la séance. Elle se ferme avec la croix ou le bouton **Fermer**. Rouverte sur la même phase, elle retrouve le support affiché ; sur une autre phase, elle repart d'un formulaire vide.
 
 ### Comparer plusieurs supports
 

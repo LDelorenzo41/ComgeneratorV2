@@ -37,8 +37,6 @@ Pour chaque phase d'une séance, vous pouvez générer un exercice ou un autre s
 
 Ici, **Ajouter à la séance** enregistre tout de suite le support dans votre banque. Vous le retrouvez à la fin de la séance, sous **📎 Supports pédagogiques**.
 
-> ⚠️ Si un ancien support s'affiche à l'ouverture de la fenêtre, cliquez d'abord sur **Nouveau support**. Sinon, vous risquez de l'ajouter à la mauvaise séance.
-
 Pour comparer plusieurs supports, cliquez sur **Épingler**, puis sur **Nouveau support**, et générez-en un autre. Le panneau **Supports épinglés** permet ensuite de tout ajouter d'un coup.
 
 ## Types de supports
