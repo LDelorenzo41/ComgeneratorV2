@@ -63,6 +63,9 @@ import { NavigationUpdateModal } from './components/modals/NavigationUpdateModal
 // Import du bouton flottant chatbot
 import { ChatbotFloatingButton } from './components/chatbot/ChatbotFloatingButton';
 
+// Import de l'aide intégrée (onglet « Aide » et panneau latéral)
+import { HelpPanel } from './components/help/HelpPanel';
+
 // Import du feature flag
 import { FEATURES } from './lib/features';
 
@@ -300,6 +303,9 @@ function App() {
         
         {/* Bouton flottant chatbot - s'affiche uniquement si user connecté, option activée ET feature activé */}
         {user && FEATURES.CHATBOT_ENABLED && <ChatbotFloatingButton />}
+
+        {/* Aide intégrée - mêmes conditions que EmailConfirmationGuard : compte connecté et e-mail confirmé */}
+        {user?.email_confirmed_at != null && FEATURES.HELP_PANEL_ENABLED && <HelpPanel />}
       </BrowserRouter>
       </ConfirmProvider>
       </ToastProvider>

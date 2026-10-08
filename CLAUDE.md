@@ -70,6 +70,11 @@ coût d'exploitation et la charge de maintenance.
   une vérification synchrone sur `VITE_ADMIN_EMAILS`.
 - **`console.log` dans les Edge Functions** : ne jamais journaliser le contenu
   généré, il contient des noms d'élèves.
+- **L'aide intégrée décrit l'interface au libellé près** : chaque page fonctionnelle
+  a son tutoriel dans `src/help/tutorials/` (registre et publication :
+  `src/help/topics.ts`). Renommer un bouton, retirer un champ ou changer un coût
+  impose de mettre à jour le tutoriel de la page dans le même commit, sinon l'aide
+  envoie l'utilisateur vers un bouton qui n'existe plus.
 
 ## Commandes
 
