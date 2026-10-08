@@ -28,7 +28,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'mon-espace',
     title: 'Mon espace',
     routes: ['/mon-espace'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/mon-espace.md?raw').then((m) => m.default),
   },
   {
@@ -42,14 +42,14 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'banque-appreciations',
     title: "Banque d'appréciations",
     routes: ['/appreciation-bank', '/my-appreciations'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/banque-appreciations.md?raw').then((m) => m.default),
   },
   {
     id: 'synthese',
     title: 'Synthèse de bulletin',
     routes: ['/synthese'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/synthese.md?raw').then((m) => m.default),
   },
   {
@@ -70,21 +70,21 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'scenario',
     title: 'Scénario pédagogique',
     routes: ['/scenario-pedagogique'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/scenario.md?raw').then((m) => m.default),
   },
   {
     id: 'banque-scenarios',
     title: 'Banque de scénarios',
     routes: ['/scenarios-bank'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/banque-scenarios.md?raw').then((m) => m.default),
   },
   {
     id: 'communication',
     title: 'Communication',
     routes: ['/communication'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/communication.md?raw').then((m) => m.default),
     // Les liens du menu « Communiquer » ouvrent la page en mode écriture ou réponse
     initialSection: (params) => {
@@ -98,14 +98,14 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: 'ressources',
     title: 'Ressources pédagogiques',
     routes: ['/resources'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/ressources.md?raw').then((m) => m.default),
   },
   {
     id: 'parametres',
     title: 'Paramètres',
     routes: ['/settings'],
-    published: false,
+    published: true,
     load: () => import('./tutorials/parametres.md?raw').then((m) => m.default),
   },
 ];
