@@ -33,7 +33,11 @@ const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const RATE_LIMIT_PER_MINUTE = 10;
 
 const MISTRAL_TRANSCRIPTION_URL = 'https://api.mistral.ai/v1/audio/transcriptions';
-const MISTRAL_MODEL = 'voxtral-mini-latest';
+// Modèle figé (et non l'alias « voxtral-mini-latest ») : Mistral retire
+// Voxtral Mini Transcribe 2 (voxtral-mini-2602) de /v1/audio/transcriptions
+// le 30/04/2027 (avis de dépréciation d'octobre 2026). Retour arrière possible
+// jusqu'à cette date : remettre 'voxtral-mini-latest' et redéployer.
+const MISTRAL_MODEL = 'voxtral-mini-transcribe-3-0';
 
 // Lexique Éducation nationale « soufflé » au modèle de transcription
 // (context_bias Voxtral, 100 termes max) : sigles et vocabulaire que les
