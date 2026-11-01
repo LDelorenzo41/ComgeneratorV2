@@ -6,7 +6,6 @@ Choisissez le modèle utilisé pour toutes vos générations :
 
 - **GPT-4.1 mini (standard)** : le choix recommandé, réglé par défaut. Les consignes de ProfAssist sont optimisées pour lui.
 - **GPT-5 mini** : modèle OpenAI de dernière génération.
-- **Mistral Medium** : alternative française (Mistral AI), utile pour varier le style de rédaction.
 
 Le choix s'applique dès le clic, sans bouton à valider, pour vos prochaines générations.
 

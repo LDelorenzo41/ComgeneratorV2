@@ -7,7 +7,7 @@ export function PolitiqueConfidentialitePage() {
   return (
     <LegalLayout 
       title="Politique de confidentialité" 
-      lastUpdated="6 septembre 2026"
+      lastUpdated="1er novembre 2026"
     >
       <div className="space-y-8">
         
@@ -295,9 +295,8 @@ export function PolitiqueConfidentialitePage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <h3 className="font-semibold text-gray-900 mb-3">🇫🇷 Mistral AI</h3>
               <p className="text-gray-700 mb-2">
-                Si vous choisissez le modèle Mistral dans vos paramètres, vos demandes de génération
-                sont transmises à Mistral AI (société française) pour traitement. La dictée vocale
-                transmet également votre enregistrement audio à Mistral AI pour transcription.
+                La dictée vocale transmet votre enregistrement audio à Mistral AI (société
+                française) pour transcription.
               </p>
               <p className="text-gray-600 text-sm">
                 <strong>Garantie :</strong> Données hébergées en Europe. L'audio de la dictée n'est

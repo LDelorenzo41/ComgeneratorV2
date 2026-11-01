@@ -298,9 +298,6 @@ export function SettingsPage() {
               <p className="text-sm text-indigo-800 dark:text-indigo-300">
                 <strong>Pourquoi des modèles "mini" ?</strong> Nos prompts sont spécialement optimisés pour tirer le meilleur parti de ces modèles rapides et économiques. Résultat : vous générez plus de contenus avec le même budget tokens, tout en réduisant l'empreinte carbone de chaque génération.
               </p>
-              <p className="text-sm text-indigo-700 dark:text-indigo-400">
-                Mistral Medium est une alternative française (Mistral AI), idéale pour varier les styles de rédaction.
-              </p>
             </div>
           </div>
           )}

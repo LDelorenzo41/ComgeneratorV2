@@ -6,7 +6,7 @@ export function MentionsLegalesPage() {
   return (
     <LegalLayout 
       title="Mentions légales" 
-      lastUpdated="6 septembre 2026"
+      lastUpdated="1er novembre 2026"
     >
       <div className="space-y-8">
         
@@ -105,8 +105,7 @@ export function MentionsLegalesPage() {
                 <strong>OpenAI</strong> — traitement des demandes de génération de contenu
               </p>
               <p className="text-gray-700 mb-2">
-                <strong>Mistral AI</strong> (société française) — génération de contenu lorsque ce
-                modèle est sélectionné dans vos paramètres, et transcription de la dictée vocale
+                <strong>Mistral AI</strong> (société française) — transcription de la dictée vocale
               </p>
               <p className="text-gray-600 text-sm">
                 Les données transmises à ces services sont soumises à leurs politiques de

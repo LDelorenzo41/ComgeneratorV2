@@ -17,7 +17,7 @@ Le code applicatif est dans le sous-dossier **`comgeneratorV2/`** — pas à la 
 |---|---|
 | Frontend | React 18 + Vite + TypeScript + Tailwind, déployé sur Netlify depuis `main` |
 | Backend | Supabase : PostgreSQL, Auth, ~21 Edge Functions Deno, un bucket Storage |
-| IA | OpenAI (principal), Mistral (option + dictée Voxtral), Cohere (rerank) |
+| IA | OpenAI (principal), Mistral (dictée Voxtral), Cohere (rerank) |
 | Paiement | Stripe, en paiement unique — **jamais d'abonnement** |
 
 ## L'objectif, qui prime sur tout le reste
