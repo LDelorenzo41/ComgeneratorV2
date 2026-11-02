@@ -180,6 +180,28 @@ Gain associé : les trois difficultés majeures du chantier BYOK disparaissent
 `rag-ingest` sortent du périmètre BYOK et restent en mode managé sur la clé
 plateforme, pour un usage d'une seule personne.
 
+### FAIT — retrait de l'option de génération Mistral
+
+L'avis Mistral d'octobre 2026 annonce le retrait de Mistral Medium 3.5 au
+30/04/2027 ; l'option « Mistral Medium » l'appelait par l'alias
+`mistral-medium-latest`, sans garantie de redirection. La migrer vers Mistral
+Large 4 imposait de modifier et de redéployer 9 Edge Functions, et de tester un
+modèle de raisonnement.
+
+Mesure du 01/11/2026 dans `credit_ledger`, depuis l'ouverture du journal
+(13/08/2026, rentrée comprise) : **2 opérations Mistral, par un seul compte, le
+14/08**, vraisemblablement des essais du sélecteur. Aucun usage réel.
+
+Décision : retrait de l'option côté front (sélecteur, Paramètres, aide, page
+d'accueil, pages légales) plutôt que migration — un modèle de moins à surveiller
+après la fermeture. Un choix « Mistral » mémorisé dans un navigateur retombe sur
+le modèle standard. Réversible par un revert de la PR.
+
+Mistral reste le fournisseur de la dictée (`voxtral-mini-transcribe-3-0`). Les
+branches Mistral des Edge Functions restent en place, inutilisées. S'il faut
+accepter des clés Mistral dans le BYOK, l'option sera réintroduite sur le modèle
+du moment.
+
 ---
 
 ## 5. Hypothèses invalidées par les mesures
@@ -210,7 +232,7 @@ semaines de chantier. Mesurer avant de concevoir.
 | janvier 2027 | Ouverture du BYOK à tous, **en option** à côté des crédits. Annonce publique de la trajectoire. |
 | février 2027 | Observation, accompagnement, aucune contrainte imposée. |
 | **1ᵉʳ mars 2027** | **Arrêt de la vente de packs** (annoncé dès janvier). Le remplaçant existe et est éprouvé. |
-| **30 avril 2027** | **Retrait de modèles Mistral** (avis d'octobre 2026), BYOK compris. Dictée (`transcribe`) : modèle figé sur `voxtral-mini-transcribe-3-0` (oct. 2026). Option « Mistral Medium » (`mistral-medium-latest`) à migrer avant cette date vers Mistral Large 4 : modèle de raisonnement, format de réponse et consommation de tokens à tester d'abord ; nom du modèle comparé en dur dans 7 fichiers. |
+| **30 avril 2027** | **Retrait de modèles Mistral** (avis d'octobre 2026), BYOK compris. Dictée (`transcribe`) : modèle figé sur `voxtral-mini-transcribe-3-0` (oct. 2026). Option de génération « Mistral Medium » : retirée du front (décision du 01/11/2026, § 4). Reste à supprimer avant cette date les branches Mistral inutilisées des Edge Functions, idéalement avec le socle BYOK qui touche les mêmes fonctions : une valeur `aiModel` inconnue retombe alors sur le modèle par défaut. |
 | **début mai 2027** | **Fermeture de la micro-entreprise.** Clôture Stripe. Les soldes acquis restent utilisables. |
 | ensuite | ProfAssist gratuit, ~12 €/an. |
 

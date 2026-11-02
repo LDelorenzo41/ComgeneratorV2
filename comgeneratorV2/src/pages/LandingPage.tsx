@@ -576,11 +576,10 @@ export function LandingPage() {
                   <Cpu className="w-16 h-16 text-white" />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="text-white font-semibold">3 modèles disponibles :</p>
+                  <p className="text-white font-semibold">Deux modèles disponibles :</p>
                   <div className="flex flex-col gap-1 text-sm">
                     <span className="text-green-300">GPT-4.1 mini</span>
                     <span className="text-blue-300">GPT-5 mini</span>
-                    <span className="text-orange-300">Mistral Medium</span>
                   </div>
                 </div>
               </div>
@@ -591,15 +590,15 @@ export function LandingPage() {
                 Nouveau • Paramètres
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                3 modèles d'IA, un seul objectif : la qualité
+                Deux modèles d'IA, un seul objectif : la qualité
               </h2>
               <p className="text-lg text-gray-300 mb-4 max-w-2xl">
                 Nos prompts sont optimisés pour tirer le meilleur parti de modèles rapides et économiques.
                 Résultat : plus de générations avec le même budget tokens, et une empreinte carbone réduite.
               </p>
               <p className="text-lg text-gray-300 mb-8 max-w-2xl">
-                Depuis vos paramètres, choisissez le modèle qui vous convient — dont le français Mistral,
-                une alternative souveraine signée Mistral AI.
+                Depuis vos paramètres, passez de l'un à l'autre en un clic : le choix s'applique
+                dès la génération suivante.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-white">
@@ -609,10 +608,6 @@ export function LandingPage() {
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
                   <span>GPT-5 mini</span>
-                </div>
-                <div className="flex items-center text-white">
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>Mistral Medium (FR)</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />

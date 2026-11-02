@@ -5,9 +5,15 @@
  * Types de modèles disponibles pour l'utilisateur
  * - "default" : utilise les modèles actuels (gpt-4o-mini / gpt-4.1-mini)
  * - "gpt-5-mini" : utilise GPT-5 mini d'OpenAI
- * - "mistral-medium" : utilise Mistral Medium
+ *
+ * L'option "mistral-medium" a été retirée le 01/11/2026 : Mistral retire
+ * Mistral Medium 3.5 le 30/04/2027, et l'option n'avait aucun utilisateur
+ * réel (mesure credit_ledger). Un choix "mistral-medium" resté dans un
+ * navigateur n'est plus reconnu par isValidModelChoice : getAIModelChoice()
+ * renvoie alors "default". Les Edge Functions gardent leur branche Mistral,
+ * inutilisée, jusqu'à son nettoyage.
  */
-export type AIModelChoice = "default" | "gpt-5-mini" | "mistral-medium";
+export type AIModelChoice = "default" | "gpt-5-mini";
 
 /**
  * Clé de stockage localStorage
@@ -31,11 +37,6 @@ export const AI_MODEL_OPTIONS: Array<{
     value: "gpt-5-mini",
     label: "GPT-5 mini",
     description: "OpenAI dernière génération — Rapide et performant"
-  },
-  {
-    value: "mistral-medium",
-    label: "Mistral Medium",
-    description: "Modèle français (Mistral AI) — Alternative souveraine"
   }
 ];
 
@@ -72,5 +73,5 @@ export function setAIModelChoice(choice: AIModelChoice): void {
  * Vérifie si une valeur est un choix de modèle valide
  */
 function isValidModelChoice(value: string): value is AIModelChoice {
-  return ["default", "gpt-5-mini", "mistral-medium"].includes(value);
+  return ["default", "gpt-5-mini"].includes(value);
 }
