@@ -70,6 +70,13 @@ coût d'exploitation et la charge de maintenance.
   une vérification synchrone sur `VITE_ADMIN_EMAILS`.
 - **`console.log` dans les Edge Functions** : ne jamais journaliser le contenu
   généré, il contient des noms d'élèves.
+- **Les noms des modèles IA sont écrits en dur** : `resolveAIConfig()` existe en
+  6 copies (`_shared/ai.ts` + `generate`, `synthesis`, `scenario`, `exercises`,
+  `lessons`), et plusieurs fonctions comparent `aiConfig.model` à un nom exact
+  (`'gpt-5-mini'`, `'gpt-4.1-mini'`, `'mistral-medium-latest'`). Changer de modèle
+  impose de tout reprendre, sinon les réglages propres au modèle se désactivent
+  sans erreur. Les fournisseurs retirent leurs modèles avec 3 à 6 mois de
+  préavis : échéances dans `docs/CONTEXTE-STRATEGIE.md`, § 6.
 - **L'aide intégrée décrit l'interface au libellé près** : chaque page fonctionnelle
   a son tutoriel dans `src/help/tutorials/` (registre et publication :
   `src/help/topics.ts`). Renommer un bouton, retirer un champ ou changer un coût

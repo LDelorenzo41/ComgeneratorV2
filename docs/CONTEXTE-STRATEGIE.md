@@ -107,8 +107,11 @@ la stratégie : il supprime le seul coût qui croît avec l'usage.
 
 **Faisabilité exceptionnelle** : l'architecture s'y prêtait déjà sans le savoir.
 - Un point de passage client unique : `secureApi.makeRequest()` (9 fonctions IA).
-- Un point de passage serveur unique : `resolveAIConfig()`, qui résout endpoint,
-  en-tête d'authentification et modèle.
+- Un point de passage serveur : `resolveAIConfig()`, qui résout endpoint,
+  en-tête d'authentification et modèle. **Correction du 03/11/2026** : la fonction
+  existe en 6 copies (`_shared/ai.ts`, partagée par les 4 fonctions de
+  communication, et 5 copies locales dans `generate`, `synthesis`, `scenario`,
+  `exercises`, `lessons`) ; elle est à unifier dans `_shared/` avant le BYOK.
 - Un sélecteur de modèle utilisateur **déjà en production** (`aiModelConfig.ts`,
   paramètre `aiModel`), qui a validé le circuit de bout en bout.
 
@@ -229,6 +232,8 @@ semaines de chantier. Mesurer avant de concevoir.
 |---|---|
 | août – mi-sept. 2026 | Rentrée. Fenêtre de gel : rien de risqué. Export et sauvegarde livrés. Chat/RAG en admin-only. |
 | mi-sept. – déc. 2026 | Lot 0 (hygiène et sécurité, § 7), puis socle BYOK — livré en continu, invisible derrière un drapeau. |
+| **11 décembre 2026** | **Retrait de `gpt-5-mini` par OpenAI** (avis du 11/06/2026, remplaçant officiel `gpt-5.6-terra`). Concerne l'option « GPT-5 mini » des Paramètres : 2 opérations du 13/08 au 01/11, toutes de test. À traiter avant cette date. |
+| **14 janvier 2027** | **Retrait de `gpt-4o-mini` et `gpt-4.1-mini` par OpenAI** (avis du 14/10/2026, remplaçant officiel `gpt-6-luna`). Ce sont les modèles par défaut : 100 % de l'usage réel (appréciations et synthèses sur `gpt-4o-mini`, tout le reste sur `gpt-4.1-mini`). Sans bascule avant cette date, toutes les générations échouent. Bascule après tests (paramètres, format de réponse, tokens, qualité), hors conseils de classe ; l'ancien modèle reste disponible jusqu'au 13/01 pour un retour arrière. Dates vérifiées sur la page officielle d'OpenAI le 03/11/2026. |
 | janvier 2027 | Ouverture du BYOK à tous, **en option** à côté des crédits. Annonce publique de la trajectoire. |
 | février 2027 | Observation, accompagnement, aucune contrainte imposée. |
 | **1ᵉʳ mars 2027** | **Arrêt de la vente de packs** (annoncé dès janvier). Le remplaçant existe et est éprouvé. |
