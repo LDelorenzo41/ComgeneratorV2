@@ -90,6 +90,7 @@ cd comgeneratorV2
 npm ci          # les dépendances ne sont pas installées par défaut
 npm run build   # seule validation disponible ; doit passer avant tout commit
 npm run dev
+node scripts/tester-modele.mjs gpt-6-luna   # un modèle OpenAI accepte-t-il les appels de ProfAssist ? (clé demandée, jamais enregistrée)
 ```
 
 ## Automatismes en place
