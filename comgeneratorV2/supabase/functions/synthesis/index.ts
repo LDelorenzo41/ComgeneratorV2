@@ -14,13 +14,20 @@ import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credit
 // Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
 const RATE_LIMIT_PER_MINUTE = 10;
 
+// Modèle par défaut des synthèses : GPT-6 Luna depuis le 08/11/2026
+// (gpt-4o-mini est retiré par OpenAI le 14/01/2027). Validé au banc d'essai :
+// longueur maximale mieux respectée, textes plus fidèles au bulletin.
+// Retour arrière possible jusqu'au 13/01/2027 : passer à false, redéployer.
+const DEFAUT_LUNA = true;
+
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
 // =====================================================
 
 function resolveAIConfig(aiModel, openaiKey, mistralKey) {
-  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  // Modèle par défaut : GPT-6 Luna (DEFAUT_LUNA), sinon gpt-4o-mini (comportement historique)
   if (!aiModel || aiModel === 'default') {
+    if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
     return {
       endpoint: 'https://api.openai.com/v1/chat/completions',
       headers: {
@@ -66,7 +73,13 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       tokenParamName: 'max_completion_tokens',
       supportsTemperature: false,
       isResponsesAPI: false,
-      reasoning: true
+      reasoning: true,
+      // Raisonnement désactivé pour les synthèses (banc d'essai du 08/11/2026) :
+      // même qualité, 1,5 s au lieu de 3,2 s, tokens identiques au modèle actuel.
+      reasoningEffort: 'none',
+      // Renfort de la consigne de longueur (buildPromptWithCharLimit) : sans lui,
+      // Luna dépassait parfois la limite de quelques caractères (banc d'essai).
+      reinforceCharLimit: true
     };
   }
 
@@ -90,6 +103,7 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 
   // Fallback : modèle par défaut si choix non reconnu
   console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
   return {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     headers: {
@@ -135,10 +149,11 @@ function cleanOutputText(text) {
 }
 
 /**
- * Renforce l'instruction de limite de caractères pour Mistral
+ * Renforce l'instruction de limite de caractères pour les modèles qui tendent à
+ * la dépasser : Mistral, et ceux marqués reinforceCharLimit (GPT-6 Luna).
  */
-function buildPromptWithCharLimit(basePrompt, maxChars, model) {
-  if (model === 'mistral-medium-latest') {
+function buildPromptWithCharLimit(basePrompt, maxChars, aiConfig) {
+  if (aiConfig.model === 'mistral-medium-latest' || aiConfig.reinforceCharLimit) {
     const reinforcement = `⚠️ CONTRAINTE CRITIQUE DE LONGUEUR ⚠️
 Ta réponse doit faire MAXIMUM ${maxChars} caractères (espaces compris).
 Cette limite est ABSOLUE et NON-NÉGOCIABLE. 
@@ -295,7 +310,7 @@ const synthesisHandler = async (req) => {
       : buildCompletePrompt(extractedText, maxChars, toneInstructions, gradesInstructions);
 
     // Adapter le prompt selon le modèle (renforcement pour Mistral)
-    const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig.model);
+    const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig);
 
     // ✅ Token limit adapté selon le modèle ET la demande utilisateur
     let tokenLimit;
@@ -331,6 +346,7 @@ const synthesisHandler = async (req) => {
         model: aiConfig.model,
         messages: [{ role: 'user', content: prompt }],
         ...(aiConfig.supportsTemperature && { temperature: 0.7 }),
+        ...(aiConfig.reasoningEffort && { reasoning_effort: aiConfig.reasoningEffort }),
         [aiConfig.tokenParamName]: tokenLimit
       };
     }
