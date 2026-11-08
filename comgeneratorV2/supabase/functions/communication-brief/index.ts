@@ -243,7 +243,7 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans balise markdown, sans texte 
 
     // Marges larges : une réponse tronquée casse le JSON (gpt-5-mini consomme
     // en plus des tokens de raisonnement sur ce plafond)
-    const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2500;
+    const tokenLimit = aiConfig.reasoning ? 4000 : 2500;
 
     try {
       // jsonObject : mode JSON natif (OpenAI et Mistral) — réponse garantie

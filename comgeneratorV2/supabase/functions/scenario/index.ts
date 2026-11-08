@@ -102,7 +102,28 @@ function resolveAIConfig(aiModel: string | undefined, openaiKey: string, mistral
       model: 'gpt-5-mini',
       tokenParamName: 'max_output_tokens',
       supportsTemperature: false,
-      isResponsesAPI: true
+      isResponsesAPI: true,
+      reasoning: true
+    };
+  }
+
+  // GPT-6 Luna : remplaçant officiel de gpt-4o-mini et gpt-4.1-mini, retirés par
+  // OpenAI le 14/01/2027. Proposé en option avant d'en faire le modèle par défaut.
+  // Testé le 08/11/2026 (scripts/tester-modele.mjs) : Chat Completions, max_tokens
+  // refusé au profit de max_completion_tokens, temperature non envoyée, une partie
+  // du plafond consommée par le raisonnement (d'où reasoning: true).
+  if (aiModel === 'gpt-6-luna') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-6-luna',
+      tokenParamName: 'max_completion_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: false,
+      reasoning: true
     };
   }
 
@@ -1009,15 +1030,17 @@ Génère maintenant le scénario pédagogique complet :`}`;
         max_tokens: 5500,
       };
     } else {
-      // Default (gpt-4.1-mini) : séparation system/user pour meilleur suivi du contexte RAG
+      // Default (gpt-4.1-mini) et GPT-6 Luna : séparation system/user pour meilleur suivi du contexte RAG.
+      // Paramètres lus dans la configuration : Luna refuse max_tokens et reçoit un
+      // plafond plus haut pour son raisonnement ; corps inchangé pour gpt-4.1-mini.
       requestBody = {
         model: aiConfig.model,
         messages: [
           { role: 'system', content: effectiveSystemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.6,
-        max_tokens: 5500,
+        ...(aiConfig.supportsTemperature !== false && { temperature: 0.6 }),
+        [aiConfig.tokenParamName ?? 'max_tokens']: aiConfig.reasoning ? 8000 : 5500,
       };
     }
 

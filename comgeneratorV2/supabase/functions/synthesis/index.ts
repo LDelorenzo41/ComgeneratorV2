@@ -45,7 +45,28 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       model: 'gpt-5-mini',
       tokenParamName: 'max_output_tokens',
       supportsTemperature: false,
-      isResponsesAPI: true
+      isResponsesAPI: true,
+      reasoning: true
+    };
+  }
+
+  // GPT-6 Luna : remplaçant officiel de gpt-4o-mini et gpt-4.1-mini, retirés par
+  // OpenAI le 14/01/2027. Proposé en option avant d'en faire le modèle par défaut.
+  // Testé le 08/11/2026 (scripts/tester-modele.mjs) : Chat Completions, max_tokens
+  // refusé au profit de max_completion_tokens, temperature non envoyée, une partie
+  // du plafond consommée par le raisonnement (d'où reasoning: true).
+  if (aiModel === 'gpt-6-luna') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-6-luna',
+      tokenParamName: 'max_completion_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: false,
+      reasoning: true
     };
   }
 
@@ -278,8 +299,8 @@ const synthesisHandler = async (req) => {
 
     // ✅ Token limit adapté selon le modèle ET la demande utilisateur
     let tokenLimit;
-    if (aiConfig.model === 'gpt-5-mini') {
-      tokenLimit = 4000; // Contrainte API Responses
+    if (aiConfig.reasoning) {
+      tokenLimit = 4000; // Modèles qui raisonnent (GPT-5 mini, GPT-6 Luna) : le raisonnement consomme une partie du plafond
     } else if (aiConfig.model === 'mistral-medium-latest') {
       // Mistral est bavard : on réduit la marge pour forcer le respect de maxChars
       tokenLimit = Math.ceil(maxChars * 1.3);

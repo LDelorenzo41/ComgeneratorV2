@@ -72,11 +72,13 @@ coût d'exploitation et la charge de maintenance.
   généré, il contient des noms d'élèves.
 - **Les noms des modèles IA sont écrits en dur** : `resolveAIConfig()` existe en
   6 copies (`_shared/ai.ts` + `generate`, `synthesis`, `scenario`, `exercises`,
-  `lessons`), et plusieurs fonctions comparent `aiConfig.model` à un nom exact
-  (`'gpt-5-mini'`, `'gpt-4.1-mini'`, `'mistral-medium-latest'`). Changer de modèle
-  impose de tout reprendre, sinon les réglages propres au modèle se désactivent
-  sans erreur. Les fournisseurs retirent leurs modèles avec 3 à 6 mois de
-  préavis : échéances dans `docs/CONTEXTE-STRATEGIE.md`, § 6.
+  `lessons`) ; un modèle s'ajoute ou se change dans les 6. Ses particularités se
+  déclarent dans sa configuration (`tokenParamName`, `supportsTemperature`,
+  `reasoning` pour un plafond de tokens plus haut), jamais en comparant
+  `aiConfig.model` à un nom : une comparaison se désactive sans erreur au
+  changement de modèle. Il en reste sur `'gpt-4.1-mini'` (`exercises`) et
+  `'mistral-medium-latest'` (code mort). Les fournisseurs retirent leurs modèles
+  avec 3 à 6 mois de préavis : échéances dans `docs/CONTEXTE-STRATEGIE.md`, § 6.
 - **L'aide intégrée décrit l'interface au libellé près** : chaque page fonctionnelle
   a son tutoriel dans `src/help/tutorials/` (registre et publication :
   `src/help/topics.ts`). Renommer un bouton, retirer un champ ou changer un coût
