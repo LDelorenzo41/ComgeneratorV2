@@ -1,0 +1,231 @@
+[
+  {
+    "titre": "Cas 1 — ton exemple : très bon partout",
+    "subject": "EPS",
+    "studentName": "Lionel",
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 6,
+        "importance": 2
+      },
+      {
+        "name": "Application des consignes",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Investissement",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Attitude",
+        "value": 5,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 2 — ton exemple : consignes insuffisantes, résultats moyens",
+    "subject": "EPS",
+    "studentName": "Lionel",
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 3,
+        "importance": 2
+      },
+      {
+        "name": "Attitude",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Investissement",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Application des consignes",
+        "value": 2,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 3 — insuffisant partout",
+    "subject": "EPS",
+    "studentName": "Inès",
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 2,
+        "importance": 2
+      },
+      {
+        "name": "Application des consignes",
+        "value": 2,
+        "importance": 1
+      },
+      {
+        "name": "Investissement",
+        "value": 2,
+        "importance": 1
+      },
+      {
+        "name": "Attitude",
+        "value": 3,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 4 — résultats faibles malgré une bonne attitude (aucun critère explicatif)",
+    "subject": "Mathématiques",
+    "studentName": "Théo",
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats aux évaluations",
+        "value": 2,
+        "importance": 2
+      },
+      {
+        "name": "Attitude en classe",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Participation orale",
+        "value": 6,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 5 — mixte : bons résultats, attitude à améliorer",
+    "subject": "Histoire-géographie",
+    "studentName": "Sarah",
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 5,
+        "importance": 2
+      },
+      {
+        "name": "Travail personnel",
+        "value": 4,
+        "importance": 1
+      },
+      {
+        "name": "Comportement",
+        "value": 2,
+        "importance": 2
+      }
+    ]
+  },
+  {
+    "titre": "Cas 6 — réglages par défaut de la page (tutoiement), excellent",
+    "subject": "Français",
+    "studentName": "Nina",
+    "addressMode": "tutoiement",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 7,
+        "importance": 2
+      },
+      {
+        "name": "Travail personnel",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Participation orale",
+        "value": 6,
+        "importance": 1
+      },
+      {
+        "name": "Rigueur",
+        "value": 5,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 7 — vouvoiement, ton bienveillant",
+    "subject": "Anglais",
+    "studentName": "Lucas",
+    "addressMode": "vouvoiement",
+    "tone": "bienveillant",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 4,
+        "importance": 2
+      },
+      {
+        "name": "Participation orale",
+        "value": 3,
+        "importance": 1
+      },
+      {
+        "name": "Travail personnel",
+        "value": 5,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "titre": "Cas 8 — anonymat (prénom à ne jamais écrire)",
+    "subject": "SVT",
+    "studentName": "Emma",
+    "hideStudentName": true,
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 3,
+        "importance": 2
+      },
+      {
+        "name": "Investissement",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Rigueur",
+        "value": 2,
+        "importance": 1
+      }
+    ]
+  }
+]
