@@ -4,7 +4,13 @@
 /**
  * Types de modèles disponibles pour l'utilisateur
  * - "default" : utilise les modèles actuels (gpt-4o-mini / gpt-4.1-mini)
- * - "gpt-5-mini" : utilise GPT-5 mini d'OpenAI
+ * - "gpt-6-luna" : utilise GPT-6 Luna d'OpenAI, futur modèle par défaut
+ *
+ * L'option "gpt-5-mini" a été remplacée le 08/11/2026 par "gpt-6-luna" :
+ * OpenAI retire gpt-5-mini le 11/12/2026, et l'option n'avait servi qu'à des
+ * essais. Un choix "gpt-5-mini" resté dans un navigateur retombe sur
+ * "default" ; Luna remplacera gpt-4o-mini et gpt-4.1-mini, retirés le
+ * 14/01/2027 (docs/CONTEXTE-STRATEGIE.md, § 6).
  *
  * L'option "mistral-medium" a été retirée le 01/11/2026 : Mistral retire
  * Mistral Medium 3.5 le 30/04/2027, et l'option n'avait aucun utilisateur
@@ -13,7 +19,7 @@
  * renvoie alors "default". Les Edge Functions gardent leur branche Mistral,
  * inutilisée, jusqu'à son nettoyage.
  */
-export type AIModelChoice = "default" | "gpt-5-mini";
+export type AIModelChoice = "default" | "gpt-6-luna";
 
 /**
  * Clé de stockage localStorage
@@ -34,9 +40,9 @@ export const AI_MODEL_OPTIONS: Array<{
     description: "Recommandé — Prompts optimisés pour ce modèle, meilleur rapport qualité/coût"
   },
   {
-    value: "gpt-5-mini",
-    label: "GPT-5 mini",
-    description: "OpenAI dernière génération — Rapide et performant"
+    value: "gpt-6-luna",
+    label: "GPT-6 Luna",
+    description: "Nouveau modèle OpenAI — futur modèle standard, à essayer dès maintenant"
   }
 ];
 
@@ -73,5 +79,5 @@ export function setAIModelChoice(choice: AIModelChoice): void {
  * Vérifie si une valeur est un choix de modèle valide
  */
 function isValidModelChoice(value: string): value is AIModelChoice {
-  return ["default", "gpt-5-mini"].includes(value);
+  return ["default", "gpt-6-luna"].includes(value);
 }

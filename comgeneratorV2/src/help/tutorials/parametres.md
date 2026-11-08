@@ -5,7 +5,7 @@ Gérez votre compte : modèle d'IA, newsletter, sauvegarde de votre travail et 
 Choisissez le modèle utilisé pour toutes vos générations :
 
 - **GPT-4.1 mini (standard)** : le choix recommandé, réglé par défaut. Les consignes de ProfAssist sont optimisées pour lui.
-- **GPT-5 mini** : modèle OpenAI de dernière génération.
+- **GPT-6 Luna** : le nouveau modèle d'OpenAI, appelé à devenir le modèle standard début 2027.
 
 Le choix s'applique dès le clic, sans bouton à valider, pour vos prochaines générations.
 
@@ -55,7 +55,7 @@ Certains réglages se trouvent ailleurs :
 ## Questions fréquentes
 
 **Quel modèle choisir ?**
-Gardez le modèle standard, sauf si vous voulez essayer un autre style de rédaction.
+Gardez le modèle standard, ou essayez dès maintenant GPT-6 Luna, qui le remplacera début 2027.
 
 **« Votre Banque est encore vide »**
 Vous n'avez encore rien enregistré dans vos banques : il n'y a rien à exporter.

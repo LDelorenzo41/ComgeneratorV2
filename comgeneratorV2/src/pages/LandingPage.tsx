@@ -579,7 +579,7 @@ export function LandingPage() {
                   <p className="text-white font-semibold">Deux modèles disponibles :</p>
                   <div className="flex flex-col gap-1 text-sm">
                     <span className="text-green-300">GPT-4.1 mini</span>
-                    <span className="text-blue-300">GPT-5 mini</span>
+                    <span className="text-blue-300">GPT-6 Luna</span>
                   </div>
                 </div>
               </div>
@@ -607,7 +607,7 @@ export function LandingPage() {
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>GPT-5 mini</span>
+                  <span>GPT-6 Luna (nouveau)</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
