@@ -14,13 +14,20 @@ import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credit
 // Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
 const RATE_LIMIT_PER_MINUTE = 10;
 
+// Modèle par défaut des synthèses : GPT-6 Luna depuis le 08/11/2026
+// (gpt-4o-mini est retiré par OpenAI le 14/01/2027). Validé au banc d'essai :
+// longueur maximale mieux respectée, textes plus fidèles au bulletin.
+// Retour arrière possible jusqu'au 13/01/2027 : passer à false, redéployer.
+const DEFAUT_LUNA = true;
+
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
 // =====================================================
 
 function resolveAIConfig(aiModel, openaiKey, mistralKey) {
-  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  // Modèle par défaut : GPT-6 Luna (DEFAUT_LUNA), sinon gpt-4o-mini (comportement historique)
   if (!aiModel || aiModel === 'default') {
+    if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
     return {
       endpoint: 'https://api.openai.com/v1/chat/completions',
       headers: {
@@ -45,7 +52,34 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       model: 'gpt-5-mini',
       tokenParamName: 'max_output_tokens',
       supportsTemperature: false,
-      isResponsesAPI: true
+      isResponsesAPI: true,
+      reasoning: true
+    };
+  }
+
+  // GPT-6 Luna : remplaçant officiel de gpt-4o-mini et gpt-4.1-mini, retirés par
+  // OpenAI le 14/01/2027. Proposé en option avant d'en faire le modèle par défaut.
+  // Testé le 08/11/2026 (scripts/tester-modele.mjs) : Chat Completions, max_tokens
+  // refusé au profit de max_completion_tokens, temperature non envoyée, une partie
+  // du plafond consommée par le raisonnement (d'où reasoning: true).
+  if (aiModel === 'gpt-6-luna') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-6-luna',
+      tokenParamName: 'max_completion_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: false,
+      reasoning: true,
+      // Raisonnement désactivé pour les synthèses (banc d'essai du 08/11/2026) :
+      // même qualité, 1,5 s au lieu de 3,2 s, tokens identiques au modèle actuel.
+      reasoningEffort: 'none',
+      // Renfort de la consigne de longueur (buildPromptWithCharLimit) : sans lui,
+      // Luna dépassait parfois la limite de quelques caractères (banc d'essai).
+      reinforceCharLimit: true
     };
   }
 
@@ -69,6 +103,7 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 
   // Fallback : modèle par défaut si choix non reconnu
   console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
   return {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     headers: {
@@ -114,10 +149,11 @@ function cleanOutputText(text) {
 }
 
 /**
- * Renforce l'instruction de limite de caractères pour Mistral
+ * Renforce l'instruction de limite de caractères pour les modèles qui tendent à
+ * la dépasser : Mistral, et ceux marqués reinforceCharLimit (GPT-6 Luna).
  */
-function buildPromptWithCharLimit(basePrompt, maxChars, model) {
-  if (model === 'mistral-medium-latest') {
+function buildPromptWithCharLimit(basePrompt, maxChars, aiConfig) {
+  if (aiConfig.model === 'mistral-medium-latest' || aiConfig.reinforceCharLimit) {
     const reinforcement = `⚠️ CONTRAINTE CRITIQUE DE LONGUEUR ⚠️
 Ta réponse doit faire MAXIMUM ${maxChars} caractères (espaces compris).
 Cette limite est ABSOLUE et NON-NÉGOCIABLE. 
@@ -274,12 +310,12 @@ const synthesisHandler = async (req) => {
       : buildCompletePrompt(extractedText, maxChars, toneInstructions, gradesInstructions);
 
     // Adapter le prompt selon le modèle (renforcement pour Mistral)
-    const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig.model);
+    const prompt = buildPromptWithCharLimit(basePrompt, maxChars, aiConfig);
 
     // ✅ Token limit adapté selon le modèle ET la demande utilisateur
     let tokenLimit;
-    if (aiConfig.model === 'gpt-5-mini') {
-      tokenLimit = 4000; // Contrainte API Responses
+    if (aiConfig.reasoning) {
+      tokenLimit = 4000; // Modèles qui raisonnent (GPT-5 mini, GPT-6 Luna) : le raisonnement consomme une partie du plafond
     } else if (aiConfig.model === 'mistral-medium-latest') {
       // Mistral est bavard : on réduit la marge pour forcer le respect de maxChars
       tokenLimit = Math.ceil(maxChars * 1.3);
@@ -310,6 +346,7 @@ const synthesisHandler = async (req) => {
         model: aiConfig.model,
         messages: [{ role: 'user', content: prompt }],
         ...(aiConfig.supportsTemperature && { temperature: 0.7 }),
+        ...(aiConfig.reasoningEffort && { reasoning_effort: aiConfig.reasoningEffort }),
         [aiConfig.tokenParamName]: tokenLimit
       };
     }

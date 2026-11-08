@@ -566,7 +566,7 @@ export function LandingPage() {
         </div>
       </div>
 
-      {/* Section choix du modèle IA */}
+      {/* Section modèle d'IA : aucun choix à faire depuis le 08/11/2026, aucun nom de modèle */}
       <div className="bg-gradient-to-r from-slate-700 via-gray-800 to-slate-900 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row items-center gap-12">
@@ -576,10 +576,10 @@ export function LandingPage() {
                   <Cpu className="w-16 h-16 text-white" />
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="text-white font-semibold">Deux modèles disponibles :</p>
+                  <p className="text-white font-semibold">Le bon modèle d'IA</p>
                   <div className="flex flex-col gap-1 text-sm">
-                    <span className="text-green-300">GPT-4.1 mini</span>
-                    <span className="text-blue-300">GPT-5 mini</span>
+                    <span className="text-green-300">pour chaque outil</span>
+                    <span className="text-blue-300">sans rien régler</span>
                   </div>
                 </div>
               </div>
@@ -587,27 +587,27 @@ export function LandingPage() {
             <div className="flex-1 text-center lg:text-left order-1 lg:order-2">
               <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/20 text-white mb-6">
                 <Settings className="w-4 h-4 mr-2" />
-                Nouveau • Paramètres
+                Sous le capot
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Deux modèles d'IA, un seul objectif : la qualité
+                Le bon modèle d'IA, un seul objectif : la qualité
               </h2>
               <p className="text-lg text-gray-300 mb-4 max-w-2xl">
                 Nos prompts sont optimisés pour tirer le meilleur parti de modèles rapides et économiques.
                 Résultat : plus de générations avec le même budget tokens, et une empreinte carbone réduite.
               </p>
               <p className="text-lg text-gray-300 mb-8 max-w-2xl">
-                Depuis vos paramètres, passez de l'un à l'autre en un clic : le choix s'applique
-                dès la génération suivante.
+                ProfAssist utilise pour chaque outil le modèle d'IA qui lui convient le mieux :
+                vous n'avez rien à régler.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>GPT-4.1 mini (recommandé)</span>
+                  <span>Le bon modèle pour chaque outil</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />
-                  <span>GPT-5 mini</span>
+                  <span>Rien à régler</span>
                 </div>
                 <div className="flex items-center text-white">
                   <CheckCircle className="w-5 h-5 mr-2 text-green-300" />

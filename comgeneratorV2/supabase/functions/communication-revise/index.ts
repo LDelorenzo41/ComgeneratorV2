@@ -128,7 +128,7 @@ Réécris ce message en le rendant ${instruction}.
 - Reste dans le registre professionnel du milieu éducatif.
 - Renvoie UNIQUEMENT le message réécrit, sans commentaire, sans explication, sans balise.`;
 
-    const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2000;
+    const tokenLimit = aiConfig.reasoning ? 4000 : 2000;
 
     try {
       const { content, usage } = await callAI(aiConfig, prompt, tokenLimit, 'communication-revise', {

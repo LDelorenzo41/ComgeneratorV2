@@ -13,6 +13,12 @@ import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credit
 // Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
 const RATE_LIMIT_PER_MINUTE = 10;
 
+// Modèle par défaut des appréciations : GPT-6 Luna depuis le 08/11/2026
+// (gpt-4o-mini est retiré par OpenAI le 14/01/2027). Luna, avec le prompt
+// corrigé, a été validé au banc d'essai (scripts/banc-appreciations.mjs).
+// Retour arrière possible jusqu'au 13/01/2027 : passer à false, redéployer.
+const DEFAUT_LUNA = true;
+
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
 // =====================================================
@@ -25,8 +31,9 @@ const RATE_LIMIT_PER_MINUTE = 10;
  * @returns {{ endpoint: string, headers: object, model: string, tokenParamName: string, supportsTemperature: boolean, isResponsesAPI: boolean }}
  */
 function resolveAIConfig(aiModel, openaiKey, mistralKey) {
-  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  // Modèle par défaut : GPT-6 Luna (DEFAUT_LUNA), sinon gpt-4o-mini (comportement historique)
   if (!aiModel || aiModel === 'default') {
+    if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
     return {
       endpoint: 'https://api.openai.com/v1/chat/completions',
       headers: {
@@ -51,7 +58,35 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       model: 'gpt-5-mini',
       tokenParamName: 'max_output_tokens',
       supportsTemperature: false,
-      isResponsesAPI: true
+      isResponsesAPI: true,
+      reasoning: true
+    };
+  }
+
+  // GPT-6 Luna : remplaçant officiel de gpt-4o-mini et gpt-4.1-mini, retirés par
+  // OpenAI le 14/01/2027. Proposé en option avant d'en faire le modèle par défaut.
+  // Testé le 08/11/2026 (scripts/tester-modele.mjs) : Chat Completions, max_tokens
+  // refusé au profit de max_completion_tokens, temperature non envoyée, une partie
+  // du plafond consommée par le raisonnement (d'où reasoning: true).
+  if (aiModel === 'gpt-6-luna') {
+    return {
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      model: 'gpt-6-luna',
+      tokenParamName: 'max_completion_tokens',
+      supportsTemperature: false,
+      isResponsesAPI: false,
+      reasoning: true,
+      // Applique le prompt à la lettre : generate lui donne une règle anti-invention
+      // sans phrase imposée, et des règles de style et d'importance des critères
+      // (voir regleAntiHallucinations et reglesComplementaires).
+      followsPromptLiterally: true,
+      // Raisonnement désactivé pour les appréciations (banc d'essai du 08/11/2026) :
+      // même qualité, 1 à 2 s au lieu de 7 à 26 s, tokens comparables au modèle actuel.
+      reasoningEffort: 'none'
     };
   }
 
@@ -75,6 +110,7 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 
   // Fallback : modèle par défaut si choix non reconnu
   console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
   return {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     headers: {
@@ -563,21 +599,43 @@ Version détaillée :
 
     // ✅ Calculer le nombre de tokens selon le modèle
     let tokenLimit;
-    if (aiConfig.model === 'gpt-5-mini') {
-      tokenLimit = 4000; // Limite pour GPT-5 mini (API Responses)
+    if (aiConfig.reasoning) {
+      tokenLimit = 4000; // Modèles qui raisonnent (GPT-5 mini, GPT-6 Luna) : le raisonnement consomme une partie du plafond
     } else {
       tokenLimit = Math.floor(params.maxLength * 2.5);
     }
 
-    // ✅ System prompt pour les modèles Chat
-    const systemPrompt = `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
-
-⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
+    // Règle anti-invention du prompt système. La version historique impose une
+    // phrase de repli (« Aucun critère ne permet d'expliquer clairement ce
+    // niveau. ») et interdit tout lien absent des critères, ce qui contredit le
+    // CAS 1 du prompt. GPT-6 Luna, qui applique le prompt à la lettre, recopiait
+    // cette phrase dans chaque appréciation (banc d'essai du 08/11/2026). Les
+    // modèles marqués followsPromptLiterally reçoivent une version corrigée, qui
+    // reconnaît aussi les observations du professeur comme des faits, et des règles
+    // de style et d'importance des critères (l'instruction « prends en compte le
+    // niveau d'importance » restait sans effet). Les autres modèles gardent le texte
+    // historique au caractère près.
+    const regleAntiHallucinations = aiConfig.followsPromptLiterally
+      ? `⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
+Tu dois rester STRICTEMENT FACTUEL. Tes deux seules sources sont les critères évalués et les observations personnelles du professeur : n'invoque JAMAIS une cause absente des deux (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.), sauf si ces termes y apparaissent. Tes conseils s'appuient eux aussi sur ces deux sources.
+Les observations personnelles du professeur (faits constatés ou indications) priment : intègre-les en les reformulant, au même titre que les critères.
+Relier les résultats à un critère actionnable évalué ou à une observation du professeur (application des consignes, investissement, attitude, travail à la maison…) n'est PAS une invention : c'est ce qui est attendu (CAS 1). Appuie-toi sur ces éléments pour expliquer les résultats, en positif comme en négatif.
+Si aucun critère ni aucune observation n'éclaire les résultats, rapproche simplement les constats avec un connecteur (« malgré », « alors que », « bien que »), comme dans le CAS 2.
+N'écris JAMAIS qu'aucun critère n'explique le niveau, ni aucune remarque sur la grille d'évaluation : l'appréciation s'adresse à l'élève et à sa famille.`
+      : `⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
 Tu dois rester STRICTEMENT FACTUEL. 
 Tu NE DOIS JAMAIS inventer une cause, une explication, un raisonnement ou un lien qui n'est PAS explicitement présent dans les critères évalués.
 Si aucun lien causal évident n'existe entre les critères évalués, tu dois écrire : 
 "Aucun critère ne permet d'expliquer clairement ce niveau." 
-Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.
+Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.`;
+    const reglesComplementaires = aiConfig.followsPromptLiterally
+      ? `\n\nRÈGLE #6 - STYLE : écris comme un enseignant, en un texte fluide et cohérent : enchaîne les constats avec des connecteurs logiques (car, ce qui, ainsi, cependant, grâce à). Une appréciation n'est pas une liste de critères suivis de leur niveau.\n\nRÈGLE #7 - IMPORTANCE DES CRITÈRES : l'importance indiquée pour chaque critère (Normal, Important, Crucial) règle la place qu'il prend dans l'appréciation.\n- Un critère « Crucial » est toujours nommé explicitement et occupe une place centrale. S'il est faible (Très insuffisant, Insuffisant, Moyen), dis-le clairement, sans l'atténuer en simple « reste à améliorer », et fais-en l'axe de progrès principal ; s'il est fort, mets-le en avant comme la réussite principale.\n- Un critère « Important » est mentionné.\n- Un critère « Normal » peut être évoqué brièvement ou regroupé avec d'autres.`
+      : '';
+
+    // ✅ System prompt pour les modèles Chat
+    const systemPrompt = `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
+
+${regleAntiHallucinations}
 
 ⚠️ RÈGLE ABSOLUE #1 - MODE D'ADRESSE :
 ${getSystemAddressModeMessage(params.addressMode)}
@@ -588,7 +646,7 @@ RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposé
 
 RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES. Tu dois faire des liens causaux UNIQUEMENT avec les critères actionnables effectivement évalués. N'INVENTE JAMAIS de causes (révisions, compréhension, etc.) qui ne sont pas dans les critères évalués.
 
-RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").`;
+RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").${reglesComplementaires}`;
 
     // ✅ Construction du body selon le type d'API
     let requestBody;
@@ -619,6 +677,7 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
           { role: 'user', content: prompt }
         ],
         ...(aiConfig.supportsTemperature && { temperature: 0.2 }),
+        ...(aiConfig.reasoningEffort && { reasoning_effort: aiConfig.reasoningEffort }),
         [aiConfig.tokenParamName]: tokenLimit
       };
     }

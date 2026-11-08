@@ -200,7 +200,7 @@ ${noMetaInstruction}
 Rédige maintenant cette réponse en respectant scrupuleusement ces instructions et en t'adaptant intelligemment au contexte du message reçu.`;
 
     // Token limit selon le modèle
-    const tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2000;
+    const tokenLimit = aiConfig.reasoning ? 4000 : 2000;
 
     // Appel IA + débit
     try {

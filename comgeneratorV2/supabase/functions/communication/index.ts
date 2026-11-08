@@ -210,7 +210,7 @@ ${signature ?
 Rédige maintenant le bilan complet en respectant SCRUPULEUSEMENT cette structure et en ANALYSANT vraiment la situation.`;
 
       // Token limit plus élevé pour les bilans de commission (documents longs)
-      tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 3000;
+      tokenLimit = aiConfig.reasoning ? 4000 : 3000;
       apiErrorMessage = 'Erreur lors de la génération du bilan. Veuillez réessayer.';
     } else {
       // =====================================================
@@ -263,7 +263,7 @@ ${signature ?
 
 Rédige maintenant cette communication en respectant scrupuleusement ces instructions.`;
 
-      tokenLimit = aiConfig.model === 'gpt-5-mini' ? 4000 : 2000;
+      tokenLimit = aiConfig.reasoning ? 4000 : 2000;
       apiErrorMessage = 'Erreur lors de la génération de la communication. Veuillez réessayer.';
     }
 

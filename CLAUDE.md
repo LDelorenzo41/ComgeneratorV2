@@ -70,6 +70,22 @@ coût d'exploitation et la charge de maintenance.
   une vérification synchrone sur `VITE_ADMIN_EMAILS`.
 - **`console.log` dans les Edge Functions** : ne jamais journaliser le contenu
   généré, il contient des noms d'élèves.
+- **Les noms des modèles IA sont écrits en dur** : `resolveAIConfig()` existe en
+  6 copies (`_shared/ai.ts` + `generate`, `synthesis`, `scenario`, `exercises`,
+  `lessons`) ; un modèle s'ajoute ou se change dans les 6. Ses particularités se
+  déclarent dans sa configuration (`tokenParamName`, `supportsTemperature`,
+  `reasoning` pour un plafond de tokens plus haut, `reasoningEffort`,
+  `followsPromptLiterally` dans `generate`, `reinforceCharLimit` dans `synthesis`),
+  jamais en comparant
+  `aiConfig.model` à un nom : une comparaison se désactive sans erreur au
+  changement de modèle. Il en reste sur `'gpt-4.1-mini'` (`exercises`) et
+  `'mistral-medium-latest'` (code mort). Les fournisseurs retirent leurs modèles
+  avec 3 à 6 mois de préavis : échéances dans `docs/CONTEXTE-STRATEGIE.md`, § 6.
+  Un modèle récent applique le prompt à la lettre : un prompt se revalide au banc
+  d'essai avant toute bascule (précédent : GPT-6 Luna recopiait une phrase imposée
+  par le prompt des appréciations, 08/11/2026). Appréciations et synthèses tournent
+  sur GPT-6 Luna par défaut (constante `DEFAUT_LUNA` de `generate` et `synthesis` :
+  `false` pour revenir à gpt-4o-mini, possible jusqu'au 13/01/2027).
 - **L'aide intégrée décrit l'interface au libellé près** : chaque page fonctionnelle
   a son tutoriel dans `src/help/tutorials/` (registre et publication :
   `src/help/topics.ts`). Renommer un bouton, retirer un champ ou changer un coût
@@ -83,6 +99,8 @@ cd comgeneratorV2
 npm ci          # les dépendances ne sont pas installées par défaut
 npm run build   # seule validation disponible ; doit passer avant tout commit
 npm run dev
+node scripts/tester-modele.mjs gpt-6-luna   # un modèle OpenAI accepte-t-il les appels de ProfAssist ? (clé demandée, jamais enregistrée)
+node scripts/banc-appreciations.mjs         # prompt des appréciations : version déployée vs copie de travail, appels réels (OPENAI_API_KEY)
 ```
 
 ## Automatismes en place

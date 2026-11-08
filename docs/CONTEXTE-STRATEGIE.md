@@ -107,10 +107,15 @@ la stratégie : il supprime le seul coût qui croît avec l'usage.
 
 **Faisabilité exceptionnelle** : l'architecture s'y prêtait déjà sans le savoir.
 - Un point de passage client unique : `secureApi.makeRequest()` (9 fonctions IA).
-- Un point de passage serveur unique : `resolveAIConfig()`, qui résout endpoint,
-  en-tête d'authentification et modèle.
+- Un point de passage serveur : `resolveAIConfig()`, qui résout endpoint,
+  en-tête d'authentification et modèle. **Correction du 03/11/2026** : la fonction
+  existe en 6 copies (`_shared/ai.ts`, partagée par les 4 fonctions de
+  communication, et 5 copies locales dans `generate`, `synthesis`, `scenario`,
+  `exercises`, `lessons`) ; elle est à unifier dans `_shared/` avant le BYOK.
 - Un sélecteur de modèle utilisateur **déjà en production** (`aiModelConfig.ts`,
-  paramètre `aiModel`), qui a validé le circuit de bout en bout.
+  paramètre `aiModel`), qui a validé le circuit de bout en bout. Carte masquée le
+  08/11/2026 (le serveur choisit le modèle outil par outil) : le circuit `aiModel`
+  reste en place pour un choix de modèle en BYOK.
 
 Le BYOK est donc un changement de configuration par requête, pas une refonte.
 Les prompts — le véritable actif produit — restent côté serveur.
@@ -229,6 +234,8 @@ semaines de chantier. Mesurer avant de concevoir.
 |---|---|
 | août – mi-sept. 2026 | Rentrée. Fenêtre de gel : rien de risqué. Export et sauvegarde livrés. Chat/RAG en admin-only. |
 | mi-sept. – déc. 2026 | Lot 0 (hygiène et sécurité, § 7), puis socle BYOK — livré en continu, invisible derrière un drapeau. |
+| **11 décembre 2026** | **Retrait de `gpt-5-mini` par OpenAI** (avis du 11/06/2026, remplaçant officiel `gpt-5.6-terra`). Concerne l'option « GPT-5 mini » des Paramètres : 2 opérations du 13/08 au 01/11, toutes de test. Option retirée avec la carte « Modèle IA » des Paramètres (code du 08/11/2026) : le serveur choisit le modèle outil par outil, et un choix mémorisé (GPT-5 mini, Mistral) retombe sur le modèle standard. |
+| **14 janvier 2027** | **Retrait de `gpt-4o-mini` et `gpt-4.1-mini` par OpenAI** (avis du 14/10/2026, remplaçant officiel `gpt-6-luna`). Ce sont les modèles par défaut : 100 % de l'usage réel (appréciations et synthèses sur `gpt-4o-mini`, tout le reste sur `gpt-4.1-mini`). Sans bascule avant cette date, toutes les générations échouent. Bascule après tests (paramètres, format de réponse, tokens, qualité), hors conseils de classe ; l'ancien modèle reste disponible jusqu'au 13/01 pour un retour arrière. Dates vérifiées sur la page officielle d'OpenAI le 03/11/2026. **Test du 08/11/2026** (`scripts/tester-modele.mjs`) : Luna refuse `max_tokens` (il faut `max_completion_tokens`) et reçoit sans `temperature` ; textes plus fidèles aux consignes (appréciation : 271 caractères pour 400 demandés, 146 tokens contre 181 pour `gpt-4o-mini`) ; génération longue 2,5 fois plus de tokens (3 291 contre 1 331) et 4 fois plus lente (32 s contre 7,6 s) que `gpt-4.1-mini`, ce qui fera consommer davantage de crédits aux scénarios : à mesurer en usage réel, puis à trancher avant la bascule. Luna essayé en conditions réelles depuis le site lancé en local (option jamais publiée, retirée avec la carte « Modèle IA »). **Premier essai réel (08/11)** : appréciations décevantes, Luna recopiant une phrase de repli imposée par notre prompt (« Aucun critère ne permet d'expliquer clairement ce niveau. »), contradictoire avec la consigne de relier résultats et critères. Prompt corrigé pour Luna seulement et raisonnement désactivé, validés au banc d'essai (`scripts/banc-appreciations.mjs`, 8 cas × 2) : aucune alerte, plus fidèle aux critères que `gpt-4o-mini` (qui invente des causes et se trompe parfois de niveau), 1,7 s, +3,5 % de tokens. Complété le même jour, toujours pour Luna : observations personnelles du professeur reconnues comme des faits (le modèle actuel en omet une partie, la règle anti-invention citant justement « révisions » comme interdite), et importance des critères rendue effective (« Crucial » ne changeait rien au texte ; un critère crucial est désormais nommé clairement et placé au centre). **Bascule décidée le 08/11/2026** pour les deux outils des conseils de classe, validés au banc d'essai : appréciations, puis synthèses deux à trois jours plus tard, sur Luna par défaut (constante `DEFAUT_LUNA`, retour arrière en une ligne jusqu'au 13/01). Synthèses : raisonnement désactivé et consigne de longueur renforcée (dépassement de la limite dans 2 cas sur 18, contre 8 sur 12 avec `gpt-4o-mini`). **Séances, exercices, scénarios et communications restent sur les anciens modèles : à valider au banc d'essai, puis basculer pendant les vacances de Noël.** |
 | janvier 2027 | Ouverture du BYOK à tous, **en option** à côté des crédits. Annonce publique de la trajectoire. |
 | février 2027 | Observation, accompagnement, aucune contrainte imposée. |
 | **1ᵉʳ mars 2027** | **Arrêt de la vente de packs** (annoncé dès janvier). Le remplaçant existe et est éprouvé. |

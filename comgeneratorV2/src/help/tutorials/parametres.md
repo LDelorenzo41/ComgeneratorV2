@@ -1,15 +1,4 @@
-Gérez votre compte : modèle d'IA, newsletter, sauvegarde de votre travail et suppression du compte.
-
-## Modèle IA
-
-Choisissez le modèle utilisé pour toutes vos générations :
-
-- **GPT-4.1 mini (standard)** : le choix recommandé, réglé par défaut. Les consignes de ProfAssist sont optimisées pour lui.
-- **GPT-5 mini** : modèle OpenAI de dernière génération.
-
-Le choix s'applique dès le clic, sans bouton à valider, pour vos prochaines générations.
-
-> 💡 Ce choix est mémorisé dans ce navigateur seulement. Sur un autre ordinateur, ou après avoir effacé les données du navigateur, choisissez à nouveau.
+Gérez votre compte : newsletter, sauvegarde de votre travail et suppression du compte.
 
 ## Newsletter
 
@@ -54,8 +43,8 @@ Certains réglages se trouvent ailleurs :
 
 ## Questions fréquentes
 
-**Quel modèle choisir ?**
-Gardez le modèle standard, sauf si vous voulez essayer un autre style de rédaction.
+**Où choisir le modèle d'IA ?**
+Nulle part : ProfAssist utilise pour chaque outil le modèle qui lui convient le mieux. Il n'y a rien à régler.
 
 **« Votre Banque est encore vide »**
 Vous n'avez encore rien enregistré dans vos banques : il n'y a rien à exporter.
