@@ -2,24 +2,21 @@
 // Configuration centralisée pour le choix du modèle IA utilisateur
 
 /**
- * Types de modèles disponibles pour l'utilisateur
- * - "default" : utilise les modèles actuels (gpt-4o-mini / gpt-4.1-mini)
- * - "gpt-6-luna" : utilise GPT-6 Luna d'OpenAI, futur modèle par défaut
+ * Choix du modèle IA par l'utilisateur — masqué depuis le 08/11/2026.
  *
- * L'option "gpt-5-mini" a été remplacée le 08/11/2026 par "gpt-6-luna" :
- * OpenAI retire gpt-5-mini le 11/12/2026, et l'option n'avait servi qu'à des
- * essais. Un choix "gpt-5-mini" resté dans un navigateur retombe sur
- * "default" ; Luna remplacera gpt-4o-mini et gpt-4.1-mini, retirés le
- * 14/01/2027 (docs/CONTEXTE-STRATEGIE.md, § 6).
+ * Le serveur choisit le modèle outil par outil : GPT-6 Luna pour les
+ * appréciations et les synthèses (constante DEFAUT_LUNA des Edge Functions),
+ * les anciens modèles pour les autres outils jusqu'à leur bascule
+ * (docs/CONTEXTE-STRATEGIE.md, § 6). La carte « Modèle IA » des Paramètres est
+ * donc masquée et seul "default" reste valide : un choix mémorisé dans un
+ * navigateur ("gpt-5-mini", retiré par OpenAI le 11/12/2026 ; "mistral-medium",
+ * retiré du front le 01/11/2026) n'est plus reconnu, getAIModelChoice() renvoie
+ * "default" et secureApi n'envoie plus aucun modèle.
  *
- * L'option "mistral-medium" a été retirée le 01/11/2026 : Mistral retire
- * Mistral Medium 3.5 le 30/04/2027, et l'option n'avait aucun utilisateur
- * réel (mesure credit_ledger). Un choix "mistral-medium" resté dans un
- * navigateur n'est plus reconnu par isValidModelChoice : getAIModelChoice()
- * renvoie alors "default". Les Edge Functions gardent leur branche Mistral,
- * inutilisée, jusqu'à son nettoyage.
+ * Le circuit (aiModel transmis par secureApi, résolu par resolveAIConfig côté
+ * serveur) reste en place pour un éventuel choix de modèle en BYOK.
  */
-export type AIModelChoice = "default" | "gpt-6-luna";
+export type AIModelChoice = "default";
 
 /**
  * Clé de stockage localStorage
@@ -27,7 +24,7 @@ export type AIModelChoice = "default" | "gpt-6-luna";
 const STORAGE_KEY = "profassist_ai_model_choice";
 
 /**
- * Options affichées dans le sélecteur
+ * Options du sélecteur (carte masquée dans les Paramètres)
  */
 export const AI_MODEL_OPTIONS: Array<{
   value: AIModelChoice;
@@ -36,13 +33,8 @@ export const AI_MODEL_OPTIONS: Array<{
 }> = [
   {
     value: "default",
-    label: "GPT-4.1 mini (standard)",
-    description: "Recommandé — Prompts optimisés pour ce modèle, meilleur rapport qualité/coût"
-  },
-  {
-    value: "gpt-6-luna",
-    label: "GPT-6 Luna",
-    description: "Nouveau modèle OpenAI — futur modèle standard, à essayer dès maintenant"
+    label: "Modèle standard",
+    description: "Le modèle choisi par ProfAssist pour chaque outil"
   }
 ];
 
@@ -79,5 +71,5 @@ export function setAIModelChoice(choice: AIModelChoice): void {
  * Vérifie si une valeur est un choix de modèle valide
  */
 function isValidModelChoice(value: string): value is AIModelChoice {
-  return ["default", "gpt-6-luna"].includes(value);
+  return ["default"].includes(value);
 }

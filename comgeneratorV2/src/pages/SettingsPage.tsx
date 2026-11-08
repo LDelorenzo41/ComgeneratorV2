@@ -7,6 +7,11 @@ import { supabase } from '../lib/supabase';
 import { AIModelChoice, AI_MODEL_OPTIONS, getAIModelChoice, setAIModelChoice } from '../lib/aiModelConfig';
 import { buildBankExport, downloadBankExport, describeBankExport, totalBankItems } from '../lib/bankExport';
 
+// Carte « Modèle IA » masquée depuis le 08/11/2026 : le serveur choisit le modèle
+// outil par outil (voir src/lib/aiModelConfig.ts). Code conservé pour un éventuel
+// choix de modèle en BYOK : passer à true pour réafficher la carte.
+const AFFICHER_CHOIX_MODELE: boolean = false;
+
 export function SettingsPage() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -228,8 +233,8 @@ export function SettingsPage() {
             </div>
           </div>
 
-          {true && (
-          /* Choix du modèle IA - DÉSACTIVÉ */
+          {AFFICHER_CHOIX_MODELE && (
+          /* Choix du modèle IA : masqué, voir AFFICHER_CHOIX_MODELE */
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
             <div className="flex items-center mb-6">
               <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center mr-4">
