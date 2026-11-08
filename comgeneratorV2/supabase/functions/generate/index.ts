@@ -72,7 +72,13 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
       tokenParamName: 'max_completion_tokens',
       supportsTemperature: false,
       isResponsesAPI: false,
-      reasoning: true
+      reasoning: true,
+      // Applique le prompt à la lettre : generate lui donne une règle anti-invention
+      // sans phrase imposée, et une règle de style (voir regleAntiHallucinations).
+      followsPromptLiterally: true,
+      // Raisonnement désactivé pour les appréciations (banc d'essai du 08/11/2026) :
+      // même qualité, 1 à 2 s au lieu de 7 à 26 s, tokens comparables au modèle actuel.
+      reasoningEffort: 'none'
     };
   }
 
@@ -590,15 +596,33 @@ Version détaillée :
       tokenLimit = Math.floor(params.maxLength * 2.5);
     }
 
-    // ✅ System prompt pour les modèles Chat
-    const systemPrompt = `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
-
-⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
+    // Règle anti-invention du prompt système. La version historique impose une
+    // phrase de repli (« Aucun critère ne permet d'expliquer clairement ce
+    // niveau. ») et interdit tout lien absent des critères, ce qui contredit le
+    // CAS 1 du prompt. GPT-6 Luna, qui applique le prompt à la lettre, recopiait
+    // cette phrase dans chaque appréciation (banc d'essai du 08/11/2026). Les
+    // modèles marqués followsPromptLiterally reçoivent une version corrigée et une
+    // règle de style ; les autres gardent le texte historique au caractère près.
+    const regleAntiHallucinations = aiConfig.followsPromptLiterally
+      ? `⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
+Tu dois rester STRICTEMENT FACTUEL : n'invoque JAMAIS une cause absente des critères évalués (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.), sauf si ces termes apparaissent EXACTEMENT dans les critères. Tes conseils portent eux aussi sur les critères évalués.
+Relier les résultats à un critère actionnable évalué (application des consignes, investissement, attitude, participation…) n'est PAS une invention : c'est ce qui est attendu (CAS 1). Appuie-toi sur ces critères pour expliquer les résultats, en positif comme en négatif.
+Si aucun critère actionnable évalué n'éclaire les résultats, rapproche simplement les constats avec un connecteur (« malgré », « alors que », « bien que »), comme dans le CAS 2.
+N'écris JAMAIS qu'aucun critère n'explique le niveau, ni aucune remarque sur la grille d'évaluation : l'appréciation s'adresse à l'élève et à sa famille.`
+      : `⚠️ RÈGLE ANTI-HALLUCINATIONS (PRIORITÉ ABSOLUE) :
 Tu dois rester STRICTEMENT FACTUEL. 
 Tu NE DOIS JAMAIS inventer une cause, une explication, un raisonnement ou un lien qui n'est PAS explicitement présent dans les critères évalués.
 Si aucun lien causal évident n'existe entre les critères évalués, tu dois écrire : 
 "Aucun critère ne permet d'expliquer clairement ce niveau." 
-Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.
+Tu n'as PAS le droit d'ajouter des interprétations externes (révisions, compréhension, méthode de travail, fondamentaux, apprentissage, etc.) sauf si ces termes apparaissent EXACTEMENT dans les critères.`;
+    const regleStyle = aiConfig.followsPromptLiterally
+      ? `\n\nRÈGLE #6 - STYLE : écris comme un enseignant, en un texte fluide et cohérent : enchaîne les constats avec des connecteurs logiques (car, ce qui, ainsi, cependant, grâce à). Une appréciation n'est pas une liste de critères suivis de leur niveau.`
+      : '';
+
+    // ✅ System prompt pour les modèles Chat
+    const systemPrompt = `Tu es un professeur expérimenté qui rédige des appréciations pour les bulletins scolaires.
+
+${regleAntiHallucinations}
 
 ⚠️ RÈGLE ABSOLUE #1 - MODE D'ADRESSE :
 ${getSystemAddressModeMessage(params.addressMode)}
@@ -609,7 +633,7 @@ RÈGLE #3 : Tu dois IMPÉRATIVEMENT respecter les limites de caractères imposé
 
 RÈGLE #4 CRITIQUE : Les critères liés aux RÉSULTATS/NOTES/PERFORMANCES sont des CONSÉQUENCES. Tu dois faire des liens causaux UNIQUEMENT avec les critères actionnables effectivement évalués. N'INVENTE JAMAIS de causes (révisions, compréhension, etc.) qui ne sont pas dans les critères évalués.
 
-RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").`;
+RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation en adjectif AVANT le nom : "un assez BON niveau" (PAS "un niveau assez bien"), "de BONS résultats" (PAS "des résultats bien").${regleStyle}`;
 
     // ✅ Construction du body selon le type d'API
     let requestBody;
@@ -640,6 +664,7 @@ RÈGLE #5 GRAMMATICALE : Pour niveau/résultats/notes, transforme l'évaluation 
           { role: 'user', content: prompt }
         ],
         ...(aiConfig.supportsTemperature && { temperature: 0.2 }),
+        ...(aiConfig.reasoningEffort && { reasoning_effort: aiConfig.reasoningEffort }),
         [aiConfig.tokenParamName]: tokenLimit
       };
     }
