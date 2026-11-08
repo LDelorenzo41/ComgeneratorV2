@@ -75,14 +75,17 @@ coût d'exploitation et la charge de maintenance.
   `lessons`) ; un modèle s'ajoute ou se change dans les 6. Ses particularités se
   déclarent dans sa configuration (`tokenParamName`, `supportsTemperature`,
   `reasoning` pour un plafond de tokens plus haut, `reasoningEffort`,
-  `followsPromptLiterally` dans `generate`), jamais en comparant
+  `followsPromptLiterally` dans `generate`, `reinforceCharLimit` dans `synthesis`),
+  jamais en comparant
   `aiConfig.model` à un nom : une comparaison se désactive sans erreur au
   changement de modèle. Il en reste sur `'gpt-4.1-mini'` (`exercises`) et
   `'mistral-medium-latest'` (code mort). Les fournisseurs retirent leurs modèles
   avec 3 à 6 mois de préavis : échéances dans `docs/CONTEXTE-STRATEGIE.md`, § 6.
   Un modèle récent applique le prompt à la lettre : un prompt se revalide au banc
   d'essai avant toute bascule (précédent : GPT-6 Luna recopiait une phrase imposée
-  par le prompt des appréciations, 08/11/2026).
+  par le prompt des appréciations, 08/11/2026). Appréciations et synthèses tournent
+  sur GPT-6 Luna par défaut (constante `DEFAUT_LUNA` de `generate` et `synthesis` :
+  `false` pour revenir à gpt-4o-mini, possible jusqu'au 13/01/2027).
 - **L'aide intégrée décrit l'interface au libellé près** : chaque page fonctionnelle
   a son tutoriel dans `src/help/tutorials/` (registre et publication :
   `src/help/topics.ts`). Renommer un bouton, retirer un champ ou changer un coût
