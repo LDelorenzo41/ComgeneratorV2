@@ -13,6 +13,12 @@ import { getBalance, consumeCredits, countRecentDebits } from '../_shared/credit
 // Plafond de générations par utilisateur et par minute (compté sur credit_ledger)
 const RATE_LIMIT_PER_MINUTE = 10;
 
+// Modèle par défaut des appréciations : GPT-6 Luna depuis le 08/11/2026
+// (gpt-4o-mini est retiré par OpenAI le 14/01/2027). Luna, avec le prompt
+// corrigé, a été validé au banc d'essai (scripts/banc-appreciations.mjs).
+// Retour arrière possible jusqu'au 13/01/2027 : passer à false, redéployer.
+const DEFAUT_LUNA = true;
+
 // =====================================================
 // CONFIGURATION DES MODÈLES IA
 // =====================================================
@@ -25,8 +31,9 @@ const RATE_LIMIT_PER_MINUTE = 10;
  * @returns {{ endpoint: string, headers: object, model: string, tokenParamName: string, supportsTemperature: boolean, isResponsesAPI: boolean }}
  */
 function resolveAIConfig(aiModel, openaiKey, mistralKey) {
-  // Modèle par défaut : gpt-4o-mini (comportement actuel inchangé)
+  // Modèle par défaut : GPT-6 Luna (DEFAUT_LUNA), sinon gpt-4o-mini (comportement historique)
   if (!aiModel || aiModel === 'default') {
+    if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
     return {
       endpoint: 'https://api.openai.com/v1/chat/completions',
       headers: {
@@ -103,6 +110,7 @@ function resolveAIConfig(aiModel, openaiKey, mistralKey) {
 
   // Fallback : modèle par défaut si choix non reconnu
   console.warn(`Modèle non reconnu: ${aiModel}, utilisation du modèle par défaut`);
+  if (DEFAUT_LUNA) return resolveAIConfig('gpt-6-luna', openaiKey, mistralKey);
   return {
     endpoint: 'https://api.openai.com/v1/chat/completions',
     headers: {
