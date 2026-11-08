@@ -13,6 +13,8 @@
 //   (« déployé ») et prompt de la copie de travail (« modifié »).
 // - Clé OpenAI : variable OPENAI_API_KEY. Dans une session Claude Code cloud,
 //   la clé est injectée par le proxy : lancer avec NODE_USE_ENV_PROXY=1, sans clé.
+// - Chaque cas peut lister des « attendus » (expressions régulières) que le
+//   texte doit contenir : notes du professeur reprises, critère crucial nommé…
 // - Cas fictifs, sans donnée d'élève réelle. Rapport écrit dans le dossier
 //   temporaire du système (chemin affiché à la fin), hors du dépôt.
 // Coût : quelques centimes par passage.
@@ -90,6 +92,7 @@ function alertes(cas, res) {
   if (cas.addressMode === 'tutoiement' && /\b(vous|votre|vos|l'élève)\b/i.test(d)) a.push('mode d\'adresse non respecté');
   if (cas.addressMode === 'vouvoiement' && /\b(tu|ton|ta|tes|l'élève|il|elle)\b/i.test(d)) a.push('mode d\'adresse non respecté');
   if (cas.hideStudentName && new RegExp(`\\b${cas.studentName}\\b`, 'i').test(d + s)) a.push('prénom présent malgré l\'anonymat');
+  for (const motif of cas.attendus || []) if (!new RegExp(motif, 'i').test(d + s)) a.push(`attendu absent : ${motif}`);
   return a;
 }
 

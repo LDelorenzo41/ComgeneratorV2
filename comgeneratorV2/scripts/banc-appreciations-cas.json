@@ -227,5 +227,174 @@
         "importance": 1
       }
     ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "titre": "N1 — notes : faits absents des critères",
+    "subject": "EPS",
+    "studentName": "Hugo",
+    "personalNotes": "Absent à plusieurs séances en novembre. Très bon esprit d'équipe pendant le cycle de handball.",
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 4,
+        "importance": 2
+      },
+      {
+        "name": "Attitude",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Investissement",
+        "value": 5,
+        "importance": 1
+      }
+    ],
+    "attendus": [
+      "absen",
+      "esprit d.équipe|handball"
+    ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "titre": "N2 — notes : cause absente des critères",
+    "subject": "Mathématiques",
+    "studentName": "Léa",
+    "personalNotes": "Ne révise pas ses leçons avant les contrôles ; le travail à la maison est rarement fait.",
+    "criteria": [
+      {
+        "name": "Résultats aux évaluations",
+        "value": 2,
+        "importance": 2
+      },
+      {
+        "name": "Participation orale",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Attitude",
+        "value": 6,
+        "importance": 1
+      }
+    ],
+    "attendus": [
+      "révis",
+      "maison"
+    ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "titre": "I1 — comportement insuffisant, importance CRUCIAL",
+    "subject": "Français",
+    "studentName": "Adam",
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Comportement",
+        "value": 2,
+        "importance": 3
+      },
+      {
+        "name": "Participation orale",
+        "value": 6,
+        "importance": 1
+      }
+    ],
+    "attendus": [
+      "insuffisant"
+    ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "titre": "I2 — même cas, comportement d'importance NORMALE",
+    "subject": "Français",
+    "studentName": "Adam",
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 5,
+        "importance": 1
+      },
+      {
+        "name": "Comportement",
+        "value": 2,
+        "importance": 1
+      },
+      {
+        "name": "Participation orale",
+        "value": 6,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "subject": "Musique",
+    "studentName": "Jade",
+    "titre": "I3 — point fort CRUCIAL (pratique instrumentale excellente)",
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 3,
+        "importance": 1
+      },
+      {
+        "name": "Pratique instrumentale",
+        "value": 7,
+        "importance": 3
+      },
+      {
+        "name": "Travail personnel",
+        "value": 4,
+        "importance": 1
+      }
+    ]
+  },
+  {
+    "addressMode": "impersonnel",
+    "tone": "normal",
+    "minLength": 150,
+    "maxLength": 300,
+    "subject": "Musique",
+    "studentName": "Jade",
+    "titre": "I4 — même cas, point fort d'importance NORMALE",
+    "criteria": [
+      {
+        "name": "Résultats",
+        "value": 3,
+        "importance": 1
+      },
+      {
+        "name": "Pratique instrumentale",
+        "value": 7,
+        "importance": 1
+      },
+      {
+        "name": "Travail personnel",
+        "value": 4,
+        "importance": 1
+      }
+    ]
   }
 ]
